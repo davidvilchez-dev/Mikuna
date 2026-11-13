@@ -1,0 +1,109 @@
+name: Mikuna frontend
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mikuna-frontend-${{ github.ref }}
+  queue: max
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Node 24.14.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.14.0'
+          package-manager-cache: false
+      - name: pnpm 12.4.2
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: '12.4.2'
+          package_json_file: frontend/package.json
+          run_install: false
+          cache: false
+      - name: Install from lock
+        run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm lint
+      - name: Check browser-test types
+        run: pnpm typecheck:e2e
+      - name: Build
+        run: pnpm build
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Browser acceptance tests
+        run: pnpm test:e2e
+      - name: Validation evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: frontend-evidence-${{ github.sha }}
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Tested deployment artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mikuna-frontend-${{ github.sha }}
+          path: frontend/dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  deploy:
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      MIKUNA_SITE_BUCKET: ${{ vars.MIKUNA_SITE_BUCKET }}
+      MIKUNA_CLOUDFRONT_DISTRIBUTION_ID: ${{ vars.MIKUNA_CLOUDFRONT_DISTRIBUTION_ID }}
+      MIKUNA_PUBLIC_URL: ${{ vars.MIKUNA_PUBLIC_URL }}
+    steps:
+      - name: Checkout validation scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Node 24.14.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.14.0'
+          package-manager-cache: false
+      - name: Validate required destination
+        run: node frontend/scripts/validate-deployment.mjs
+      - name: Download the tested artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: mikuna-frontend-${{ github.sha }}
+          path: site
+          digest-mismatch: error
+      - name: Temporary AWS credentials
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Publish the same static artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws s3 sync site/ "s3://$MIKUNA_SITE_BUCKET/" --exclude 'index.html' --cache-control 'public,max-age=31536000,immutable' --only-show-errors --no-follow-symlinks
+          aws s3 cp site/index.html "s3://$MIKUNA_SITE_BUCKET/index.html" --cache-control 'no-cache' --content-type 'text/html' --only-show-errors
+          invalidation_id="$(aws cloudfront create-invalidation --distribution-id "$MIKUNA_CLOUDFRONT_DISTRIBUTION_ID" --paths '/*' --query 'Invalidation.Id' --output text)"
+          aws cloudfront wait invalidation-completed --distribution-id "$MIKUNA_CLOUDFRONT_DISTRIBUTION_ID" --id "$invalidation_id"
+      - name: Verify public HTTPS delivery
+        run: node frontend/scripts/verify-deployment.mjs

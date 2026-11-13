@@ -1,0 +1,72 @@
+﻿[
+    {
+        "file":  "restaurant-chef.png",
+        "original":  "Chef peruana cierra un pedido-1.png",
+        "width":  1672,
+        "height":  941,
+        "sha256":  "42DAAB9F55AFA81C7703BE231F9888B45812755678F642CADEE522CA10C4D251"
+    },
+    {
+        "file":  "courier.png",
+        "original":  "Repartidor Mikuna junto a su scooter-2.png",
+        "width":  1672,
+        "height":  941,
+        "sha256":  "F759F161FBCCDA78905B5A02527D6DD1BE9A587760F007DE067972B16FA2B912"
+    },
+    {
+        "file":  "customer.png",
+        "original":  "Mujer sonriente abre bolsa Mikuna en casa-3.png",
+        "width":  1672,
+        "height":  941,
+        "sha256":  "B8240416406E2FFB953E2BB4B8CAC4D93E26B290968DE2713E65A659F9C9326F"
+    },
+    {
+        "file":  "restaurant-pizza.png",
+        "original":  "Pizza artesanal de pepperoni con queso derretido-4.png",
+        "width":  1672,
+        "height":  941,
+        "sha256":  "B47FD6AA5D0CF808E924D9A2DCDFA38E5EAC88607A365A05E789FE7A8F714442"
+    },
+    {
+        "file":  "restaurant-chicken.png",
+        "original":  "Pollo a la brasa, papas y ensalada-5.png",
+        "width":  1672,
+        "height":  941,
+        "sha256":  "3E23B10A6357267A15477B8A6CEBA658F81CDFC90981D54351E58DBC07A67EA6"
+    },
+    {
+        "file":  "restaurant-ceviche.png",
+        "original":  "Ceviche peruano con camote y maíz-6.png",
+        "width":  1672,
+        "height":  941,
+        "sha256":  "F46D40AD6636236070BC5E04EE43F179A62F6878C2CB3EE579B513874D6EF2A5"
+    },
+    {
+        "file":  "restaurant-stew.png",
+        "original":  "Carne dorada con papas, arroz y hierbas-7.png",
+        "width":  1672,
+        "height":  941,
+        "sha256":  "FD65135EFCB3834322E50D8A377031E022F75022409696EA05EFE9E0F7061B50"
+    },
+    {
+        "file":  "restaurant-cafe.png",
+        "original":  "Causa peruana y café en mesa rústica-8.png",
+        "width":  1672,
+        "height":  941,
+        "sha256":  "1B4F223F7182AEA6F908D06A68B8A380EB6ECC63D91365BAFFD21A6D566E7838"
+    },
+    {
+        "file":  "restaurant-ribs.png",
+        "original":  "Costillas glaseadas con puré y ensalada fresca-9.png",
+        "width":  1672,
+        "height":  941,
+        "sha256":  "F9E3E14F627A3941C1061F51931BF5C850F3EAA407FBBE51A1DEEF3A3622B4EF"
+    },
+    {
+        "file":  "restaurant-ribs-alternative.png",
+        "original":  "Costillas glaseadas con puré y ensalada-10.png",
+        "width":  1672,
+        "height":  941,
+        "sha256":  "1CB17969CC78BD8BCB74424608F6D86AF456461D34BE6181DD74D80BD862B929"
+    }
+]

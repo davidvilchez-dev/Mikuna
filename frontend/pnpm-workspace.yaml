@@ -1,0 +1,8 @@
+packages:
+  - '.'
+
+# The installed pnpm and CI action provide the pinned package-manager runtime.
+pmOnFail: ignore
+
+# Run installed tools without an implicit install; explicit installs retain policy checks.
+verifyDepsBeforeRun: warn
