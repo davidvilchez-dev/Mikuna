@@ -15,7 +15,8 @@ logs/
 !.env.example
 Thumbs.db
 .DS_Store
-.Propuesta_de_Proyecto.docx
+/Propuesta_de_Proyecto.docx
+/Resultado.png
 # Local tooling and IDE metadata
 .idea/
 .classpath
