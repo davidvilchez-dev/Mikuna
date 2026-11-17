@@ -31,10 +31,10 @@ export function HomePage() {
         </section>
         <section id="sobre-nosotros" className="screen-panel about-panel" aria-labelledby="about-title" tabIndex={-1}><AboutSection /></section>
         <section id="como-funciona" className="screen-panel info-panel how-panel" aria-labelledby="public-title-customer" tabIndex={-1}><HowItWorksPage onComingSoon={notice.show} /></section>
-        <section id="para-restaurantes" className="screen-panel info-panel partners-panel" aria-labelledby="public-title-restaurant" tabIndex={-1}><ForRestaurantsPage onComingSoon={notice.show} /></section>
-        <section id="se-repartidor" className="screen-panel info-panel courier-panel" aria-labelledby="public-title-courier" tabIndex={-1}><CourierPage onComingSoon={notice.show} /></section>
+        <section id="para-restaurantes" className="screen-panel info-panel partners-panel" aria-labelledby="public-title-restaurant" tabIndex={-1}><ForRestaurantsPage /></section>
+        <section id="se-repartidor" className="screen-panel info-panel courier-panel" aria-labelledby="public-title-courier" tabIndex={-1}><CourierPage /></section>
       </main>
-      <SiteFooter onComingSoon={notice.show} />
+      <SiteFooter />
       <ComingSoonNotice
         visible={notice.visible}
         revision={notice.revision}

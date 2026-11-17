@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router'
+import { hasActiveSession } from '../../auth/session-storage'
 import { homeAssets } from '../home-assets'
 import { headerAction, navigation } from '../home-content'
 import type { MenuToggleRef, ShowComingSoon } from '../home-types'
@@ -80,6 +82,9 @@ export function SiteHeader({ activePage, menuToggleRef, onComingSoon }: SiteHead
                 <span data-keep-clear>{item.label}</span>
               </a>
             ))}
+          {hasActiveSession()
+            ? <Link to="/mi-cuenta" className="nav-link" onClick={followSection}><span data-keep-clear>Mi cuenta</span></Link>
+            : <Link to="/iniciar-sesion" className="nav-link" onClick={followSection}><span data-keep-clear>Iniciar sesión</span></Link>}
           <button type="button" className="header-order bg-mikuna-orange text-mikuna-white" data-action={headerAction.id} onClick={(event) => { onComingSoon(event.currentTarget); followSection() }}>
             <span data-keep-clear>{headerAction.label}</span>
           </button>

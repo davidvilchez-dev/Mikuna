@@ -1,15 +1,15 @@
-import type { ShowComingSoon } from '../home/home-types'
+import { Link } from 'react-router'
 import { courierFeatures, publicPhotos } from './public-content'
 import { PublicHero } from './components/PublicHero'
 import { FeatureSection } from './components/FeatureSection'
 import { PublicIcon } from './components/PublicIcon'
 
-export function CourierPage({ onComingSoon }: { onComingSoon: ShowComingSoon }) {
+export function CourierPage() {
   return (
     <>
       <PublicHero variant="courier" title={<>Tu próxima entrega <span>empieza aquí.</span></>} description="Conecta con pedidos de tu ciudad y gestiona tus entregas con Mikuna." photo={publicPhotos.courier}>
-        <button className="public-button" type="button" onClick={(event) => onComingSoon(event.currentTarget)}>Quiero ser repartidor</button>
-        <button className="public-text-button" type="button" onClick={(event) => onComingSoon(event.currentTarget)}>Ya tengo cuenta</button>
+        <Link className="public-button" to="/registro?tipo=repartidor">Quiero ser repartidor</Link>
+        <Link className="public-text-button" to="/iniciar-sesion">Ya tengo cuenta</Link>
       </PublicHero>
       <FeatureSection title="Tus entregas, en un solo lugar" items={courierFeatures} variant="courier" />
       <section className="public-shell courier-cta" aria-labelledby="courier-cta-title">
@@ -25,7 +25,7 @@ export function CourierPage({ onComingSoon }: { onComingSoon: ShowComingSoon }) 
           <span className="public-eyebrow">CADA ENTREGA CONECTA</span>
           <h3 id="courier-cta-title">Tu ciudad. Tu recorrido.<br /><span>Reparte con Mikuna.</span></h3>
           <p>Acerca las cocinas de Ayacucho a quienes las disfrutan.</p>
-          <button className="courier-join" type="button" onClick={(event) => onComingSoon(event.currentTarget)}>Quiero sumarme</button>
+          <Link className="courier-join" to="/registro?tipo=repartidor">Quiero sumarme</Link>
         </div>
       </section>
     </>

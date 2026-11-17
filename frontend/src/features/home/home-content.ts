@@ -19,7 +19,7 @@ export const headerAction: ActionItem = {
 
 export const heroActions: readonly ActionItem[] = [
   { id: 'empezar-a-pedir', label: 'Empezar a pedir', order: 1, behavior: 'coming-soon', appearance: 'primary' },
-  { id: 'crear-cuenta', label: 'Crear cuenta', order: 2, behavior: 'coming-soon', appearance: 'secondary' },
+  { id: 'crear-cuenta', label: 'Crear cuenta', order: 2, behavior: 'route', to: '/registro', appearance: 'secondary' },
 ]
 
 export const categories: readonly CategoryItem[] = [

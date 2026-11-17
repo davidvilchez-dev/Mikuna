@@ -1,14 +1,14 @@
-import type { ShowComingSoon } from '../home/home-types'
+import { Link } from 'react-router'
 import { restaurantFeatures, publicPhotos } from './public-content'
 import { PublicHero } from './components/PublicHero'
 import { FeatureSection } from './components/FeatureSection'
 
-export function ForRestaurantsPage({ onComingSoon }: { onComingSoon: ShowComingSoon }) {
+export function ForRestaurantsPage() {
   return (
     <>
       <PublicHero variant="restaurant" title={<>Tu cocina, <span>a más mesas.</span></>} description="Lleva el sabor de tu restaurante a más personas con Mikuna." photo={publicPhotos.chef}>
-        <button className="public-button" type="button" onClick={(event) => onComingSoon(event.currentTarget)}>Registrar mi restaurante</button>
-        <button className="public-text-button" type="button" onClick={(event) => onComingSoon(event.currentTarget)}>Ya tengo cuenta</button>
+        <Link className="public-button" to="/registro?tipo=restaurante">Registrar mi restaurante</Link>
+        <Link className="public-text-button" to="/iniciar-sesion">Ya tengo cuenta</Link>
       </PublicHero>
       <FeatureSection title="Todo para gestionar tus pedidos" items={restaurantFeatures} variant="restaurant" />
       <section className="restaurant-onboarding" aria-labelledby="onboarding-title">

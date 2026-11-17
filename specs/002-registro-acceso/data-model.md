@@ -8,14 +8,16 @@
 | name | `varchar(100)` NOT NULL | Recortado, no vacío, ≤ 100. |
 | email | `varchar(254)` NOT NULL, `UNIQUE uk_cuentas_email` | Se guarda normalizado (`trim` + minúsculas `Locale.ROOT`). Formato válido, ≤ 254. |
 | passwordHash | `varchar(255)` NOT NULL | Hash PBKDF2 con prefijo. Nunca se serializa. |
-| role | `varchar(20)` NOT NULL, enum `Role` | `CUSTOMER`, `RESTAURANT`, `COURIER` o `ADMIN`. No se modifica después de crear la cuenta. |
+| role | `varchar(20)` NOT NULL; en Java, `String` expuesto como enum `Role` | `CUSTOMER`, `RESTAURANT`, `COURIER` o `ADMIN`. No se modifica después de crear la cuenta. |
 | status | `varchar(20)` NOT NULL, enum `AccountStatus` | `ENABLED` o `DISABLED`. Todo registro nuevo empieza en `ENABLED`. |
 | restaurantApproval | `varchar(20)` NULL, enum `RestaurantApproval` | Solo para `RESTAURANT`: `PENDING`. `NULL` para los demás roles. |
 | createdAt | `timestamptz` NOT NULL | Se asigna al crear. |
 
-**Columnas de enum:** se guardan como texto (`EnumType.STRING`) con
-`columnDefinition = "varchar(20)"`. Así Hibernate no genera una restricción `CHECK` con los valores
-actuales, que `ddl-auto=update` no puede ampliar cuando RF-06 añada `APPROVED` o `REJECTED`.
+**Columnas de enum:** la entidad guarda `role`, `status` y `restaurantApproval` como `String`, y los
+getters devuelven el enum. Con `@Enumerated(STRING)`, e incluso con `AttributeConverter` o
+`columnDefinition`, Hibernate 7 genera restricciones `CHECK` con los valores actuales, y
+`ddl-auto=update` no puede ampliarlas cuando RF-06 añada `APPROVED` o `REJECTED`. Se comprobó en
+PostgreSQL el 2026-11-17: con este diseño la tabla solo tiene `cuentas_pkey` y `uk_cuentas_email`.
 
 **Validaciones de entrada** (registro): la contraseña mide de 12 a 128 caracteres y
 `passwordConfirmation` debe coincidir con ella. Se comprueba en el DTO y otra vez en el servicio.

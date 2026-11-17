@@ -18,7 +18,9 @@ export interface NavigationItem {
   readonly id: string
   readonly label: string
   readonly order: number
-  readonly behavior: 'home' | 'page' | 'coming-soon'
+  readonly behavior: 'home' | 'page' | 'coming-soon' | 'route'
+  /** Ruta de la aplicación cuando behavior es 'route'. */
+  readonly to?: string
   readonly appearance: 'normal' | 'active' | 'primary' | 'secondary'
 }
 

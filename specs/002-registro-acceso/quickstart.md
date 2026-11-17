@@ -13,7 +13,7 @@
 ```powershell
 cd backend; .\mvnw verify          # unit + integración + informe JaCoCo
 # Informe: backend/target/site/jacoco/index.html (≥ 90 % de líneas en account/ y auth/ service)
-cd ..\frontend; pnpm test -- --coverage   # Vitest: validación y sesión
+cd ..\frontend; pnpm test:coverage          # Vitest: validación y sesión
 pnpm build                                 # compilación TypeScript + Vite
 ```
 
