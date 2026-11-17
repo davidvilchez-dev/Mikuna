@@ -31,8 +31,8 @@ describe('validateRegistration', () => {
     expect(validateRegistration({ ...valid, email: '  Ana@Mail.com ' }).email).toBeUndefined()
   })
 
-  it('valida la contraseña entre 12 y 128 caracteres', () => {
-    for (const [length, ok] of [[11, false], [12, true], [128, true], [129, false]] as const) {
+  it('valida la contraseña: obligatoria y hasta 128 caracteres', () => {
+    for (const [length, ok] of [[0, false], [1, true], [128, true], [129, false]] as const) {
       const password = 'x'.repeat(length)
       const errors = validateRegistration({ ...valid, password, passwordConfirmation: password })
       expect(errors.password === undefined).toBe(ok)

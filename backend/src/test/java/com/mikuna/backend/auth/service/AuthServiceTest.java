@@ -9,7 +9,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.mikuna.backend.account.model.Account;
-import com.mikuna.backend.account.model.RestaurantApproval;
 import com.mikuna.backend.account.model.Role;
 import com.mikuna.backend.account.repository.AccountRepository;
 import com.mikuna.backend.auth.dto.AccountResponse;
@@ -98,7 +97,7 @@ class AuthServiceTest {
     }
 
     @Test
-    void restaurantePendientePuedeIniciarSesionSinAprobacion() {
+    void restaurantePuedeIniciarSesion() {
         Account account = TestAccounts.account(Role.RESTAURANT, "local@mail.com", "{hash}");
         when(accounts.findByEmail("local@mail.com")).thenReturn(Optional.of(account));
         when(passwordEncoder.matches("clave", "{hash}")).thenReturn(true);
@@ -106,7 +105,7 @@ class AuthServiceTest {
 
         LoginResponse response = service.login("local@mail.com", "clave");
 
-        assertThat(response.account().restaurantApproval()).isEqualTo(RestaurantApproval.PENDING);
+        assertThat(response.account().role()).isEqualTo(Role.RESTAURANT);
     }
 
     @Test

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Navigate, useNavigate } from 'react-router'
+import { Link, Navigate, useNavigate } from 'react-router'
 import { ApiError, GENERIC_ERROR, fetchMe, type AccountResponse } from './auth-api'
 import { roleLabels, statusLabels } from './auth-labels'
 import { AuthLayout } from './AuthLayout'
@@ -70,12 +70,12 @@ export function AccountPage() {
         <div><dt>Correo</dt><dd>{account.email}</dd></div>
         <div><dt>Tipo de cuenta</dt><dd>{roleLabels[account.role]}</dd></div>
         <div><dt>Estado</dt><dd>{statusLabels[account.status]}</dd></div>
-        {account.restaurantApproval === 'PENDING' && (
-          <div><dt>Aprobación comercial</dt><dd>Pendiente de aprobación</dd></div>
-        )}
       </dl>
-      {account.restaurantApproval === 'PENDING' && (
-        <p className="auth-notice">Tu restaurante podrá recibir pedidos cuando un administrador lo apruebe.</p>
+      {account.role === 'RESTAURANT' && (
+        <Link to="/mi-restaurante" className="auth-submit">Mi restaurante</Link>
+      )}
+      {account.role === 'ADMIN' && (
+        <Link to="/admin/solicitudes" className="auth-submit">Solicitudes de restaurantes</Link>
       )}
       <button type="button" className="auth-submit auth-submit-secondary" onClick={logout}>Cerrar sesión</button>
     </AuthLayout>

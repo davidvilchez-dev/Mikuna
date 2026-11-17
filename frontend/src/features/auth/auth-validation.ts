@@ -3,7 +3,8 @@ import type { PublicRole } from './auth-api'
 /** Reglas espejo del backend (que vuelve a validarlas); solo mejoran la respuesta inmediata. */
 export const NAME_MAX = 100
 export const EMAIL_MAX = 254
-export const PASSWORD_MIN = 12
+/** Mínimo temporal de 1 por decisión del usuario (2026-11-17); restaurar 12 al cerrar el proyecto. */
+export const PASSWORD_MIN = 1
 export const PASSWORD_MAX = 128
 
 const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -30,7 +31,7 @@ export function validateRegistration(form: RegistrationForm): FieldErrors {
   if (!name || name.length > NAME_MAX) errors.name = 'El nombre es obligatorio y admite hasta 100 caracteres'
   if (!isValidEmail(form.email)) errors.email = 'Ingresa un correo válido de hasta 254 caracteres'
   if (form.password.length < PASSWORD_MIN || form.password.length > PASSWORD_MAX) {
-    errors.password = 'La contraseña debe tener entre 12 y 128 caracteres'
+    errors.password = 'La contraseña es obligatoria y admite hasta 128 caracteres'
   }
   if (form.passwordConfirmation !== form.password) errors.passwordConfirmation = 'Las contraseñas no coinciden'
   if (!PUBLIC_ROLES.includes(form.role as PublicRole)) errors.role = 'Elige un tipo de cuenta válido'

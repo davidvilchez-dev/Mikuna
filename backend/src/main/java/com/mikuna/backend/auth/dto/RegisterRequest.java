@@ -2,6 +2,7 @@ package com.mikuna.backend.auth.dto;
 
 import com.mikuna.backend.account.model.Role;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
@@ -12,8 +13,8 @@ import jakarta.validation.constraints.Size;
 public record RegisterRequest(
         @NotBlank(message = "Ingresa tu nombre") String name,
         @NotBlank(message = "Ingresa tu correo") String email,
-        @NotNull(message = "Ingresa una contraseña")
-        @Size(min = 12, max = 128, message = "La contraseña debe tener entre 12 y 128 caracteres") String password,
+        @NotEmpty(message = "Ingresa una contraseña")
+        @Size(max = 128, message = "La contraseña es obligatoria y admite hasta 128 caracteres") String password,
         @NotNull(message = "Confirma tu contraseña") String passwordConfirmation,
         @NotNull(message = "Elige un tipo de cuenta") Role role) {
 }

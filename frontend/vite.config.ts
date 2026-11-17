@@ -23,7 +23,11 @@ export default defineConfig({
     exclude: ['tests/e2e/**', 'node_modules/**'],
     coverage: {
       provider: 'v8',
-      include: ['src/features/auth/auth-validation.ts', 'src/features/auth/session-storage.ts'],
+      include: [
+        'src/features/auth/auth-validation.ts',
+        'src/features/auth/session-storage.ts',
+        'src/features/restaurant/restaurant-validation.ts',
+      ],
       reporter: ['text', 'html'],
       thresholds: { lines: 90 },
     },

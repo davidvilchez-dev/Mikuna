@@ -68,7 +68,7 @@ class RegisterIntegrationTest {
                 .andExpect(jsonPath("$.email").value("ana@mail.com"))
                 .andExpect(jsonPath("$.role").value(role))
                 .andExpect(jsonPath("$.status").value("ENABLED"))
-                .andExpect(jsonPath("$.restaurantApproval").value(role.equals("RESTAURANT") ? "PENDING" : null))
+                .andExpect(jsonPath("$.restaurantApproval").doesNotExist())
                 .andExpect(content().string(not(containsString("password"))))
                 .andExpect(content().string(not(containsString(PASSWORD))));
         assertThat(accounts.count()).isEqualTo(1);
@@ -85,7 +85,7 @@ class RegisterIntegrationTest {
                 .andExpect(jsonPath("$.errors.email").exists());
         register(body("Ana", "a".repeat(246) + "@mail.com", PASSWORD, PASSWORD, "CUSTOMER"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors.email").exists());
-        register(body("Ana", "a@mail.com", "x".repeat(11), "x".repeat(11), "CUSTOMER")).andExpect(status().isBadRequest())
+        register(body("Ana", "a@mail.com", "", "", "CUSTOMER")).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.password").exists());
         register(body("Ana", "a@mail.com", "x".repeat(129), "x".repeat(129), "CUSTOMER"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors.password").exists());

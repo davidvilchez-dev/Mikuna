@@ -51,8 +51,8 @@ export function RegisterPage() {
       <AuthLayout title="¡Cuenta creada!" description={`Tu cuenta de ${roleLabels[created.role].toLowerCase()} está lista.`}>
         <div className="auth-success" role="status">
           <p>Registramos <strong>{created.email}</strong>. Ya puedes iniciar sesión con tu correo y contraseña.</p>
-          {created.restaurantApproval === 'PENDING' && (
-            <p className="auth-notice">Tu habilitación comercial está pendiente de aprobación. Podrás recibir pedidos cuando un administrador apruebe tu restaurante.</p>
+          {created.role === 'RESTAURANT' && (
+            <p className="auth-notice">Tu habilitación comercial está pendiente. Inicia sesión y envía la solicitud de tu restaurante; podrás recibir pedidos cuando un administrador la apruebe.</p>
           )}
         </div>
         <Link to="/iniciar-sesion" className="auth-submit">Iniciar sesión</Link>
@@ -76,7 +76,7 @@ export function RegisterPage() {
 
         <FormField id="name" label="Nombre del titular" autoComplete="name" maxLength={120} value={form.name} onChange={(event) => update('name')(event.target.value)} error={errors.name} />
         <FormField id="email" label="Correo electrónico" type="email" autoComplete="email" value={form.email} onChange={(event) => update('email')(event.target.value)} error={errors.email} />
-        <FormField id="password" label="Contraseña" type="password" autoComplete="new-password" hint="Entre 12 y 128 caracteres." value={form.password} onChange={(event) => update('password')(event.target.value)} error={errors.password} />
+        <FormField id="password" label="Contraseña" type="password" autoComplete="new-password" hint="Hasta 128 caracteres." value={form.password} onChange={(event) => update('password')(event.target.value)} error={errors.password} />
         <FormField id="passwordConfirmation" label="Confirma la contraseña" type="password" autoComplete="new-password" value={form.passwordConfirmation} onChange={(event) => update('passwordConfirmation')(event.target.value)} error={errors.passwordConfirmation} />
 
         {formError && <p className="auth-alert" role="alert">{formError}</p>}

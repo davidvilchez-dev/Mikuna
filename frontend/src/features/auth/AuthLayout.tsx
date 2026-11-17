@@ -8,10 +8,12 @@ interface AuthLayoutProps {
   title: string
   description?: string
   children: ReactNode
+  /** Tarjeta ancha para listas y tablas. */
+  wide?: boolean
 }
 
 /** Marco común de las pantallas de cuenta, con regreso al inicio público. */
-export function AuthLayout({ title, description, children }: AuthLayoutProps) {
+export function AuthLayout({ title, description, children, wide }: AuthLayoutProps) {
   return (
     <div className="auth-page">
       <header className="auth-header">
@@ -21,7 +23,7 @@ export function AuthLayout({ title, description, children }: AuthLayoutProps) {
         <Link to="/" className="auth-back">Volver al inicio</Link>
       </header>
       <main className="auth-main">
-        <section className="auth-card" aria-labelledby="auth-title">
+        <section className={wide ? 'auth-card auth-card-wide' : 'auth-card'} aria-labelledby="auth-title">
           <h1 id="auth-title">{title}</h1>
           {description && <p className="auth-description">{description}</p>}
           {children}

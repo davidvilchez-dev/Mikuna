@@ -65,6 +65,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(problem(HttpStatus.FORBIDDEN, ex.getMessage()));
     }
 
+    @ExceptionHandler(RestaurantNotFoundException.class)
+    ResponseEntity<ProblemDetail> handleRestaurantNotFound(RestaurantNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem(HttpStatus.NOT_FOUND, ex.getMessage()));
+    }
+
+    @ExceptionHandler(RestaurantStateException.class)
+    ResponseEntity<ProblemDetail> handleRestaurantState(RestaurantStateException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(problem(HttpStatus.FORBIDDEN, ex.getMessage()));
+    }
+
+    @ExceptionHandler(RestaurantConflictException.class)
+    ResponseEntity<ProblemDetail> handleRestaurantConflict(RestaurantConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem(HttpStatus.CONFLICT, ex.getMessage()));
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<ProblemDetail> handleUnexpected(Exception ex) {
         log.error("Error no controlado en la API", ex);
