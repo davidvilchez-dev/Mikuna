@@ -14,6 +14,22 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, UUID> {
 
     Optional<Restaurant> findByOwnerId(UUID ownerId);
 
+    /**
+     * Restaurantes visibles al público (spec 004): aprobados y con la cuenta habilitada, con su horario
+     * en la misma consulta. Que atiendan o no en este momento lo decide {@code OrderEligibility}.
+     */
+    @Query("""
+            select distinct r from Restaurant r left join fetch r.schedule
+            where r.status = 'APPROVED'
+              and exists (select 1 from Account a where a.id = r.ownerId and a.status = 'ENABLED')""")
+    List<Restaurant> findVisible();
+
+    @Query("""
+            select distinct r from Restaurant r left join fetch r.schedule
+            where r.id = :id and r.status = 'APPROVED'
+              and exists (select 1 from Account a where a.id = r.ownerId and a.status = 'ENABLED')""")
+    Optional<Restaurant> findVisibleById(@Param("id") UUID id);
+
     /** El estado llega como texto (valor de RestaurantStatus); de la más antigua a la más reciente. */
     List<Restaurant> findByStatusOrderBySubmittedAtAsc(String status);
 

@@ -2,6 +2,7 @@ package com.mikuna.backend.restaurant.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.mikuna.backend.restaurant.model.AttentionStatus;
 import com.mikuna.backend.restaurant.model.Restaurant;
 import com.mikuna.backend.restaurant.model.RestaurantStatus;
 import com.mikuna.backend.support.TestRestaurants;
@@ -76,6 +77,28 @@ class OrderEligibilityTest {
         Restaurant restaurant = TestRestaurants.restaurant(OWNER, RestaurantStatus.APPROVED);
         restaurant.setAvailable(true);
         assertThat(mondayAfternoon().canReceiveOrders(restaurant, true)).isFalse();
+    }
+
+    @Test
+    void atencionPausadaTienePrioridadSobreElHorario() {
+        assertThat(mondayAfternoon().attentionStatus(TestRestaurants.approvedOpenOnMonday(OWNER, false)))
+                .isEqualTo(AttentionStatus.PAUSED);
+    }
+
+    @Test
+    void atencionAbiertaDentroDelHorarioYFueraDeHorarioEnElResto() {
+        Restaurant restaurant = TestRestaurants.approvedOpenOnMonday(OWNER, true);
+        assertThat(mondayAfternoon().attentionStatus(restaurant)).isEqualTo(AttentionStatus.OPEN);
+        // lunes 08:59 y martes (cerrado) en Lima
+        assertThat(at("2026-11-16T13:59:00Z").attentionStatus(restaurant)).isEqualTo(AttentionStatus.OUTSIDE_HOURS);
+        assertThat(at("2026-11-17T20:00:00Z").attentionStatus(restaurant)).isEqualTo(AttentionStatus.OUTSIDE_HOURS);
+    }
+
+    @Test
+    void atencionSinHorarioGuardadoEsFueraDeHorario() {
+        Restaurant restaurant = TestRestaurants.restaurant(OWNER, RestaurantStatus.APPROVED);
+        restaurant.setAvailable(true);
+        assertThat(mondayAfternoon().attentionStatus(restaurant)).isEqualTo(AttentionStatus.OUTSIDE_HOURS);
     }
 
     @Test

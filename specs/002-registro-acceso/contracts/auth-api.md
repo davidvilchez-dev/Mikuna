@@ -19,17 +19,17 @@ Request (cualquier campo desconocido → 400):
 | Resultado | Código | Cuerpo |
 | --- | --- | --- |
 | Creada | 201 | `AccountResponse` |
-| Campos inválidos, confirmación distinta, `role` = `ADMIN` o desconocido, campo privilegiado | 400 | ProblemDetail + `errors` |
+| Campos inválidos (contraseña vacía o > 128), confirmación distinta, `role` = `ADMIN` o desconocido, campo privilegiado | 400 | ProblemDetail + `errors` |
 | Correo (normalizado) ya registrado, con cualquier rol | 409 | ProblemDetail `"El correo ya está registrado"` |
 
 `AccountResponse`:
 
 ```json
 { "id": "uuid", "name": "Ana Quispe", "email": "ana@mail.com", "role": "CUSTOMER",
-  "status": "ENABLED", "restaurantApproval": null }
+  "status": "ENABLED" }
 ```
 
-Para `RESTAURANT`, `restaurantApproval` vale `"PENDING"`.
+*(Spec 003: se retiró `restaurantApproval`; el estado comercial es del restaurante, ver [restaurant-api](../../003-registro-restaurante/contracts/restaurant-api.md).)*
 
 ## POST `/login`: **público**
 
@@ -56,5 +56,8 @@ estado se ignora (US3-4).
 ## Otras rutas
 
 - `GET /actuator/health`: público.
+- `GET /api/public/**`: público y de solo lectura (búsqueda y catálogo de restaurantes, RF-09 y RF-10),
+  añadido por la spec 004; véase [catalog-api](../../004-catalogo-consulta/contracts/catalog-api.md).
+  Es la única ampliación de rutas públicas posterior a esta spec.
 - Cualquier otra ruta `/api/**`: protegida (401 sin token).
 - No hay endpoint de logout (ver research §2).

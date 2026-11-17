@@ -45,6 +45,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+                        // RF-09/RF-10 son públicos (constitución III): solo lectura de datos comerciales.
+                        .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
                         .requestMatchers("/error").permitAll()
                         // RF-04: rol por ruta; el estado de la cuenta ya lo comprueba AccountStatusFilter.
                         .requestMatchers("/api/restaurant/**").hasRole("RESTAURANT")

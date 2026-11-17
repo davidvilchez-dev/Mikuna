@@ -1,6 +1,10 @@
 package com.mikuna.backend.support;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+
 import com.jayway.jsonpath.JsonPath;
+import com.mikuna.backend.catalog.service.CloudinaryImageStorage;
 import com.mikuna.backend.account.model.Account;
 import com.mikuna.backend.account.model.Role;
 import com.mikuna.backend.account.repository.AccountRepository;
@@ -12,6 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -36,8 +41,15 @@ public abstract class IntegrationTestSupport {
     @Autowired
     protected JdbcTemplate jdbc;
 
+    /** Cloudinary nunca se llama en las pruebas; por defecto devuelve una imagen fija. */
+    @MockitoBean
+    protected CloudinaryImageStorage imageStorage;
+
     @BeforeEach
     void cleanDatabase() {
+        when(imageStorage.upload(any(), any()))
+                .thenReturn(new CloudinaryImageStorage.StoredImage("https://img.test/p.jpg", "mikuna/products/p"));
+        jdbc.update("delete from productos");
         jdbc.update("delete from horarios_restaurante");
         jdbc.update("delete from restaurantes");
         accounts.deleteAll();

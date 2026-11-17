@@ -128,7 +128,7 @@ con otro rol) da 409; reiniciar el backend y comprobar en la BD que las cuentas 
     - Todas las validaciones del servicio lanzan `RegistrationValidationException` con su campo (400 con `errors`). Primera: `role == ADMIN` o `null` → campo `role`.
     - Recorta `name` y valida que no esté vacío y tenga ≤ 100 caracteres.
     - Normaliza el correo con `EmailNormalizer` y valida que tenga ≤ 254.
-    - Valida que la contraseña tenga 12–128 caracteres y coincida con la confirmación.
+    - Valida que la contraseña tenga 12–128 caracteres y coincida con la confirmación. *(Cambio posterior, 2026-11-17: mínimo suspendido a 1 por decisión del usuario.)*
     - Si `existsByEmail` → `EmailAlreadyRegisteredException`.
     - Crea la cuenta con `Account.create` y el hash de `PasswordEncoder`, y hace `saveAndFlush`. Si salta `DataIntegrityViolationException` → `EmailAlreadyRegisteredException`.
   - `createAdmin(name, email, password)`: package-private o público con la misma validación, solo para T045.

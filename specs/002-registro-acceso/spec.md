@@ -118,7 +118,9 @@ códigos. Los criterios de cada historia y los casos límite son su evidencia de
 - **RF-01 — Registro público:** admitir cliente, restaurante y repartidor con nombre de titular,
   correo, contraseña y confirmación. El tipo de cuenta debe ser visible y no incluir administrador.
 - **RF-01 — Validación:** exigir nombre no vacío de hasta 100 caracteres, correo de formato válido
-  de hasta 254 caracteres y contraseña de 12 a 128 caracteres, con confirmación coincidente.
+  de hasta 254 caracteres y contraseña no vacía de hasta 128 caracteres, con confirmación
+  coincidente. *(Decisión del usuario del 2026-11-17: el mínimo de 12 caracteres se suspende
+  temporalmente para agilizar las pruebas; se restaurará antes de cerrar el proyecto.)*
   Aplicar también las validaciones en el sistema que procesa y guarda la cuenta.
 - **RF-01 — Unicidad y persistencia:** tratar el correo sin espacios exteriores y sin distinguir
   mayúsculas para unicidad y acceso; conservar las cuentas tras reiniciar y garantizar unicidad
@@ -197,3 +199,6 @@ códigos. Los criterios de cada historia y los casos límite son su evidencia de
   RF-04 y límites RF-05/RF-06; [constitución 2.0.0](../../.specify/memory/constitution.md);
   solicitud y aclaración del usuario del 2026-11-13. No se modifica la especificación histórica
   del inicio: su comportamiento provisional de registro se reemplaza solo por este nuevo flujo.
+
+- **Rutas públicas posteriores:** la spec 004 añade `GET /api/public/**` (solo lectura de restaurantes y
+  catálogos, RF-09 y RF-10). Véase [catalog-api](../004-catalogo-consulta/contracts/catalog-api.md).
