@@ -1,20 +1,24 @@
 <!--
 Sync Impact Report — material temporal de revisión; retirar antes del commit.
-Cambio de versión: plantilla sin versión adoptada → 1.0.0.
-Motivo: primera constitución del proyecto; no existe una versión normativa anterior.
-Principios sustituidos: los cinco espacios genéricos de la plantilla se reemplazan por
-I. Modularidad por dominio; II. Separación de responsabilidades; III. Seguridad verificable;
-IV. Consistencia de operaciones concurrentes; V. Pruebas automatizadas y cobertura;
-VI. Trazabilidad de requisitos (principio adicional).
-Secciones incorporadas: Alcance, arquitectura y requisitos de referencia;
-Desarrollo incremental y criterios de aceptación; reglas de Governance.
-Secciones normativas eliminadas: ninguna; se retiran ejemplos y marcadores de plantilla.
-Decisiones consultadas y confirmadas por el usuario el 2026-11-12:
-- RNF-11: cobertura de líneas >= 90 %; informar ramas sin umbral obligatorio.
-- RNF-07: inicio, acceso a cuentas y RF-09/RF-10 públicos;
-  operaciones personales y de gestión protegidas.
-Seguimiento diferido: TODO(POLITICAS_DE_NEGOCIO) y TODO(DECISIONES_TECNICAS),
-a consultar antes de planificar el incremento que dependa de cada decisión.
+Cambio de versión: 1.0.0 → 2.0.0.
+Motivo: enmienda mayor aprobada explícitamente por el usuario el 2026-11-13;
+redefine obligaciones incompatibles de infraestructura, HTTPS, E2E y entrega para la etapa local.
+Principios modificados:
+- I. Modularidad por dominio → I. Monolito modular sencillo.
+- II. Separación de responsabilidades: capas y Spring Data JPA; sin adaptadores anticipados.
+- III. Seguridad verificable: HTTP local y cifrado para integraciones externas permitidas.
+- IV. Consistencia de operaciones concurrentes: invariantes según el incremento y pagos aplazados.
+- V. Pruebas automatizadas y cobertura → V. Pruebas acotadas y cobertura de negocio.
+- VI. Trazabilidad de requisitos: distinguir cumplimiento local y verificación aplazada.
+Principio añadido: VII. Planificación y avance incremental.
+Secciones añadidas: configuración local; registro de aplazamientos; estado por RNF en esta etapa.
+Secciones sustituidas: arquitectura obligatoria de la propuesta → arquitectura local ejecutable;
+decisiones técnicas sujetas a consulta general → convenciones elegidas y decisiones rutinarias.
+Obligaciones retiradas de esta etapa: infraestructura cloud, workers y servicios adicionales,
+TLS local, E2E de navegador, CI/CD y despliegue como condición de aceptación.
+Seguimiento: políticas de negocio no definidas, solo al abordar el incremento que las necesite;
+infraestructura futura y verificaciones aplazadas, sin declararlas cumplidas.
+Marcadores de plantilla pendientes: ninguno.
 Plantillas, comandos y archivos de aplicación modificados: ninguno.
 -->
 
@@ -22,193 +26,200 @@ Plantillas, comandos y archivos de aplicación modificados: ninguno.
 
 ## Core Principles
 
-### I. Modularidad por dominio
+### I. Monolito modular sencillo
 
-**Origen:** propuesta, secciones 1.1, 2.3, 3.2 y 3.3.1; solicitud de principios verificables.
+- La arquitectura ejecutable DEBE constar de un frontend React con TypeScript, una única
+  aplicación Java con Spring Boot y PostgreSQL, todos ejecutados localmente.
+- El backend DEBE organizarse por funcionalidades. Cada módulo DEBE incorporar `model`,
+  `repository`, `service`, `controller` y `dto` solo según sus necesidades; `security` y `exception`
+  DEBEN mantenerse como responsabilidades comunes cuando corresponda.
+- Los módulos y abstracciones DEBEN crearse cuando el incremento los necesite. NO DEBEN crearse
+  estructuras vacías, interfaces sin utilidad, módulos futuros ni infraestructura anticipada.
+- Las dependencias DEBEN evitar ciclos y respetar las reglas del módulo responsable de cada
+  operación. No se exige una interfaz adicional cuando no aporta utilidad concreta.
 
-- El backend DEBE mantener módulos con responsabilidades identificables de acceso y usuarios,
-  restaurantes y catálogo, pedidos, pagos, entregas, seguimiento, notificaciones y administración.
-  Cada incremento DEBE identificar los módulos que modifica y los contratos entre ellos.
-- La base arquitectónica DEBE ser una aplicación Spring Boot modular, con el worker asíncrono
-  descrito en la propuesta. La replicación de instancias DEBE conservar la misma lógica funcional.
-  Introducir microservicios o sustituir esta base requiere una decisión consultada y documentada.
-- Como regla constitucional de modularidad, los módulos DEBEN exponer sus operaciones mediante
-  contratos definidos y evitar dependencias circulares. Un módulo NO DEBE modificar directamente
-  los datos privados de otro sin pasar por el contrato responsable de sus invariantes.
-
-**Verificación:** revisión de responsabilidades, dependencias y contratos de los módulos afectados,
-acompañada de pruebas de sus reglas y colaboraciones. Esto permite ampliar la solución por
-incrementos sin acoplar todas las funcionalidades.
+**Verificación:** revisar estructura y dependencias de los módulos afectados. Esta base permite
+entregar funcionalidad local sin preparar una plataforma distribuida.
 
 ### II. Separación de responsabilidades
 
-**Origen:** arquitectura de la propuesta, secciones 3.1 a 3.3; regla constitucional solicitada.
+- React con TypeScript DEBE gestionar presentación e interacción. El backend DEBE ejecutar
+  las reglas de negocio, la autorización y la coordinación de las operaciones.
+- Los controladores DEBEN gestionar HTTP, los servicios DEBEN contener las reglas de negocio
+  y los repositorios DEBEN acceder a los datos mediante Spring Data JPA con PostgreSQL.
+- Las validaciones del navegador NO DEBEN sustituir las del backend. El backend DEBE recalcular
+  y validar importes, permisos y transiciones; NO DEBE confiar en precios, roles o estados
+  enviados por el cliente.
+- Las integraciones DEBEN separarse de las reglas de negocio cuando se implementen. No se exige
+  diseñar adaptadores ni mecanismos de sustitución para proveedores o funciones futuras.
 
-- React con TypeScript DEBE gestionar presentación e interacción. Java con Spring Boot DEBE
-  ejecutar las reglas de negocio, la autorización y la coordinación de las operaciones.
-  Las validaciones del navegador NO DEBEN sustituir las comprobaciones del backend.
-- La entrada HTTP/WebSocket, la lógica de negocio, la persistencia y las integraciones externas
-  DEBEN tener responsabilidades separadas. Las reglas de negocio NO DEBEN depender de componentes
-  visuales ni quedar implementadas únicamente en controladores o adaptadores de proveedores.
-- El backend DEBE recalcular y validar importes, permisos y transiciones de estado. NO DEBE
-  considerar autoritativos los precios, roles o estados enviados por el cliente.
-- Los adaptadores de pagos, mapas, imágenes y comunicaciones DEBEN permitir sustituir el proveedor
-  sin reescribir las reglas de negocio. Notificaciones y correo DEBEN procesarse de forma
-  asíncrona mediante RabbitMQ y el worker, según la propuesta.
-
-**Verificación:** revisión de los límites anteriores, pruebas de negocio sin servicios externos
-reales y pruebas de integración de los adaptadores. No se impone un patrón de capas o una
-biblioteca adicional que la propuesta no haya seleccionado.
+**Verificación:** revisar responsabilidades y probar las reglas y colaboraciones implementadas
+sin depender de servicios externos reales en las pruebas unitarias.
 
 ### III. Seguridad verificable
 
-**Origen:** RF-01 a RF-06, RNF-06 a RNF-08 y sección 3.3.1; aclaración del usuario del 2026-11-12.
+- El desarrollo en localhost DEBE utilizar HTTP. NO DEBEN prepararse certificados, autoridades
+  certificadoras ni TLS local. La comprobación de HTTPS del despliegue queda aplazada;
+  RNF-06 NO DEBE declararse cumplido por una ejecución local.
+- Las únicas integraciones externas permitidas son Cloudinary para imágenes y el servicio de
+  correo electrónico. DEBEN prepararse solo cuando la funcionalidad actual las necesite y usar
+  el cifrado correspondiente a su protocolo: HTTPS para APIs y TLS para transporte de correo.
+- La autenticación DEBE usar tokens sin sesiones en memoria de la API. El inicio, el registro,
+  el inicio de sesión, la recuperación de contraseña y RF-09/RF-10 son públicos, conforme a la
+  aclaración del usuario del 2026-11-12. Las operaciones personales y de gestión DEBEN protegerse;
+  cada contrato DEBE declarar si es público o protegido.
+- RNF-07 DEBE aplicarse al 100 % de accesos protegidos: comprobar rol, estado de cuenta y relación
+  con el recurso según RF-04, rechazar accesos sin autorización y probar los casos 401/403 y de
+  pertenencia aplicables. El perfil NO DEBE permitir cambiar el propio rol.
+- Solo los restaurantes aprobados DEBEN recibir pedidos. El registro público NO DEBE permitir
+  eludir esa aprobación ni adquirir privilegios administrativos.
+- Las contraseñas DEBEN almacenarse mediante hashes adaptativos con sal; la recuperación DEBE
+  utilizar mecanismos temporales de un solo uso. Los secretos NO DEBEN exponerse en respuestas
+  o registros; las credenciales externas reales NO DEBEN incluirse en commits.
+- Los datos sensibles de tarjetas NO DEBEN almacenarse. La integración con la pasarela y la
+  evidencia completa de RNF-08 quedan aplazadas, sin simular su cumplimiento.
 
-- Toda comunicación cliente/plataforma DEBE utilizar HTTPS; las solicitudes HTTP DEBEN
-  redirigirse o rechazarse. La autenticación DEBE usar tokens sin sesiones en memoria de la API.
-- Conforme a la aclaración del usuario, el inicio, el acceso a cuentas —registro, inicio de sesión
-  y recuperación de contraseña— y las consultas de restaurantes y catálogo de RF-09/RF-10 son
-  públicos. Las operaciones personales y de gestión DEBEN estar protegidas. Cada contrato DEBE
-  declarar su carácter público o protegido; no se permiten excepciones públicas implícitas.
-- RNF-07 DEBE aplicarse al 100 % de los accesos a operaciones protegidas: rechazar los intentos
-  sin autenticación o sin permisos. La autorización DEBE comprobar rol, estado de cuenta y relación
-  con el recurso, según RF-04. Se DEBEN probar los rechazos 401/403 correspondientes y los accesos
-  entre usuarios y restaurantes distintos. El perfil NO DEBE permitir cambiar el propio rol.
-- Solo los restaurantes aprobados DEBEN recibir pedidos. El acceso público al registro NO DEBE
-  permitir eludir la aprobación ni adquirir privilegios administrativos.
-- Los datos sensibles de tarjetas NO DEBEN almacenarse en la plataforma; el pago DEBE delegarse
-  a Stripe mediante comunicación cifrada y únicamente en su entorno de pruebas.
-- Como reglas constitucionales de seguridad, las contraseñas DEBEN almacenarse mediante hashes
-  adaptativos con sal; los mecanismos de recuperación DEBEN ser temporales y de un solo uso;
-  los secretos NO DEBEN incluirse en el código ni exponerse en respuestas o registros. La selección
-  de algoritmos y parámetros queda sujeta a consulta en el incremento de acceso.
-
-**Verificación:** matriz de permisos y pruebas automatizadas por rol, cuenta y pertenencia;
-pruebas de las rutas públicas declaradas; comprobación HTTPS; revisión del esquema, los registros
-y el flujo de pago en sandbox. La delimitación pública anterior es una aclaración del usuario a
-RNF-07, no una afirmación de que la propuesta enumerara esas rutas.
+**Verificación:** revisar validación, permisos, secretos y cifrado de las integraciones permitidas
+que existan; probar rutas públicas y rechazos del incremento.
 
 ### IV. Consistencia de operaciones concurrentes
 
-**Origen:** RF-13 a RF-25, RF-31, RNF-05 y secciones 1.3, 2.2, 2.3 y 3.3.1.
-
-- Las operaciones críticas de generación de pedidos, cambios de estado, pagos y asignación de
-  entregas DEBEN definir sus invariantes y comprobarlas en el backend y la persistencia.
-  Como regla constitucional, las escrituras que deban confirmarse juntas en PostgreSQL DEBEN usar
-  transacciones y comprobar el estado esperado; una comprobación seguida de una escritura
-  desprotegida no es suficiente.
-- La asignación DEBE usar la actualización condicional en PostgreSQL prevista en la propuesta.
-  Ante solicitudes simultáneas, una entrega DEBE tener como máximo un repartidor activo y solo
-  una de las aceptaciones concurrentes DEBE prosperar. RF-23 DEBE preservar esa unicidad al reasignar.
-  Los bloqueos en memoria de una instancia NO DEBEN ser la única protección de estas reglas.
-- El flujo nominal DEBE respetar: Pendiente → Aceptado → En preparación → Listo para recoger →
+- Las operaciones críticas DEBEN definir y preservar sus invariantes en backend y persistencia
+  cuando se implementen. Las escrituras que deban confirmarse juntas en PostgreSQL DEBEN usar
+  transacciones y comprobar el estado esperado; comprobar y luego escribir sin protección
+  NO DEBE ser la única garantía.
+- La asignación DEBE usar actualización condicional en PostgreSQL. Una entrega DEBE tener como
+  máximo un repartidor activo; solo una aceptación concurrente DEBE prosperar. RF-23 DEBE
+  preservar esa unicidad al reasignar. Un bloqueo en memoria NO DEBE ser la única protección.
+- El flujo nominal conserva Pendiente → Aceptado → En preparación → Listo para recoger →
   Asignado → Recogido → Entregado. Desde Pendiente se permite Rechazado por el restaurante o
-  Cancelado por su cliente antes de la aceptación. El rechazo de una asignación activa la
-  reasignación, no el rechazo del pedido. No se permiten saltos o retrocesos no especificados.
-- El pago DEBE autorizarse al confirmar, capturarse al aceptar y liberar la reserva al rechazar
-  o cancelar antes de la aceptación. El resultado DEBE quedar asociado al pedido. Los webhooks
-  repetidos DEBEN producir un único efecto de negocio, conforme a la propuesta.
-- Como regla constitucional de consistencia, los reintentos de una misma operación lógica NO
-  DEBEN duplicar pedidos, cobros o asignaciones. Las carreras entre aceptación y cancelación y
-  los fallos entre persistencia y pasarela DEBEN tener un tratamiento definido y probado antes
-  de aceptar el incremento. No se presupone una transacción atómica entre PostgreSQL y Stripe.
-- RF-31 DEBE garantizar una única calificación de 1 a 5 por pedido propio entregado, incluso
+  Cancelado por su cliente antes de la aceptación. Rechazar una asignación activa la reasignación,
+  no el rechazo del pedido. NO DEBEN introducirse saltos o retrocesos no especificados.
+- Los reintentos de una operación lógica NO DEBEN duplicar pedidos o asignaciones. Las carreras
+  entre aceptación y cancelación DEBEN resolverse y probarse en el incremento correspondiente.
+  RF-31 DEBE garantizar una única calificación de 1 a 5 por pedido propio entregado, incluso
   ante solicitudes simultáneas.
+- Se conserva como requisito futuro de RF-16/RF-17 autorizar el pago al confirmar, capturarlo al
+  aceptar, liberar la reserva al rechazar o cancelar antes de aceptar y asociar el resultado al
+  pedido. La pasarela, sus webhooks, su idempotencia y su recuperación ante fallos quedan
+  aplazados. NO DEBEN declararse pagos completos sin esa integración y su evidencia.
 
-**Verificación:** pruebas de integración con solicitudes realmente concurrentes y comprobación del
-estado persistido, incluidos múltiples contendientes para una entrega, aceptación frente a
-cancelación y duplicación de eventos de pago. Los mecanismos concretos de reintento y recuperación
-se consultan al planificar el incremento correspondiente.
+**Verificación:** pruebas de integración acotadas de las transacciones y carreras introducidas,
+comprobando el estado persistido. No se requieren servicios distribuidos para esta garantía.
 
-### V. Pruebas automatizadas y cobertura
+### V. Pruebas acotadas y cobertura de negocio
 
-**Origen:** RNF-11, secciones 1.4, 2.3 y 3.3.1; métrica confirmada por el usuario el 2026-11-12.
+- Cada incremento DEBE utilizar pruebas unitarias y de integración acotadas a sus reglas y
+  colaboraciones. El backend DEBE utilizar JUnit y Mockito según corresponda; los casos negativos
+  de seguridad y consistencia DEBEN cubrirse cuando sean aplicables.
+- Se conserva el objetivo de **al menos 90 % de cobertura de líneas de la lógica de negocio**
+  de RNF-11 y el reporte de ramas sin umbral obligatorio, confirmados el 2026-11-12. La medición
+  DEBE incluir la lógica de negocio existente, también en frontend cuando la contenga;
+  NO DEBE extenderse artificialmente a toda la presentación visual.
+- El reporte local DEBE identificar código medido, líneas cubiertas y totales, porcentaje y
+  exclusiones justificadas. NO DEBEN excluirse reglas, validaciones o transiciones de negocio
+  para alcanzar el umbral ni diluirlo con código generado. Sin lógica de negocio, la medición
+  DEBE registrarse como no aplicable, sin atribuir 100 % ni cumplimiento completo de RNF-11.
+- NO DEBE instalarse, configurarse ni ejecutarse Playwright. Las pruebas E2E automatizadas de
+  navegador quedan aplazadas y NO DEBEN sustituirse por otra herramienta para el mismo trabajo.
+- Se DEBEN verificar compilación, funcionamiento local y reglas relevantes del incremento.
+  Las comprobaciones aprobadas NO DEBEN repetirse sin cambios, fallos o dudas concretas que
+  lo justifiquen. CI/CD y publicación de cobertura en CI quedan aplazados.
 
-- La lógica de negocio DEBE tener pruebas automatizadas con cobertura de líneas de al menos
-  **90 %**. La cobertura de ramas DEBE informarse, sin umbral obligatorio. La medición DEBE
-  abarcar la lógica de negocio existente, también en el frontend cuando este la contenga.
-- El reporte DEBE identificar el código medido, líneas cubiertas y totales, porcentaje y
-  exclusiones justificadas. No se permite excluir reglas, validaciones o transiciones de negocio
-  para alcanzar el umbral ni diluirlo con código generado. La agregación entre lenguajes y las
-  herramientas se definen mediante consulta antes del primer incremento con lógica de negocio.
-- Cada incremento DEBE incluir pruebas unitarias de sus reglas, pruebas de integración de las
-  colaboraciones que introduce y pruebas de extremo a extremo de los flujos principales que
-  habilita. Seguridad, concurrencia y pagos DEBEN incluir los casos negativos y fallos aplicables.
-- La integración continua DEBE ejecutar las pruebas y publicar la cobertura de negocio. Un
-  resultado inferior al 90 % o una prueba fallida DEBE impedir aceptar el incremento y desplegarlo.
-  Un inicio sin lógica de negocio DEBE registrar esta medición como no aplicable, con justificación;
-  NO DEBE reportarse como cobertura del 100 % ni como cumplimiento completo de RNF-11.
-
-**Verificación:** resultados reproducibles de pruebas y reporte de cobertura en CI. El porcentaje
-no sustituye la comprobación de las reglas y los criterios de aceptación.
+**Verificación:** resultados reproducibles de las comprobaciones locales pertinentes y cobertura
+de negocio. El porcentaje no sustituye comprobar reglas y criterios de aceptación.
 
 ### VI. Trazabilidad de requisitos
 
-**Origen:** códigos de las secciones 1.1, 1.2 y 1.4; regla constitucional solicitada por el usuario.
-
 - Los identificadores **RF-01 a RF-33** y **RNF-01 a RNF-12** DEBEN conservarse exactamente.
-  No se permite renumerarlos, reutilizarlos ni inventar códigos de la propuesta para requisitos
-  nuevos. Los resúmenes de esta constitución NO DEBEN sustituir el detalle de la fuente.
-- Cada incremento DEBE vincular sus requisitos aplicables con criterios de aceptación, tareas,
-  cambios y evidencia de verificación. La relación DEBE poder recorrerse en ambos sentidos y
-  distinguir cumplimiento pendiente, parcial y verificado.
-- Cada decisión DEBE indicar si procede de la propuesta, de una aclaración del usuario o de una
-  regla constitucional. Las recomendaciones DEBEN identificarse como tales y no convertirse en
-  obligaciones ni requisitos de producto sin una decisión explícita.
-- Un requisito NO DEBE declararse cumplido solo por tener una pantalla, una interfaz simulada,
-  un diseño o una prueba aislada. Los RNF DEBEN contar con su evidencia medible, incluida la
-  configuración y carga usadas para obtenerla.
+  NO DEBEN renumerarse, reutilizarse ni inventarse códigos atribuidos a la propuesta.
+- Cada incremento DEBE vincular requisitos aplicables, criterios, tareas, cambios y evidencia
+  mediante referencias breves. DEBE distinguirse cumplimiento pendiente, parcial y verificado.
+- Las decisiones DEBEN indicar si proceden de la propuesta, del usuario o de esta constitución.
+  Las recomendaciones NO DEBEN convertirse en obligaciones sin una decisión explícita.
+- Un requisito NO DEBE declararse cumplido solo por una pantalla, simulación, diseño o prueba
+  aislada. Los RNF DEBEN disponer de evidencia medible; un aplazamiento NO equivale a cumplimiento.
+- La infraestructura, servicios y verificaciones aplazados DEBEN permanecer identificados como
+  pendientes, sin bloquear el desarrollo local con su preparación.
 
-**Verificación:** revisión de trazabilidad en cada incremento y ausencia de requisitos declarados
-cumplidos sin evidencia. La página de inicio se identifica por la instrucción del usuario,
-sin atribuirle un RF inexistente.
+**Verificación:** revisar trazabilidad y estado de los requisitos del incremento. La página de
+inicio deriva de la instrucción del usuario, sin atribuirle un RF inexistente.
+
+### VII. Planificación y avance incremental
+
+- Las especificaciones, planes y tareas DEBEN ser breves y concretos, limitados al incremento
+  solicitado y sus dependencias necesarias. NO DEBE rediseñarse toda la plataforma en cada ejecución.
+- Se DEBEN utilizar las tecnologías y decisiones ya elegidas. La documentación DEBE consultarse
+  de forma puntual para implementar o resolver un problema concreto; NO DEBEN realizarse
+  investigaciones generales ni comparaciones de alternativas.
+- Las preguntas DEBEN centrarse en reglas de negocio realmente pendientes. Las decisiones
+  rutinarias de implementación DEBEN resolverse con las convenciones acordadas.
+- Cada incremento DEBE producir funcionalidad ejecutable localmente y conectar interfaz,
+  backend y persistencia cuando corresponda a su alcance. Una simulación DEBE identificarse
+  y NO DEBE presentarse como integración terminada.
+
+**Verificación:** alcance acotado y evidencia de funcionamiento local de lo entregado.
 
 ## Alcance, arquitectura y requisitos de referencia
 
-### Fuente y naturaleza de las reglas
+### Fuente y precedencia de la etapa local
 
-La fuente primaria es [Propuesta_de_Proyecto.docx](../../Propuesta_de_Proyecto.docx), consultada
-el 2026-11-12. La ruta solicitada `docs/Propuesta_de_Proyecto.docx` no existe en el espacio de
-trabajo; se utilizó el documento del mismo nombre presente en la raíz, sin moverlo ni modificarlo.
+La fuente original es [Propuesta_de_Proyecto.docx](../../Propuesta_de_Proyecto.docx), consultada
+el 2026-11-12 en la raíz del repositorio; la ruta entonces solicitada bajo `docs/` no existía.
+Sus RF/RNF se conservan como referencia. Esta enmienda registra las decisiones explícitas del
+usuario del **2026-11-13** para una primera etapa funcional y local, que prevalecen sobre las
+reglas anteriores que obligaban a preparar infraestructura cloud o pruebas E2E.
 
-Son **requisitos explícitos de la propuesta** sus RF, RNF, flujo de estados, alcance y arquitectura.
-Son **decisiones del usuario** el nombre Mikuna, el inicio como primer incremento, la entrega
-posterior por incrementos acotados y las dos aclaraciones de cobertura y acceso público anteriores.
-Son **reglas constitucionales** las condiciones de revisión y verificación añadidas aquí para
-hacer comprobables los principios solicitados. **DEBE**, **NO DEBE** y **DEBEN** expresan
-obligaciones; una **recomendación** no bloquea la aceptación por sí misma.
+Se conservan el nombre Mikuna, el inicio como primer incremento y las aclaraciones de acceso
+público y cobertura del 2026-11-12. **DEBE**, **NO DEBE** y **DEBEN** expresan obligaciones.
+Las disposiciones futuras registradas como pendientes NO DEBEN interpretarse como trabajo actual.
 
 Mikuna es una plataforma web de delivery multi-restaurante para clientes, restaurantes,
-repartidores y administradores. Según la sección 2.4, quedan fuera las aplicaciones móviles
-nativas, múltiples pasarelas, transacciones financieras reales, contabilidad, inventario avanzado,
+repartidores y administradores. Se mantienen fuera del alcance las aplicaciones móviles nativas,
+múltiples pasarelas, transacciones financieras reales, contabilidad, inventario avanzado,
 optimización avanzada de rutas, operación fuera del ámbito urbano considerado, otros tipos de
 comercio, reembolsos y conciliación contable.
 
-### Arquitectura explícita de la propuesta
+### Arquitectura local ejecutable y configuración
 
-| Responsabilidad | Base que se debe conservar |
+| Responsabilidad | Decisión vigente para esta etapa |
 | --- | --- |
-| Presentación | React + TypeScript; archivos estáticos en Amazon S3 distribuidos por CloudFront. |
-| API y cómputo | Java + Spring Boot; REST y WebSocket cuando corresponda; Docker sobre Linux en EC2; tokens sin sesiones en memoria. |
-| Persistencia | Amazon RDS for PostgreSQL con JDBC/SQL; escrituras y decisiones transaccionales en la base principal; réplica para lecturas que toleren retraso. |
-| Caché y tiempo real | Redis, con ElastiCache como servicio objetivo; consultas frecuentes, última ubicación y propagación de eventos entre instancias. |
-| Ubicación persistida | PostgreSQL registra la ubicación del repartidor al recoger y entregar; las actualizaciones frecuentes se mantienen en Redis. |
-| Tareas asíncronas | RabbitMQ por AMQP en Docker sobre EC2; worker Java + Spring Boot en Docker para notificaciones y correo. |
-| Servicios externos | Stripe sandbox; Cloudinary para imágenes; MapTiler con datos compatibles con OpenStreetMap; FCM para push y Resend para correo. |
-| Distribución y disponibilidad | Dominio en Namecheap, certificado de ACM, CloudFront, ALB y EC2 Auto Scaling; ALB en al menos dos zonas y distribución de instancias entre dos zonas. |
-| Entrega y evaluación | GitHub y GitHub Actions para compilación, pruebas y despliegue; CloudWatch para métricas y k6 desde un equipo independiente para carga. |
+| Presentación | React + TypeScript ejecutado localmente; HTTP en localhost. |
+| Backend | Una aplicación Java + Spring Boot organizada por funcionalidades. |
+| Persistencia | PostgreSQL local mediante Spring Data JPA; base creada manualmente por el usuario. |
+| Configuración | `src/main/resources/application.properties` del backend. |
+| Integraciones permitidas | Cloudinary y correo (Resend según la propuesta), solo cuando sean necesarios y con cifrado. |
 
-La capacidad inicial reducida, el aumento de recursos durante pruebas y la activación de la réplica
-cuando corresponda siguen las consideraciones académicas de costo de la propuesta. No modifican
-los objetivos de aceptación. Los aproximadamente **10 000 usuarios son una referencia de diseño**
-de la sección 2.2; **1 000 usuarios concurrentes son el objetivo de validación de RNF-01**.
-La ejecución incremental no obliga a desplegar toda esta infraestructura en el primer incremento,
-pero no permite declarar satisfechos sus RNF sin implementarla y medirlos.
+La conexión PostgreSQL, el puerto y, cuando correspondan, los parámetros de correo y Cloudinary
+DEBEN centralizarse y quedar configurables en `src/main/resources/application.properties`.
+El usuario completará los valores locales y creará manualmente la base de datos. Las credenciales
+externas reales NO DEBEN incluirse en commits.
+
+Durante esta etapa se DEBE utilizar `spring.jpa.hibernate.ddl-auto=update`. NO DEBEN añadirse
+herramientas de migración por anticipado.
+
+### Registro explícito de aplazamientos
+
+- **Cloud y entrega:** NO DEBEN realizarse configuraciones, despliegues, investigaciones ni
+  comparaciones sobre AWS u otros proveedores. Quedan aplazados infraestructura como código,
+  balanceadores, escalamiento, réplicas, CDN, monitoreo cloud y CI/CD.
+- **Infraestructura adicional:** Redis, RabbitMQ, workers separados, contenedores y demás
+  infraestructura adicional quedan aplazados. El correo que se necesite NO DEBE exigirlos.
+- **Otras integraciones:** Stripe sandbox, MapTiler y FCM quedan como referencias aplazadas
+  de pagos, mapas y notificaciones push; no se permite integrarlos durante esta etapa.
+  Cloudinary y correo se preparan exclusivamente cuando sean necesarios para la funcionalidad actual.
+- **Verificaciones posteriores:** HTTPS del despliegue, E2E automatizadas de navegador,
+  validación de infraestructura y evaluaciones de carga y disponibilidad correspondientes
+  quedan pendientes. NO DEBEN prepararse certificados ni TLS local para anticiparlas.
+
+La arquitectura cloud de la propuesta queda como antecedente aplazado, sin obligación de
+prepararla durante esta etapa. Su abordaje posterior requiere una planificación explícita.
 
 ### Registro de requisitos funcionales explícitos
 
-Los siguientes resúmenes conservan los códigos originales. El texto íntegro de la sección 1.1
-prevalece sobre cualquier abreviación de esta tabla.
+Los siguientes resúmenes conservan los códigos originales. El texto íntegro de la propuesta
+prevalece sobre su abreviación, sujeto a las decisiones de etapa registradas arriba. La tabla
+NO constituye una solicitud de implementar todos los RF ni sus dependencias en cada incremento.
 
 | Código | Obligación de referencia |
 | --- | --- |
@@ -246,108 +257,95 @@ prevalece sobre cualquier abreviación de esta tabla.
 | RF-32 | Gestión administrativa de usuarios, restaurantes y repartidores. |
 | RF-33 | Consulta administrativa de pedidos y entregas según su estado. |
 
-### Objetivos y evidencia de requisitos no funcionales
+### Objetivos y estado de requisitos no funcionales
 
-Esta tabla conserva los objetivos de las secciones 1.2 y 1.4. Las aclaraciones de RNF-07 y RNF-11
-proceden del usuario y se registran expresamente, sin renumerar los requisitos.
+Se conservan los objetivos originales y las aclaraciones del usuario. La evidencia local DEBE
+distinguirse de la validación futura. Esta tabla define aplicabilidad, no certifica cumplimiento.
 
-| Código | Objetivo obligatorio | Evidencia requerida |
+| Código | Objetivo conservado | Aplicación y evidencia durante esta etapa |
 | --- | --- | --- |
-| RNF-01 | Al menos el 95 % de consultas de restaurantes, catálogo y estado del pedido en menos de 2 s con 1 000 usuarios concurrentes. | Informe k6 con 1 000 usuarios virtuales y p(95) < 2 000 ms. |
-| RNF-02 | Con 3 instancias atender al menos el doble de usuarios que con 1, sin cambiar la lógica funcional. | Dos corridas comparables con el mismo umbral e historial de escalamiento. |
-| RNF-03 | Atender desde caché al menos el 80 % de consultas repetidas de restaurantes y catálogo. | Porcentaje de aciertos y comparación de tiempos con y sin caché. |
-| RNF-04 | Continuar atendiendo si cae una instancia y otras siguen disponibles. | Detener una instancia durante carga y comprobar la continuidad del servicio. |
-| RNF-05 | No asignar simultáneamente una entrega a más de un repartidor. | Integración concurrente: una aceptación exitosa y una única asignación activa persistida. |
-| RNF-06 | HTTPS para toda comunicación cliente/plataforma; redirigir o rechazar HTTP. | Solicitud HTTP, comprobación HTTPS y certificado válido; la sección 3.3.1 prevé redirección. |
-| RNF-07 | Denegar el 100 % de accesos sin autenticación o permisos a operaciones protegidas; rutas públicas delimitadas por el usuario en el principio III. | Pruebas automatizadas por rol y recurso, rechazos 401/403 y acceso a rutas públicas declaradas. |
-| RNF-08 | No almacenar datos sensibles de tarjetas; delegar su procesamiento a la pasarela mediante cifrado. | Revisión del esquema sin campos de tarjeta y flujo con la pasarela en sandbox. |
-| RNF-09 | Un usuario nuevo completa el pedido desde búsqueda hasta confirmación en menos de 5 min y sin ayuda. | Prueba cronometrada con cinco personas y prueba de extremo a extremo del flujo completo. |
-| RNF-10 | Visualizar CPU, tiempo de respuesta y tasa de errores durante operación y carga. | Captura del panel de monitoreo durante la prueba de carga. |
-| RNF-11 | Pruebas automatizadas con al menos 90 % de líneas de negocio; informar ramas sin umbral, según decisión del usuario. | Reporte reproducible generado en integración continua, con alcance y exclusiones. |
-| RNF-12 | Cada cambio integrado a la rama principal ejecuta pruebas y, si pasan, se despliega sin intervención manual. | Historial de ejecuciones de GitHub Actions con pruebas y despliegue automático. |
+| RNF-01 | Al menos el 95 % de consultas de restaurantes, catálogo y estado en menos de 2 s con 1 000 usuarios concurrentes. | Validación de carga aplazada; las comprobaciones funcionales locales no acreditan este objetivo. |
+| RNF-02 | Con 3 instancias atender al menos el doble de usuarios que con 1, sin cambiar la lógica. | Escalamiento y corridas comparables aplazados. |
+| RNF-03 | Atender desde caché al menos el 80 % de consultas repetidas de restaurantes y catálogo. | Caché y medición de aciertos aplazadas. |
+| RNF-04 | Continuar atendiendo si cae una instancia y otras siguen disponibles. | Infraestructura redundante y prueba de caída aplazadas. |
+| RNF-05 | No asignar simultáneamente una entrega a más de un repartidor. | Aplicable al implementar asignación; integración concurrente y estado persistido único. |
+| RNF-06 | HTTPS cliente/plataforma y redirección o rechazo de HTTP en despliegue. | Aplazado para despliegue; desarrollo local por HTTP sin certificados ni TLS local. |
+| RNF-07 | Denegar el 100 % de accesos sin autenticación o permisos a operaciones protegidas. | Aplicable; pruebas por rol, recurso, 401/403 y rutas públicas declaradas. |
+| RNF-08 | No almacenar datos sensibles de tarjetas y delegar su procesamiento a una pasarela cifrada. | Prohibición de almacenamiento vigente; integración y evidencia completa aplazadas. |
+| RNF-09 | Un usuario nuevo completa el pedido desde búsqueda hasta confirmación en menos de 5 min y sin ayuda. | Evaluación cronometrada con cinco personas cuando exista el flujo; E2E automatizadas aplazadas. |
+| RNF-10 | Visualizar CPU, tiempo de respuesta y tasa de errores durante operación y carga. | Monitoreo cloud y evidencia del panel durante carga aplazados. |
+| RNF-11 | Al menos 90 % de líneas de lógica de negocio y reporte de ramas sin umbral obligatorio. | Pruebas y reporte locales; publicación en CI aplazada y sin extender el umbral a toda la presentación. |
+| RNF-12 | Cada cambio en la rama principal ejecuta pruebas y, si pasan, se despliega sin intervención manual. | CI/CD y su historial de evidencia aplazados; no bloquean la aceptación local. |
 
-Adicionalmente, la sección 3.3.1 fija para k6 una **tasa de errores inferior al 1 %**. Este umbral
-DEBE conservarse en las pruebas de carga, con su procedencia arquitectónica, sin inventar otro RNF.
-Cada informe DEBE registrar versión evaluada, datos, duración, configuración e instancias para
-permitir reproducir y comparar el resultado. La duración y el perfil de carga se consultarán al
-preparar las pruebas; no se atribuyen a la propuesta valores que esta no especifica.
+Los aproximadamente **10 000 usuarios** siguen siendo una referencia de diseño; **1 000 usuarios
+concurrentes** son el objetivo futuro de RNF-01. Para la futura evaluación de carga se conservan
+k6, p(95) < 2 000 ms y tasa de errores inferior al 1 % de la propuesta, sin preparar ni ejecutar
+esa evaluación en esta etapa. Sus informes deberán registrar versión, datos, duración y
+configuración para ser reproducibles; el perfil se definirá cuando corresponda abordarlo.
 
 ## Desarrollo incremental y criterios de aceptación
 
-### Secuencia y alcance de los incrementos
+### Secuencia y alcance
 
-1. **Primer incremento: página de inicio.** Se DEBE especificar y construir primero el inicio en
-   React con TypeScript, con alcance visual e interacciones expresamente delimitados. La política
-   pública confirmada se aplica a esta página. Su entrega NO DEBE presentarse como implementación
-   del catálogo, autenticación, pedidos o pagos si esos flujos aún no existen. El uso de datos
-   simulados, cuando se acuerde, DEBE identificarse en la especificación y en la evidencia.
-2. **Incrementos funcionales posteriores.** Cada uno DEBE seleccionar un conjunto acotado de RF,
-   sus dependencias y RNF aplicables. El tamaño, orden y criterios de aceptación se acuerdan en su
-   especificación; esta constitución no presume un orden de implementación para los 33 RF.
-3. **Evaluación acumulativa.** Lo aún no construido DEBE permanecer trazado como pendiente.
-   Las pruebas de carga y del flujo completo se realizan cuando existan los componentes necesarios;
-   la planificación DEBE identificar el incremento que aportará cada evidencia pendiente.
+El inicio conserva su condición de primer incremento, sin implicar reconstruirlo si ya existe.
+Los incrementos posteriores DEBEN seleccionar únicamente el alcance solicitado y sus dependencias
+necesarias. La página de inicio NO DEBE presentarse como catálogo, autenticación, pedidos o pagos
+implementados si esos flujos no existen.
 
-La instrucción de construir primero el inicio es una regla de secuencia, no una solicitud de
-implementarlo durante esta elaboración de la constitución.
+Cada incremento DEBE entregar funcionalidad ejecutable en local, conectando interfaz, backend
+y persistencia cuando corresponda. Lo no construido o aplazado DEBE mantenerse pendiente con
+una explicación breve, sin diseñar por anticipado toda la plataforma.
 
 ### Condiciones para aceptar cada incremento
 
-- Especificación con alcance, exclusiones, criterios comprobables y trazabilidad a RF/RNF o a la
-  instrucción de inicio. Las dependencias y decisiones pendientes DEBEN ser visibles.
-- Revisión de modularidad, responsabilidades, seguridad y consistencia en los componentes
-  afectados, con justificación de los puntos no aplicables.
-- Pruebas del incremento y regresión de los flujos afectados exitosas; cobertura de negocio de
-  al menos 90 % de líneas y reporte de ramas cuando exista esa lógica.
-- Evidencia de los RNF aplicables, o registro de su verificación pendiente y del incremento
-  previsto para completarla. No se permite omitir una comprobación necesaria para el flujo que
-  se declara terminado ni tratar una verificación pendiente como cumplimiento.
-- Integración y despliegue automáticos conforme a RNF-12. Las evidencias DEBEN vincularse a la
-  versión entregada. Esta constitución no crea ni ejecuta la infraestructura de entrega.
+- Especificación, plan y tareas breves, con alcance, criterios y referencias a RF/RNF aplicables
+  o a la instrucción del usuario; dependencias y aplazamientos explícitos.
+- Revisión de responsabilidades, seguridad, validación, autorización y consistencia de lo
+  implementado, justificando lo que no aplique.
+- Compilación y funcionamiento local comprobados; pruebas unitarias y de integración pertinentes
+  aprobadas; al menos 90 % de líneas de negocio y reporte de ramas cuando exista esa lógica.
+- Evidencia de los requisitos aplicables al flujo que se declara terminado. La verificación
+  futura DEBE registrarse como pendiente, sin confundirse con cumplimiento.
+- Los aplazamientos de esta etapa NO DEBEN generar tareas obligatorias de cloud, TLS local,
+  infraestructura adicional, E2E de navegador ni CI/CD para aceptar el incremento.
 
-### Recomendaciones y decisiones aún no definidas
+### Reglas de negocio pendientes y decisiones rutinarias
 
-**Recomendaciones no vinculantes:** documentar contratos REST con OpenAPI, registrar las decisiones
-arquitectónicas mediante ADR, usar TDD y automatizar las comprobaciones de dependencias modulares.
-La propuesta no exige esas prácticas o herramientas concretas; su adopción se decide en la
-planificación y no se utiliza por sí sola como condición de aceptación.
+Solo al abordar el incremento que las necesite se DEBEN consultar las políticas aún no definidas:
+zona urbana y cobertura, fórmulas de envío y comisión, carrito con varios restaurantes, elección
+de repartidor y espera sin candidatos, y aprovisionamiento de cuentas privilegiadas. No se les
+asignan valores por defecto en esta constitución.
 
-**TODO(POLITICAS_DE_NEGOCIO):** consultar y registrar, antes del incremento afectado, los límites
-de la zona urbana y cobertura, las fórmulas de envío y comisión, si el carrito admite productos
-de varios restaurantes, los criterios de elección de repartidor y espera sin candidatos, y el
-aprovisionamiento de cuentas privilegiadas. La propuesta no fija esas políticas y esta constitución
-no les asigna valores por defecto. La consulta de cada punto se difiere al incremento que lo necesite.
-
-**TODO(DECISIONES_TECNICAS):** consultar y registrar, antes del incremento afectado, las versiones
-de plataforma, bibliotecas y herramientas no fijadas; formato y ciclo de vida de tokens y recuperación;
-herramientas y agregación de cobertura; tratamiento de fallos y reintentos de pagos y mensajes;
-caducidad e invalidación de caché; frecuencia de ubicación; perfil de carga y parámetros de
-escalamiento y costo. No se presupone JWT, un ORM, una biblioteca de estado o un patrón distribuido
-específico. Las decisiones que contradigan una base explícita requieren resolver el conflicto
-mediante el procedimiento de enmienda.
+Las decisiones rutinarias de implementación DEBEN resolverse con las tecnologías y convenciones
+acordadas, consultando documentación puntual cuando sea necesario. No se requiere abrir una
+comparación de alternativas ni pedir confirmación de cada biblioteca, parámetro o abstracción.
+OpenAPI, ADR o TDD son recomendaciones no vinculantes; NO DEBEN imponerse como preparación previa
+ni como condiciones adicionales de aceptación.
 
 ## Governance
 
 Esta constitución rige las especificaciones, planes, tareas, revisiones y entregas de Mikuna.
-No autoriza a reducir silenciosamente el alcance ni los umbrales de la propuesta. Ante un conflicto
-con la fuente o una ambigüedad, se DEBE consultar al responsable del proyecto y registrar la
-resolución con su procedencia antes de implementar la decisión afectada.
+Las decisiones explícitas del usuario del 2026-11-13 autorizan esta etapa local y sustituyen las
+obligaciones anteriores incompatibles. Los documentos anteriores que todavía exijan preparación
+cloud o E2E NO DEBEN reintroducirlas como bloqueos; al planificar un incremento se DEBE aplicar
+esta constitución y señalar la discrepancia pertinente sin ampliar el alcance.
 
-Toda enmienda DEBE incluir motivo, reglas y RF/RNF afectados, impacto en incrementos y evidencia,
-aprobación explícita del responsable del proyecto y, cuando corresponda, plan de adaptación de lo
-ya construido. Las recomendaciones solo adquieren carácter obligatorio mediante una decisión
-documentada; si cambian estas reglas, se requiere una enmienda.
+Toda enmienda DEBE registrar motivo, reglas y RF/RNF afectados, impacto y aprobación explícita
+del responsable del proyecto. Cuando cambie lo ya construido, DEBE indicar su adaptación necesaria.
+Esta solicitud constituye la aprobación de la enmienda 2.0.0; no requiere una nueva confirmación.
+Un conflicto nuevo sobre alcance o reglas de negocio DEBE consultarse cuando afecte al incremento.
+Las decisiones rutinarias se resuelven conforme al principio VII.
 
-El versionado DEBE seguir SemVer: MAJOR para eliminar o redefinir obligaciones de forma
-incompatible; MINOR para añadir principios, secciones u obligaciones compatibles; PATCH para
-aclaraciones y correcciones sin cambiar obligaciones. La adopción inicial es **1.0.0**. Las fechas
-DEBEN expresarse en ISO 8601 y cada enmienda DEBE actualizar la fecha de modificación y su informe
-de impacto. La fecha de ratificación original se conserva.
+El versionado DEBE seguir SemVer: MAJOR para eliminar o redefinir obligaciones incompatibles,
+MINOR para añadir obligaciones compatibles y PATCH para aclaraciones sin cambio normativo.
+Las fechas DEBEN expresarse en ISO 8601; cada enmienda DEBE actualizar versión y fecha de
+modificación, conservar la ratificación original y adjuntar un informe temporal de impacto para
+revisión, que se retirará antes del commit.
 
-Cada revisión de incremento DEBE comprobar los seis principios, la trazabilidad y la evidencia de
-calidad. Los incumplimientos DEBEN resolverse antes de aceptar el alcance afectado; una excepción
-no puede rebajar el 90 % de líneas ni otro requisito explícito sin una enmienda aprobada que
-identifique el cambio de alcance. Los TODO de decisiones futuras no autorizan a escoger valores
-silenciosamente ni a omitir requisitos.
+La revisión de cada incremento DEBE comprobar los siete principios y la evidencia aplicable.
+Los incumplimientos del alcance implementado DEBEN resolverse antes de aceptarlo. Los servicios
+y RNF aplazados NO DEBEN declararse cumplidos ni bloquear la entrega local por su preparación.
+La infraestructura futura y las pruebas E2E se abordarán después mediante una decisión explícita
+y la planificación correspondiente.
 
-**Version**: 1.0.0 | **Ratified**: 2026-11-12 | **Last Amended**: 2026-11-12
+**Version**: 2.0.0 | **Ratified**: 2026-11-12 | **Last Amended**: 2026-11-13
