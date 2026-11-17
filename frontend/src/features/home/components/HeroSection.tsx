@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import { heroActions, heroContent } from '../home-content'
 import type { ShowComingSoon } from '../home-types'
 import { HeroFoodComposition } from './HeroFoodComposition'
@@ -12,7 +13,11 @@ export function HeroSection({ onComingSoon }: { onComingSoon: ShowComingSoon }) 
           </h1>
           <p className="hero-description text-mikuna-gray" data-description data-keep-clear>{heroContent.description}</p>
           <div className="hero-actions">
-            {heroActions.map((action) => (
+            {heroActions.map((action) => action.behavior === 'route' && action.to ? (
+              <Link key={action.id} to={action.to} className="hero-action action-secondary text-mikuna-indigo" data-action={action.id}>
+                <span data-keep-clear>{action.label}</span>
+              </Link>
+            ) : (
               <button
                 key={action.id}
                 type="button"
