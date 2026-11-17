@@ -8,7 +8,6 @@ export interface AccountResponse {
   email: string
   role: Role
   status: AccountStatus
-  restaurantApproval: 'PENDING' | null
 }
 
 export interface LoginResponse {
@@ -41,10 +40,11 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+/** Llamada JSON a la API con errores normalizados; la comparten las funcionalidades con sesión. */
+export async function apiRequest<T>(url: string, init: RequestInit = {}): Promise<T> {
   let response: Response
   try {
-    response = await fetch('/api/auth' + path, {
+    response = await fetch(url, {
       ...init,
       headers: { Accept: 'application/json', ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...init.headers },
     })
@@ -65,6 +65,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (error instanceof ApiError) throw error
     throw new ApiError(response.status, GENERIC_ERROR)
   }
+}
+
+function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  return apiRequest<T>('/api/auth' + path, init)
 }
 
 export function register(data: RegisterData): Promise<AccountResponse> {

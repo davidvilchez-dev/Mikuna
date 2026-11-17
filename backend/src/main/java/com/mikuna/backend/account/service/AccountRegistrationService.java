@@ -20,7 +20,8 @@ public class AccountRegistrationService {
 
     static final int NAME_MAX = 100;
     static final int EMAIL_MAX = 254;
-    static final int PASSWORD_MIN = 12;
+    /** Mínimo temporal de 1 por decisión del usuario (2026-11-17); restaurar 12 al cerrar el proyecto. */
+    static final int PASSWORD_MIN = 1;
     static final int PASSWORD_MAX = 128;
     private static final Pattern EMAIL_FORMAT = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
 
@@ -59,7 +60,7 @@ public class AccountRegistrationService {
             throw new RegistrationValidationException("email", "Ingresa un correo válido de hasta 254 caracteres");
         }
         if (password == null || password.length() < PASSWORD_MIN || password.length() > PASSWORD_MAX) {
-            throw new RegistrationValidationException("password", "La contraseña debe tener entre 12 y 128 caracteres");
+            throw new RegistrationValidationException("password", "La contraseña es obligatoria y admite hasta 128 caracteres");
         }
         if (!password.equals(passwordConfirmation)) {
             throw new RegistrationValidationException("passwordConfirmation", "Las contraseñas no coinciden");

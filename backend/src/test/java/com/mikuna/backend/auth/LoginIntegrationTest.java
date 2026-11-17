@@ -79,11 +79,12 @@ class LoginIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void restaurantePendienteVeSuCondicion() throws Exception {
+    void restauranteVeSoloIdentidadYEstadoDeCuenta() throws Exception {
         create(Role.RESTAURANT, "local@mail.com");
         String token = loginAndGetToken("local@mail.com");
         mvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.restaurantApproval").value("PENDING"));
+                .andExpect(jsonPath("$.role").value("RESTAURANT"))
+                .andExpect(jsonPath("$.restaurantApproval").doesNotExist());
     }
 }

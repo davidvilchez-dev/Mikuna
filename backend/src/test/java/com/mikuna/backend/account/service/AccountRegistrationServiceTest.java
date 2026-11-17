@@ -9,7 +9,6 @@ import static org.mockito.Mockito.when;
 
 import com.mikuna.backend.account.model.Account;
 import com.mikuna.backend.account.model.AccountStatus;
-import com.mikuna.backend.account.model.RestaurantApproval;
 import com.mikuna.backend.account.model.Role;
 import com.mikuna.backend.account.repository.AccountRepository;
 import com.mikuna.backend.common.exception.EmailAlreadyRegisteredException;
@@ -63,20 +62,13 @@ class AccountRegistrationServiceTest {
         verify(accounts).existsByEmail("ana@mail.com");
     }
 
-    @Test
-    void restauranteQuedaConAprobacionPendiente() {
-        stubSave();
-        Account account = service.registerPublic("La Picantería", "local@mail.com", PASSWORD, PASSWORD, Role.RESTAURANT);
-        assertThat(account.getRestaurantApproval()).isEqualTo(RestaurantApproval.PENDING);
-    }
-
     @ParameterizedTest
-    @EnumSource(value = Role.class, names = {"CUSTOMER", "COURIER"})
-    void clienteYRepartidorSinAprobacionComercial(Role role) {
+    @EnumSource(value = Role.class, names = {"CUSTOMER", "RESTAURANT", "COURIER"})
+    void registraLosTresRolesPublicosHabilitados(Role role) {
         stubSave();
         Account account = service.registerPublic("Nombre", "persona@mail.com", PASSWORD, PASSWORD, role);
-        assertThat(account.getRestaurantApproval()).isNull();
         assertThat(account.getRole()).isEqualTo(role);
+        assertThat(account.isEnabled()).isTrue();
     }
 
     @Test
@@ -121,11 +113,18 @@ class AccountRegistrationServiceTest {
 
     @Test
     void rechazaContrasenaFueraDeLimites() {
-        assertField(() -> service.registerPublic("Ana", "a@mail.com", "x".repeat(11), "x".repeat(11), Role.CUSTOMER),
-                "password");
+        assertField(() -> service.registerPublic("Ana", "a@mail.com", "", "", Role.CUSTOMER), "password");
         assertField(() -> service.registerPublic("Ana", "a@mail.com", "x".repeat(129), "x".repeat(129), Role.CUSTOMER),
                 "password");
         assertField(() -> service.registerPublic("Ana", "a@mail.com", null, null, Role.CUSTOMER), "password");
+    }
+
+    @Test
+    void aceptaContrasenaCorta() {
+        when(passwordEncoder.encode("1")).thenReturn("{hash}1");
+        when(accounts.saveAndFlush(any(Account.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        assertThat(service.registerPublic("Ana", "a@mail.com", "1", "1", Role.CUSTOMER).getPasswordHash())
+                .isEqualTo("{hash}1");
     }
 
     @Test
@@ -157,12 +156,11 @@ class AccountRegistrationServiceTest {
         assertThat(admin.getRole()).isEqualTo(Role.ADMIN);
         assertThat(admin.getEmail()).isEqualTo("admin@mikuna.pe");
         assertThat(admin.isEnabled()).isTrue();
-        assertThat(admin.getRestaurantApproval()).isNull();
     }
 
     @Test
     void administradorAplicaLasMismasValidaciones() {
-        assertField(() -> service.createAdmin("Responsable", "admin@mikuna.pe", "corta"), "password");
+        assertField(() -> service.createAdmin("Responsable", "admin@mikuna.pe", ""), "password");
     }
 
     private static void assertField(Runnable call, String field) {

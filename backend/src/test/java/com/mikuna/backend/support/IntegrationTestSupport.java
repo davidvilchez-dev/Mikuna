@@ -2,6 +2,7 @@ package com.mikuna.backend.support;
 
 import com.jayway.jsonpath.JsonPath;
 import com.mikuna.backend.account.model.Account;
+import com.mikuna.backend.account.model.Role;
 import com.mikuna.backend.account.repository.AccountRepository;
 import com.mikuna.backend.account.service.AccountRegistrationService;
 import java.util.UUID;
@@ -37,6 +38,8 @@ public abstract class IntegrationTestSupport {
 
     @BeforeEach
     void cleanDatabase() {
+        jdbc.update("delete from horarios_restaurante");
+        jdbc.update("delete from restaurantes");
         accounts.deleteAll();
     }
 
@@ -50,6 +53,16 @@ public abstract class IntegrationTestSupport {
 
     protected Account admin(String email) {
         return registrationService.createAdmin("Responsable", email, PASSWORD);
+    }
+
+    protected Account restaurantOwner(String email) {
+        return registrationService.registerPublic("Dueño", email, PASSWORD, PASSWORD, Role.RESTAURANT);
+    }
+
+    protected static String validRestaurantJson() {
+        return """
+                {"name":"La Picantería","category":"Criolla","description":"Comida casera",
+                 "address":"Jr. Lima 123","zone":"Ayacucho","phone":"+51 966 123 456"}""";
     }
 
     protected void disable(UUID accountId) {

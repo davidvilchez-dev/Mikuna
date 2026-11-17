@@ -39,6 +39,8 @@
   box-shadow: 0 12px 40px color-mix(in srgb, var(--color-mikuna-indigo) 10%, transparent);
 }
 
+.auth-card-wide { width: min(860px, 100%); }
+
 .auth-card h1 {
   margin: 0;
   font-size: clamp(30px, 5vw, 40px);

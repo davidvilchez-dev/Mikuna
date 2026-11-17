@@ -64,14 +64,14 @@ class AdminAccountInitializerTest {
     }
 
     @Test
-    void fallaConContrasenaCortaSinMostrarla(CapturedOutput output) {
-        MockEnvironment environment = fullEnvironment().withProperty("MIKUNA_ADMIN_PASSWORD", "corta");
-        when(registrationService.createAdmin("Responsable", "admin@mikuna.pe", "corta"))
-                .thenThrow(new RegistrationValidationException("password", "La contraseña debe tener entre 12 y 128 caracteres"));
+    void fallaConContrasenaInvalidaSinMostrarla(CapturedOutput output) {
+        MockEnvironment environment = fullEnvironment().withProperty("MIKUNA_ADMIN_PASSWORD", "x".repeat(129));
+        when(registrationService.createAdmin("Responsable", "admin@mikuna.pe", "x".repeat(129)))
+                .thenThrow(new RegistrationValidationException("password", "La contraseña es obligatoria y admite hasta 128 caracteres"));
 
         assertThatThrownBy(() -> initializer(environment).run(new DefaultApplicationArguments()))
                 .isInstanceOf(IllegalStateException.class);
-        assertThat(output).contains("No se creó el administrador").doesNotContain("corta");
+        assertThat(output).contains("No se creó el administrador").doesNotContain("x".repeat(129));
     }
 
     @Test
