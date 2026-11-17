@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
 import { AuthLayout } from '../auth/AuthLayout'
+import { clearSession, getSession } from '../auth/session-storage'
+import { addToCart, clearCart } from '../cart/cart-api'
 import { attentionLabels, getCatalog, type Catalog, type PublicProduct } from './catalog-api'
 import { formatPrice } from './catalog-validation'
+import '../cart/cart.css'
 import './catalog.css'
 
 type ViewState =
@@ -26,6 +29,9 @@ function groupByCategory(products: PublicProduct[]): { category: string; items: 
 /** Catálogo público de un restaurante visible (RF-10): solo productos disponibles; no requiere sesión. */
 export function RestaurantCatalogPage() {
   const { id = '' } = useParams()
+  const navigate = useNavigate()
+  const [cartMessage, setCartMessage] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
   const [page, setPage] = useState(0)
   const [attempt, setAttempt] = useState(0)
   const [state, setState] = useState<ViewState>({ kind: 'loading' })
@@ -41,6 +47,40 @@ export function RestaurantCatalogPage() {
       })
     return () => { active = false }
   }, [id, page, attempt])
+
+  /** Agrega una unidad al carrito (RF-11). Sin sesión lleva a iniciar sesión; el backend valida rol y elegibilidad. */
+  async function add(product: PublicProduct) {
+    const session = getSession()
+    if (!session) {
+      navigate('/iniciar-sesion')
+      return
+    }
+    if (adding) return
+    setAdding(true)
+    setCartMessage(null)
+    try {
+      try {
+        await addToCart(session.token, product.id, 1)
+      } catch (error) {
+        if (!(error instanceof ApiError && error.code === 'CART_OTHER_RESTAURANT')) throw error
+        if (!window.confirm('Tu carrito es de otro restaurante. ¿Vaciarlo y agregar este producto?')) return
+        await clearCart(session.token)
+        await addToCart(session.token, product.id, 1)
+      }
+      setCartMessage(`«${product.name}» se agregó a tu carrito.`)
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        clearSession()
+        navigate('/iniciar-sesion')
+      } else if (error instanceof ApiError && error.status === 403) {
+        setCartMessage('Solo las cuentas de cliente pueden agregar productos al carrito.')
+      } else {
+        setCartMessage(error instanceof ApiError ? error.message : GENERIC_ERROR)
+      }
+    } finally {
+      setAdding(false)
+    }
+  }
 
   if (state.kind === 'loading') {
     return <AuthLayout title="Restaurante" wide><p className="auth-description" role="status">Cargando el catálogo…</p></AuthLayout>
@@ -94,6 +134,7 @@ export function RestaurantCatalogPage() {
                     <h3>{product.name}</h3>
                     {product.description && <p>{product.description}</p>}
                     <p className="catalog-price">{formatPrice(product.price)}</p>
+                    <button type="button" className="auth-submit cart-add" disabled={adding || notAttending} onClick={() => add(product)}>Agregar al carrito</button>
                   </div>
                 </li>
               ))}
@@ -101,6 +142,8 @@ export function RestaurantCatalogPage() {
           </section>
         ))
       )}
+
+      {cartMessage && <p className="auth-notice" role="status">{cartMessage} <Link to="/carrito">Ver carrito</Link></p>}
 
       {products.totalPages > 1 && (
         <nav className="catalog-pager" aria-label="Paginación">

@@ -50,6 +50,7 @@ public class SecurityConfig {
                         .requestMatchers("/error").permitAll()
                         // RF-04: rol por ruta; el estado de la cuenta ya lo comprueba AccountStatusFilter.
                         .requestMatchers("/api/restaurant/**").hasRole("RESTAURANT")
+                        .requestMatchers("/api/customer/**").hasRole("CUSTOMER")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth

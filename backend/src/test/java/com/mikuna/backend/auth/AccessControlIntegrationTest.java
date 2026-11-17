@@ -31,10 +31,6 @@ class AccessControlIntegrationTest extends IntegrationTestSupport {
     @Autowired
     private JwtProperties jwtProperties;
 
-    private Account customer(String email) {
-        return registrationService.registerPublic("Cliente", email, PASSWORD, PASSWORD, Role.CUSTOMER);
-    }
-
     @Test
     void sinTokenResponde401() throws Exception {
         mvc.perform(get("/api/auth/me"))
