@@ -71,6 +71,12 @@ export function AccountPage() {
         <div><dt>Tipo de cuenta</dt><dd>{roleLabels[account.role]}</dd></div>
         <div><dt>Estado</dt><dd>{statusLabels[account.status]}</dd></div>
       </dl>
+      {account.role === 'CUSTOMER' && (
+        <>
+          <Link to="/carrito" className="auth-submit">Mi carrito</Link>
+          <Link to="/mis-direcciones" className="auth-submit auth-submit-secondary">Mis direcciones</Link>
+        </>
+      )}
       {account.role === 'RESTAURANT' && (
         <Link to="/mi-restaurante" className="auth-submit">Mi restaurante</Link>
       )}

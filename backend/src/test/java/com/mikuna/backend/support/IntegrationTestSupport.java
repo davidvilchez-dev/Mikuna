@@ -49,6 +49,9 @@ public abstract class IntegrationTestSupport {
     void cleanDatabase() {
         when(imageStorage.upload(any(), any()))
                 .thenReturn(new CloudinaryImageStorage.StoredImage("https://img.test/p.jpg", "mikuna/products/p"));
+        jdbc.update("delete from lineas_carrito");
+        jdbc.update("delete from carritos");
+        jdbc.update("delete from direcciones");
         jdbc.update("delete from productos");
         jdbc.update("delete from horarios_restaurante");
         jdbc.update("delete from restaurantes");
@@ -65,6 +68,10 @@ public abstract class IntegrationTestSupport {
 
     protected Account admin(String email) {
         return registrationService.createAdmin("Responsable", email, PASSWORD);
+    }
+
+    protected Account customer(String email) {
+        return registrationService.registerPublic("Cliente", email, PASSWORD, PASSWORD, Role.CUSTOMER);
     }
 
     protected Account restaurantOwner(String email) {

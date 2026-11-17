@@ -31,12 +31,15 @@ export const GENERIC_ERROR = 'No se pudo completar la operación, inténtalo de 
 export class ApiError extends Error {
   readonly status: number
   readonly errors: Record<string, string>
+  /** Código de negocio de algunos 409 (p. ej. CART_OTHER_RESTAURANT) que la interfaz distingue. */
+  readonly code: string | null
 
-  constructor(status: number, detail: string, errors: Record<string, string> = {}) {
+  constructor(status: number, detail: string, errors: Record<string, string> = {}, code: string | null = null) {
     super(detail)
     this.name = 'ApiError'
     this.status = status
     this.errors = errors
+    this.code = code
   }
 }
 
@@ -61,8 +64,8 @@ export async function apiRequest<T>(url: string, init: RequestInit = {}): Promis
   if (!contentType.includes('application/problem+json')) throw new ApiError(response.status, GENERIC_ERROR)
 
   try {
-    const problem = (await response.json()) as { detail?: string; errors?: Record<string, string> }
-    throw new ApiError(response.status, problem.detail ?? GENERIC_ERROR, problem.errors ?? {})
+    const problem = (await response.json()) as { detail?: string; errors?: Record<string, string>; code?: string }
+    throw new ApiError(response.status, problem.detail ?? GENERIC_ERROR, problem.errors ?? {}, problem.code ?? null)
   } catch (error) {
     if (error instanceof ApiError) throw error
     throw new ApiError(response.status, GENERIC_ERROR)

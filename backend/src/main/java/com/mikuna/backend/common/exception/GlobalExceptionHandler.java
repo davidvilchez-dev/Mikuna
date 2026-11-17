@@ -61,14 +61,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @Override
     protected ResponseEntity<Object> handleMaxUploadSizeExceededException(
             MaxUploadSizeExceededException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
-        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(imageTooLarge(new ImageTooLargeException()).getBody());
+        return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).body(imageTooLarge(new ImageTooLargeException()).getBody());
     }
 
     @ExceptionHandler(ImageTooLargeException.class)
     ResponseEntity<ProblemDetail> imageTooLarge(ImageTooLargeException ex) {
-        ProblemDetail problem = problem(HttpStatus.PAYLOAD_TOO_LARGE, ex.getMessage());
+        ProblemDetail problem = problem(HttpStatus.CONTENT_TOO_LARGE, ex.getMessage());
         problem.setProperty("errors", Map.of("image", ex.getMessage()));
-        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(problem);
+        return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).body(problem);
     }
 
     @ExceptionHandler(ProductNotFoundException.class)
@@ -79,6 +79,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(ProductConflictException.class)
     ResponseEntity<ProblemDetail> handleProductConflict(ProductConflictException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem(HttpStatus.CONFLICT, ex.getMessage()));
+    }
+
+    @ExceptionHandler({AddressNotFoundException.class, CartLineNotFoundException.class})
+    ResponseEntity<ProblemDetail> handleCartNotFound(RuntimeException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem(HttpStatus.NOT_FOUND, ex.getMessage()));
+    }
+
+    /** 409 con el {@code code} que la interfaz usa para distinguir el caso (p. ej. otro restaurante). */
+    @ExceptionHandler(CartConflictException.class)
+    ResponseEntity<ProblemDetail> handleCartConflict(CartConflictException ex) {
+        ProblemDetail problem = problem(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setProperty("code", ex.getCode());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
     }
 
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
