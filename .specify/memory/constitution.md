@@ -1,27 +1,3 @@
-<!--
-Sync Impact Report — material temporal de revisión; retirar antes del commit.
-Cambio de versión: 1.0.0 → 2.0.0.
-Motivo: enmienda mayor aprobada explícitamente por el usuario el 2026-11-13;
-redefine obligaciones incompatibles de infraestructura, HTTPS, E2E y entrega para la etapa local.
-Principios modificados:
-- I. Modularidad por dominio → I. Monolito modular sencillo.
-- II. Separación de responsabilidades: capas y Spring Data JPA; sin adaptadores anticipados.
-- III. Seguridad verificable: HTTP local y cifrado para integraciones externas permitidas.
-- IV. Consistencia de operaciones concurrentes: invariantes según el incremento y pagos aplazados.
-- V. Pruebas automatizadas y cobertura → V. Pruebas acotadas y cobertura de negocio.
-- VI. Trazabilidad de requisitos: distinguir cumplimiento local y verificación aplazada.
-Principio añadido: VII. Planificación y avance incremental.
-Secciones añadidas: configuración local; registro de aplazamientos; estado por RNF en esta etapa.
-Secciones sustituidas: arquitectura obligatoria de la propuesta → arquitectura local ejecutable;
-decisiones técnicas sujetas a consulta general → convenciones elegidas y decisiones rutinarias.
-Obligaciones retiradas de esta etapa: infraestructura cloud, workers y servicios adicionales,
-TLS local, E2E de navegador, CI/CD y despliegue como condición de aceptación.
-Seguimiento: políticas de negocio no definidas, solo al abordar el incremento que las necesite;
-infraestructura futura y verificaciones aplazadas, sin declararlas cumplidas.
-Marcadores de plantilla pendientes: ninguno.
-Plantillas, comandos y archivos de aplicación modificados: ninguno.
--->
-
 # Mikuna Constitution
 
 ## Core Principles
@@ -120,8 +96,10 @@ comprobando el estado persistido. No se requieren servicios distribuidos para es
   exclusiones justificadas. NO DEBEN excluirse reglas, validaciones o transiciones de negocio
   para alcanzar el umbral ni diluirlo con código generado. Sin lógica de negocio, la medición
   DEBE registrarse como no aplicable, sin atribuir 100 % ni cumplimiento completo de RNF-11.
-- NO DEBE instalarse, configurarse ni ejecutarse Playwright. Las pruebas E2E automatizadas de
-  navegador quedan aplazadas y NO DEBEN sustituirse por otra herramienta para el mismo trabajo.
+- Playwright PUEDE permanecer instalado en el frontend para uso manual del responsable del
+  proyecto (decisión del usuario del 2026-11-17). Los agentes NO DEBEN configurarlo, ampliarlo
+  ni ejecutarlo, y sus pruebas NO son condición de aceptación. Las pruebas E2E automatizadas
+  de navegador siguen aplazadas y NO DEBEN sustituirse por otra herramienta para el mismo trabajo.
 - Se DEBEN verificar compilación, funcionamiento local y reglas relevantes del incremento.
   Las comprobaciones aprobadas NO DEBEN repetirse sin cambios, fallos o dudas concretas que
   lo justifiquen. CI/CD y publicación de cobertura en CI quedan aplazados.
@@ -348,4 +326,4 @@ y RNF aplazados NO DEBEN declararse cumplidos ni bloquear la entrega local por s
 La infraestructura futura y las pruebas E2E se abordarán después mediante una decisión explícita
 y la planificación correspondiente.
 
-**Version**: 2.0.0 | **Ratified**: 2026-11-12 | **Last Amended**: 2026-11-13
+**Version**: 3.0.0 | **Ratified**: 2026-11-12 | **Last Amended**: 2026-11-17
