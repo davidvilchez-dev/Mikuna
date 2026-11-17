@@ -34,18 +34,17 @@ Con el backend en `:8080` y Vite en `:5173`:
 
 Las cuentas de prueba (`*@prueba.local`) se borraron de `mikuna_db` al terminar.
 
-## Pendiente de comprobación manual en el navegador (usuario)
+## Comprobación manual en el navegador
 
-Quickstart §3, filas 1–10: aspecto visual de las pantallas, navegación del menú móvil, enlace
-«Iniciar sesión» / «Mi cuenta» en la cabecera, aviso de restaurante pendiente, cierre de sesión y
-mensaje de error con el backend detenido. La lógica de cada caso tiene pruebas automatizadas; falta
-la verificación visual.
+✅ El usuario recorrió el quickstart §3 en el navegador el 2026-11-17 y confirmó que las pruebas
+pasaron: registro de los tres tipos, alta y acceso del administrador, inicio y cierre de sesión y
+navegación desde el inicio.
 
 ## Estado de requisitos
 
 | Requisito | Estado |
 | --- | --- |
-| RF-01 | **Verificado en local** (API, persistencia y pruebas). Falta la revisión visual del navegador indicada arriba. |
+| RF-01 | **Verificado en local**: API, persistencia, pruebas automatizadas y comprobación manual en el navegador. |
 | RF-04 | **Parcial**: rol y estado se comprueban en cada acceso implementado. Las relaciones con pedidos, restaurantes y entregas siguen pendientes. |
 | RNF-07 | **Verificado en los accesos implementados**: 401 y 403, token manipulado, vencido o firmado con otro secreto, suplantación y rutas públicas declaradas. |
 | RNF-11 | **Cumplido en este incremento**: 97,1 % de líneas en el backend medido y 97,6 % en la lógica del frontend; reporte de ramas incluido. |
@@ -54,6 +53,11 @@ la verificación visual.
 | RF-02 y RF-03 | Fuera de este incremento. |
 
 ## Desviaciones respecto al plan
+
+- **Contraseña sin mínimo de 12 (temporal):** por decisión del usuario del 2026-11-17, para agilizar
+  las pruebas manuales, la contraseña solo debe no estar vacía y tener hasta 128 caracteres.
+  **Pendiente:** restaurar `PASSWORD_MIN = 12` en `AccountRegistrationService` y `auth-validation.ts`
+  (más la anotación de `RegisterRequest` y las pruebas) antes de cerrar el proyecto.
 
 - **Enums de `Account`:** se guardan como `String` en lugar de `@Enumerated`. Hibernate 7 genera
   `CHECK` incluso con conversores o `columnDefinition` (se comprobó en PostgreSQL). Se actualizaron

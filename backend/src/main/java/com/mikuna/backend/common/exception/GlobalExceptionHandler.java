@@ -10,11 +10,14 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /** Traduce las excepciones de la API a ProblemDetail (RFC 9457) sin exponer detalles internos. */
@@ -41,6 +44,53 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleHttpMessageNotReadable(
             HttpMessageNotReadableException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         return ResponseEntity.badRequest().body(problem(HttpStatus.BAD_REQUEST, "Solicitud inválida"));
+    }
+
+    /** Falta la parte JSON «product» o el archivo «image» del multipart del catálogo. */
+    @Override
+    protected ResponseEntity<Object> handleMissingServletRequestPart(
+            MissingServletRequestPartException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        String field = "image".equals(ex.getRequestPartName()) ? "image" : "product";
+        String message = "image".equals(field) ? "La imagen es obligatoria" : "Completa los datos del producto";
+        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, INVALID_FORM);
+        problem.setProperty("errors", Map.of(field, message));
+        return ResponseEntity.badRequest().body(problem);
+    }
+
+    /** El límite de 2 MB del multipart lo aplica el contenedor antes del servicio. */
+    @Override
+    protected ResponseEntity<Object> handleMaxUploadSizeExceededException(
+            MaxUploadSizeExceededException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(imageTooLarge(new ImageTooLargeException()).getBody());
+    }
+
+    @ExceptionHandler(ImageTooLargeException.class)
+    ResponseEntity<ProblemDetail> imageTooLarge(ImageTooLargeException ex) {
+        ProblemDetail problem = problem(HttpStatus.PAYLOAD_TOO_LARGE, ex.getMessage());
+        problem.setProperty("errors", Map.of("image", ex.getMessage()));
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(problem);
+    }
+
+    @ExceptionHandler(ProductNotFoundException.class)
+    ResponseEntity<ProblemDetail> handleProductNotFound(ProductNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem(HttpStatus.NOT_FOUND, ex.getMessage()));
+    }
+
+    @ExceptionHandler(ProductConflictException.class)
+    ResponseEntity<ProblemDetail> handleProductConflict(ProductConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem(HttpStatus.CONFLICT, ex.getMessage()));
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    ResponseEntity<ProblemDetail> handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(problem(HttpStatus.CONFLICT, ProductConflictException.STALE));
+    }
+
+    @ExceptionHandler(ImageUnavailableException.class)
+    ResponseEntity<ProblemDetail> handleImageUnavailable(ImageUnavailableException ex) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(problem(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage()));
     }
 
     @ExceptionHandler(RegistrationValidationException.class)

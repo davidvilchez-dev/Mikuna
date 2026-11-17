@@ -27,6 +27,7 @@ export default defineConfig({
         'src/features/auth/auth-validation.ts',
         'src/features/auth/session-storage.ts',
         'src/features/restaurant/restaurant-validation.ts',
+        'src/features/catalog/catalog-validation.ts',
       ],
       reporter: ['text', 'html'],
       thresholds: { lines: 90 },

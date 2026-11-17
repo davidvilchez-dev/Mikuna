@@ -344,6 +344,14 @@ export function RestaurantPage() {
         </button>
       </section>
 
+      {isApproved && (
+        <section className="restaurant-section" aria-labelledby="catalog-title">
+          <h2 id="catalog-title">Catálogo</h2>
+          <p className="auth-description">Administra los productos que verán tus clientes.</p>
+          <Link to="/mi-restaurante/productos" className="auth-submit">Mi catálogo</Link>
+        </section>
+      )}
+
       <Link to="/mi-cuenta" className="auth-switch">Volver a mi cuenta</Link>
     </AuthLayout>
   )

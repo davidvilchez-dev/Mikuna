@@ -23,7 +23,7 @@ Resultado esperado: todo en verde, incluidas las pruebas de 409 concurrente y de
 ## 2. Crear un administrador (procedimiento local)
 
 ```powershell
-$env:MIKUNA_ADMIN_NAME = "<tu nombre>"; $env:MIKUNA_ADMIN_EMAIL = "<tu correo>"; $env:MIKUNA_ADMIN_PASSWORD = "<≥12 caracteres>"
+$env:MIKUNA_ADMIN_NAME = "<tu nombre>"; $env:MIKUNA_ADMIN_EMAIL = "<tu correo>"; $env:MIKUNA_ADMIN_PASSWORD = "<tu contraseña>"
 cd backend; .\mvnw spring-boot:run "-Dspring-boot.run.profiles=admin-setup" "-Dspring-boot.run.arguments=--spring.main.web-application-type=none"
 Remove-Item Env:MIKUNA_ADMIN_PASSWORD
 ```

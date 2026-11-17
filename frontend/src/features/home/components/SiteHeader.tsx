@@ -82,6 +82,7 @@ export function SiteHeader({ activePage, menuToggleRef, onComingSoon }: SiteHead
                 <span data-keep-clear>{item.label}</span>
               </a>
             ))}
+          <Link to="/restaurantes" className="nav-link" onClick={followSection}><span data-keep-clear>Restaurantes</span></Link>
           {hasActiveSession()
             ? <Link to="/mi-cuenta" className="nav-link" onClick={followSection}><span data-keep-clear>Mi cuenta</span></Link>
             : <Link to="/iniciar-sesion" className="nav-link" onClick={followSection}><span data-keep-clear>Iniciar sesión</span></Link>}

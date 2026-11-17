@@ -46,12 +46,14 @@ export async function apiRequest<T>(url: string, init: RequestInit = {}): Promis
   try {
     response = await fetch(url, {
       ...init,
-      headers: { Accept: 'application/json', ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...init.headers },
+      // Con FormData el navegador fija el Content-Type (multipart) con su límite.
+      headers: { Accept: 'application/json', ...(init.body && !(init.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}), ...init.headers },
     })
   } catch {
     throw new ApiError(0, GENERIC_ERROR)
   }
 
+  if (response.status === 204) return undefined as T
   if (response.ok) return (await response.json()) as T
 
   // Solo los ProblemDetail del backend se leen; el resto (p. ej. el 502 en texto del proxy de Vite) es genérico.
