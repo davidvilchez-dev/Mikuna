@@ -16,6 +16,7 @@ import { RestaurantPage } from './features/restaurant/RestaurantPage'
 import { AdminDeliveriesPage } from './features/delivery/AdminDeliveriesPage'
 import { CourierPage } from './features/delivery/CourierPage'
 import { NotificationsPage } from './features/notifications/NotificationsPage'
+import { HistoryPage } from './features/history/HistoryPage'
 
 export default function App() {
   return (
@@ -36,6 +37,7 @@ export default function App() {
       <Route path="/admin/solicitudes" element={<AdminRequestsPage />} />
       <Route path="/repartidor/entregas" element={<CourierPage />} />
       <Route path="/avisos" element={<NotificationsPage />} />
+      <Route path="/historial" element={<HistoryPage />} />
       <Route path="/admin/entregas" element={<AdminDeliveriesPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

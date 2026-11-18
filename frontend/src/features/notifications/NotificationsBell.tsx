@@ -13,10 +13,14 @@ export function NotificationsBell() {
   const text = badgeText(unread)
   const label = unread > 0 ? `Mis avisos, ${unread} sin leer` : 'Mis avisos'
 
+  // Las cuentas que reciben avisos (cliente, restaurante, repartidor) son las mismas que tienen historial (RF-30).
   return (
-    <Link to="/avisos" className="notifications-bell" aria-label={label}>
-      <span aria-hidden="true">Avisos</span>
-      {text && <span className="notifications-badge" aria-hidden="true">{text}</span>}
-    </Link>
+    <>
+      <Link to="/historial" className="notifications-bell">Historial</Link>
+      <Link to="/avisos" className="notifications-bell" aria-label={label}>
+        <span aria-hidden="true">Avisos</span>
+        {text && <span className="notifications-badge" aria-hidden="true">{text}</span>}
+      </Link>
+    </>
   )
 }

@@ -132,6 +132,11 @@ export function OrderPage() {
           Cancelar pedido
         </button>
       )}
+      {status === 'DELIVERED' && (
+        <p className="catalog-banner" role="status">
+          Tu pedido fue entregado. <Link to="/historial">Califícalo en tu historial</Link>.
+        </p>
+      )}
       {tracking && (
         <section className="cart-section" aria-labelledby="order-tracking-title">
           <h2 id="order-tracking-title">Seguimiento</h2>
