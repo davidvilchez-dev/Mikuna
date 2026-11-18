@@ -114,6 +114,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
     }
 
+    @ExceptionHandler(RatingConflictException.class)
+    ResponseEntity<ProblemDetail> handleRatingConflict(RatingConflictException ex) {
+        ProblemDetail problem = problem(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setProperty("code", ex.getCode());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
+    }
+
     @ExceptionHandler(LocationRejectedException.class)
     ResponseEntity<ProblemDetail> handleLocationRejected(LocationRejectedException ex) {
         ProblemDetail problem = problem(HttpStatus.CONFLICT, ex.getMessage());

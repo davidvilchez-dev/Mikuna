@@ -1,0 +1,8 @@
+.history-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 16px; }
+.history-filters label { display: grid; gap: 4px; font-weight: 700; }
+.history-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.history-item { display: grid; gap: 6px; padding: 14px; border: 2px solid color-mix(in srgb, var(--color-mikuna-indigo) 15%, transparent); border-radius: 12px; background: var(--color-mikuna-white); }
+.history-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; }
+.history-time { font-size: 0.85rem; }
+.history-rating { font-weight: 700; }
+.rating-control { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
