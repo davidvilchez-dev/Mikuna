@@ -42,6 +42,38 @@ public abstract class DeliveryTestSupport extends OrderStatusTestSupport {
         return mvc.perform(bearer == null ? request : request.header("Authorization", "Bearer " + bearer));
     }
 
+    /** Envía una ubicación del repartidor (spec 009). */
+    protected ResultActions sendLocation(String bearer, double latitude, double longitude, Instant recordedAt)
+            throws Exception {
+        return sendLocationJson(bearer, "{\"latitude\":%s,\"longitude\":%s,\"recordedAt\":\"%s\"}"
+                .formatted(latitude, longitude, recordedAt));
+    }
+
+    protected ResultActions sendLocationJson(String bearer, String json) throws Exception {
+        var request = put(COURIER + "/location").contentType(MediaType.APPLICATION_JSON).content(json);
+        return mvc.perform(bearer == null ? request : request.header("Authorization", "Bearer " + bearer));
+    }
+
+    protected ResultActions tracking(String bearer, UUID orderId) throws Exception {
+        return getAs(bearer, ORDERS + "/" + orderId + "/tracking");
+    }
+
+    protected ResultActions notifications(String bearer, String query) throws Exception {
+        return getAs(bearer, "/api/notifications" + query);
+    }
+
+    protected int unreadCount(String bearer) throws Exception {
+        String body = getAs(bearer, "/api/notifications/unread-count").andExpect(status().isOk()).andReturn()
+                .getResponse().getContentAsString();
+        return ((Number) com.jayway.jsonpath.JsonPath.read(body, "$.unread")).intValue();
+    }
+
+    /** Avisos de una cuenta como «TIPO» en orden cronológico de la base. */
+    protected List<String> noticeTypes(UUID accountId) {
+        return jdbc.queryForList("select type from avisos where recipient_id = ? order by created_at, id",
+                String.class, accountId);
+    }
+
     protected ResultActions courierAct(String bearer, UUID orderId, String action) throws Exception {
         return act(bearer, COURIER + "/deliveries/" + orderId + "/" + action);
     }

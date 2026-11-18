@@ -4,12 +4,16 @@ import com.mikuna.backend.common.security.AccountPrincipal;
 import com.mikuna.backend.delivery.dto.AvailabilityRequest;
 import com.mikuna.backend.delivery.dto.AvailabilityResponse;
 import com.mikuna.backend.delivery.dto.CourierDeliveryResponse;
+import com.mikuna.backend.delivery.dto.LocationRequest;
 import com.mikuna.backend.delivery.dto.RejectDeliveryRequest;
 import com.mikuna.backend.delivery.service.CourierAvailabilityService;
 import com.mikuna.backend.delivery.service.CourierDeliveryService;
+import com.mikuna.backend.delivery.service.LocationService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,10 +30,21 @@ public class CourierController {
 
     private final CourierAvailabilityService availability;
     private final CourierDeliveryService deliveries;
+    private final LocationService location;
 
-    public CourierController(CourierAvailabilityService availability, CourierDeliveryService deliveries) {
+    public CourierController(CourierAvailabilityService availability, CourierDeliveryService deliveries,
+            LocationService location) {
         this.availability = availability;
         this.deliveries = deliveries;
+        this.location = location;
+    }
+
+    /** Ubicación vigente del repartidor con una entrega en curso (RF-26). */
+    @PutMapping("/location")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateLocation(@AuthenticationPrincipal AccountPrincipal principal,
+            @Valid @RequestBody LocationRequest request) {
+        location.update(principal.id(), request);
     }
 
     @GetMapping("/availability")

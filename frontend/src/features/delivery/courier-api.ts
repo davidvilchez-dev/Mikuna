@@ -1,6 +1,7 @@
 import { apiRequest } from '../auth/auth-api'
 import type { OrderStatus } from '../restaurant/orders-logic'
 import type { CourierAction } from './courier-logic'
+import type { Position } from './location-sender'
 
 const BASE = '/api/courier'
 
@@ -31,6 +32,15 @@ export function setAvailability(token: string, available: boolean): Promise<Avai
     method: 'PUT',
     headers: { ...headers(token), 'Content-Type': 'application/json' },
     body: JSON.stringify({ available }),
+  })
+}
+
+/** Ubicación vigente del repartidor con una entrega en curso (RF-26); el servidor la asocia a su entrega. */
+export function sendLocation(token: string, position: Position): Promise<void> {
+  return apiRequest(BASE + '/location', {
+    method: 'PUT',
+    headers: { ...headers(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify(position),
   })
 }
 
