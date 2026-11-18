@@ -1,0 +1,10 @@
+.auth-header-links { display: flex; align-items: center; gap: 16px; }
+.notifications-bell { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; text-decoration: underline; text-underline-offset: 4px; }
+.notifications-bell:hover { color: var(--color-mikuna-orange); }
+.notifications-badge { min-width: 22px; padding: 2px 7px; border-radius: 999px; background: var(--color-mikuna-orange); color: var(--color-mikuna-white); font-size: 0.8rem; text-align: center; text-decoration: none; }
+.notices-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.notice { display: grid; gap: 4px; padding: 12px 14px; border: 2px solid color-mix(in srgb, var(--color-mikuna-indigo) 15%, transparent); border-radius: 12px; background: var(--color-mikuna-white); }
+.notice-unread { border-color: var(--color-mikuna-orange); font-weight: 700; }
+.notice-time { font-size: 0.85rem; font-weight: 400; }
+.notice-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.notices-filter { display: flex; align-items: center; gap: 8px; }

@@ -5,9 +5,11 @@ import com.mikuna.backend.common.security.AccountPrincipal;
 import com.mikuna.backend.order.dto.ConfirmOrderRequest;
 import com.mikuna.backend.order.dto.DecisionRequest;
 import com.mikuna.backend.order.dto.OrderResponse;
+import com.mikuna.backend.order.dto.TrackingResponse;
 import com.mikuna.backend.order.service.CheckoutService;
 import com.mikuna.backend.order.service.CheckoutTransaction;
 import com.mikuna.backend.order.service.OrderStatusService;
+import com.mikuna.backend.order.service.TrackingService;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -31,10 +33,12 @@ public class OrderController {
 
     private final CheckoutService service;
     private final OrderStatusService statusService;
+    private final TrackingService tracking;
 
-    public OrderController(CheckoutService service, OrderStatusService statusService) {
+    public OrderController(CheckoutService service, OrderStatusService statusService, TrackingService tracking) {
         this.service = service;
         this.statusService = statusService;
+        this.tracking = tracking;
     }
 
     /** 201 si se registró ahora; 200 si la clave de idempotencia ya se había procesado. */
@@ -57,6 +61,12 @@ public class OrderController {
         OrderStatusService.Result result = statusService.cancel(principal.id(), id,
                 request == null ? null : request.reason());
         return OrderResponse.of(result.order(), result.payment());
+    }
+
+    /** Estado, etapas y, solo con el pedido Recogido, la ubicación del repartidor (RF-27, RF-28). */
+    @GetMapping("/{id}/tracking")
+    public TrackingResponse tracking(@AuthenticationPrincipal AccountPrincipal principal, @PathVariable UUID id) {
+        return tracking.get(principal.id(), id);
     }
 
     @GetMapping("/{id}")

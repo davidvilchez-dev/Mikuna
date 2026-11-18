@@ -13,6 +13,7 @@ import com.mikuna.backend.order.dto.CheckoutResponse;
 import com.mikuna.backend.order.dto.ConfirmOrderRequest;
 import com.mikuna.backend.order.dto.OrderResponse;
 import com.mikuna.backend.order.model.Order;
+import com.mikuna.backend.order.model.OrderPlacedEvent;
 import com.mikuna.backend.order.repository.OrderRepository;
 import com.mikuna.backend.payment.model.Payment;
 import com.mikuna.backend.payment.model.PaymentStatus;
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,9 +50,11 @@ public class CheckoutTransaction {
     private final PaymentService paymentService;
     private final StripeProperties stripe;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
 
     public CheckoutTransaction(CartService carts, OrderRepository orders, PaymentRepository payments,
-            AddressRepository addresses, PaymentService paymentService, StripeProperties stripe, Clock clock) {
+            AddressRepository addresses, PaymentService paymentService, StripeProperties stripe, Clock clock,
+            ApplicationEventPublisher events) {
         this.carts = carts;
         this.orders = orders;
         this.payments = payments;
@@ -58,6 +62,7 @@ public class CheckoutTransaction {
         this.paymentService = paymentService;
         this.stripe = stripe;
         this.clock = clock;
+        this.events = events;
     }
 
     @Transactional
@@ -91,6 +96,7 @@ public class CheckoutTransaction {
             orders.saveAndFlush(order);
             paymentService.recordAuthorized(customerId, orderId, confirmationKey, totals.total(), intentId);
             carts.clearAfterCheckout(cart);
+            events.publishEvent(new OrderPlacedEvent(orderId));
             return new Confirmation(OrderResponse.of(order, PaymentStatus.AUTHORIZED), true);
         } catch (RuntimeException e) {
             // Una clave duplicada comparte la misma reserva con el pedido ya registrado: no se libera.

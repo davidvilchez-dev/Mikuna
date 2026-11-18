@@ -52,6 +52,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/restaurant/**").hasRole("RESTAURANT")
                         .requestMatchers("/api/customer/**").hasRole("CUSTOMER")
                         .requestMatchers("/api/courier/**").hasRole("COURIER")
+                        .requestMatchers("/api/notifications/**").hasAnyRole("CUSTOMER", "RESTAURANT", "COURIER")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth

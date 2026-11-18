@@ -6,6 +6,7 @@ import com.mikuna.backend.common.exception.RestaurantNotEnabledException;
 import com.mikuna.backend.order.model.ActorRole;
 import com.mikuna.backend.order.model.Order;
 import com.mikuna.backend.order.model.OrderReadyEvent;
+import com.mikuna.backend.order.model.OrderStatusChangedEvent;
 import com.mikuna.backend.order.model.OrderStatus;
 import com.mikuna.backend.order.model.OrderStatusChange;
 import com.mikuna.backend.order.repository.OrderRepository;
@@ -146,8 +147,10 @@ public class OrderStatusService {
         OrderStatus from = order.getStatus();
         order.transitionTo(target);
         orders.save(order);
-        changes.save(new OrderStatusChange(order.getId(), from, target, Instant.now(clock), actorId, role,
-                normalize(reason)));
+        OrderStatusChange change = new OrderStatusChange(order.getId(), from, target, Instant.now(clock), actorId,
+                role, normalize(reason));
+        changes.save(change);
+        events.publishEvent(new OrderStatusChangedEvent(change.getId(), order.getId(), from, target, actorId, role));
     }
 
     private static String normalize(String reason) {

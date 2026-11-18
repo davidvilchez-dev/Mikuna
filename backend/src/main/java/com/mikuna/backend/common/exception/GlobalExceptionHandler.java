@@ -99,6 +99,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem(HttpStatus.NOT_FOUND, ex.getMessage()));
     }
 
+    @ExceptionHandler(NotificationNotFoundException.class)
+    ResponseEntity<ProblemDetail> handleNotificationNotFound(NotificationNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem(HttpStatus.NOT_FOUND, ex.getMessage()));
+    }
+
     @ExceptionHandler(OrderConflictException.class)
     ResponseEntity<ProblemDetail> handleOrderConflict(OrderConflictException ex) {
         ProblemDetail problem = problem(HttpStatus.CONFLICT, ex.getMessage());
@@ -106,6 +111,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         if (ex.getCheckout() != null) {
             problem.setProperty("checkout", ex.getCheckout());
         }
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
+    }
+
+    @ExceptionHandler(LocationRejectedException.class)
+    ResponseEntity<ProblemDetail> handleLocationRejected(LocationRejectedException ex) {
+        ProblemDetail problem = problem(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setProperty("code", ex.getCode());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
     }
 

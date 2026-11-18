@@ -7,6 +7,7 @@ import {
   actOnDelivery,
   getAvailability,
   listDeliveries,
+  sendLocation,
   setAvailability,
   type Availability,
   type CourierDelivery,
@@ -23,6 +24,7 @@ import {
   validateDeliveryReason,
   type CourierAction,
 } from './courier-logic'
+import { sharingMessages, startLocationSharing, type SharingState } from './location-sender'
 import '../restaurant/restaurant.css'
 
 type ViewState =
@@ -42,6 +44,7 @@ export function CourierPage() {
   const [reason, setReason] = useState('')
   const [reasonError, setReasonError] = useState<string | undefined>()
   const [busy, setBusy] = useState(false)
+  const [sharing, setSharing] = useState<SharingState>('idle')
 
   const token = session?.token ?? ''
 
@@ -74,6 +77,13 @@ export function CourierPage() {
     const timer = setInterval(load, DELIVERY_POLL_MS)
     return () => { active = false; clearInterval(timer) }
   }, [token, attempt, fail])
+
+  // Mientras haya una entrega Asignada o Recogida se comparte la ubicación del navegador (RF-26).
+  const hasActiveDelivery = view.kind === 'ready' && view.deliveries.length > 0
+  useEffect(() => {
+    if (!token || !hasActiveDelivery) return
+    return startLocationSharing((position) => sendLocation(token, position), setSharing)
+  }, [token, hasActiveDelivery])
 
   if (!session) return <Navigate to="/iniciar-sesion" replace />
 
@@ -158,6 +168,7 @@ export function CourierPage() {
                 : 'No tienes entregas asignadas. Activa tu disponibilidad para recibir pedidos.'}
             </p>
           )}
+          {hasActiveDelivery && <p className="auth-description" role="status">{sharingMessages[sharing]}</p>}
           <ul className="restaurant-list">
             {view.deliveries.map((delivery) => (
               <li key={delivery.orderId} className="restaurant-card">

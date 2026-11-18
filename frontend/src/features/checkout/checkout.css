@@ -2,3 +2,6 @@
 .checkout-lines li { display: flex; justify-content: space-between; gap: 12px; }
 .checkout-form { display: grid; gap: 12px; }
 .checkout-card { padding: 14px 12px; border: 2px solid color-mix(in srgb, var(--color-mikuna-indigo) 20%, transparent); border-radius: 12px; background: var(--color-mikuna-white); }
+.tracking-stages { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 6px; }
+.tracking-stages li { display: flex; justify-content: space-between; gap: 12px; }
+.tracking-location { display: grid; gap: 4px; padding: 12px 14px; border: 2px solid var(--color-mikuna-orange); border-radius: 12px; background: var(--color-mikuna-white); }
