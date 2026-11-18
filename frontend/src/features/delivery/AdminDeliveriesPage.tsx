@@ -1,0 +1,138 @@
+import { useCallback, useEffect, useState } from 'react'
+import { Link, Navigate, useNavigate } from 'react-router'
+import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
+import { AuthLayout } from '../auth/AuthLayout'
+import { clearSession, getSession } from '../auth/session-storage'
+import { assignDelivery, listPending, releaseDelivery, type PendingDelivery } from './admin-deliveries-api'
+import { DELIVERY_POLL_MS } from './courier-logic'
+import '../restaurant/restaurant.css'
+
+const dateFormat = new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium', timeStyle: 'short' })
+
+type ViewState =
+  | { kind: 'loading' }
+  | { kind: 'ready'; items: PendingDelivery[] }
+  | { kind: 'forbidden' }
+  | { kind: 'error'; message: string }
+
+/** Entregas por resolver (RF-24): asigna manualmente a un candidato y libera las de repartidores inhabilitados. */
+export function AdminDeliveriesPage() {
+  const navigate = useNavigate()
+  const [session] = useState(() => getSession())
+  const [view, setView] = useState<ViewState>({ kind: 'loading' })
+  const [attempt, setAttempt] = useState(0)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const token = session?.token ?? ''
+
+  const fail = useCallback((error: unknown): string => {
+    if (error instanceof ApiError && error.status === 401) {
+      clearSession()
+      navigate('/iniciar-sesion', { replace: true })
+      return 'Tu sesión venció'
+    }
+    return error instanceof ApiError ? error.message : GENERIC_ERROR
+  }, [navigate])
+
+  useEffect(() => {
+    if (!token) return
+    let active = true
+    const load = () => {
+      listPending(token)
+        .then((items) => { if (active) setView({ kind: 'ready', items }) })
+        .catch((error: unknown) => {
+          if (!active) return
+          if (error instanceof ApiError && error.status === 403) setView({ kind: 'forbidden' })
+          else {
+            const message = fail(error)
+            setView((current) => (current.kind === 'ready' ? current : { kind: 'error', message }))
+          }
+        })
+    }
+    load()
+    const timer = setInterval(load, DELIVERY_POLL_MS)
+    return () => { active = false; clearInterval(timer) }
+  }, [token, attempt, fail])
+
+  if (!session) return <Navigate to="/iniciar-sesion" replace />
+
+  const reload = () => setAttempt((n) => n + 1)
+
+  async function run(action: () => Promise<unknown>, done: string) {
+    if (busy) return
+    setBusy(true)
+    setNotice(null)
+    try {
+      await action()
+      setNotice(done)
+    } catch (error) {
+      // 409: otra solicitud ya la resolvió o el repartidor dejó de ser candidato; se muestra el motivo.
+      setNotice(fail(error))
+    } finally {
+      setBusy(false)
+      reload()
+    }
+  }
+
+  if (view.kind === 'forbidden') {
+    return (
+      <AuthLayout title="Entregas pendientes">
+        <p className="auth-alert" role="alert">Esta sección es solo para administradores.</p>
+        <Link to="/mi-cuenta" className="auth-submit auth-submit-secondary">Volver a mi cuenta</Link>
+      </AuthLayout>
+    )
+  }
+
+  return (
+    <AuthLayout wide title="Entregas pendientes" description="Asigna a un repartidor las entregas que el sistema no pudo asignar.">
+      {notice && <p className="auth-notice" role="status">{notice}</p>}
+      {view.kind === 'loading' && <p className="auth-description" role="status">Cargando entregas…</p>}
+      {view.kind === 'error' && (
+        <>
+          <p className="auth-alert" role="alert">{view.message}</p>
+          <button type="button" className="auth-submit" onClick={() => { setView({ kind: 'loading' }); reload() }}>Reintentar</button>
+        </>
+      )}
+      {view.kind === 'ready' && view.items.length === 0 && (
+        <p className="auth-description" role="status">No hay entregas pendientes de asignación.</p>
+      )}
+      {view.kind === 'ready' && view.items.length > 0 && (
+        <ul className="restaurant-list">
+          {view.items.map((item) => (
+            <li key={item.orderId} className="restaurant-card">
+              <h2>{item.restaurantName}</h2>
+              <dl>
+                <div><dt>Listo desde</dt><dd>{dateFormat.format(new Date(item.readyAt))}</dd></div>
+                <div><dt>Distrito de entrega</dt><dd>{item.district}</dd></div>
+                <div><dt>Situación</dt><dd>{item.courierDisabled ? 'Asignada a un repartidor inhabilitado' : 'Sin repartidor'}</dd></div>
+              </dl>
+              {item.courierDisabled && (
+                <div className="restaurant-actions">
+                  <button type="button" className="auth-submit" disabled={busy}
+                    onClick={() => void run(() => releaseDelivery(token, item.orderId), 'Entrega liberada; se intentará reasignar')}>
+                    Liberar
+                  </button>
+                </div>
+              )}
+              {!item.courierDisabled && item.candidates.length === 0 && (
+                <p className="auth-description">No hay repartidores disponibles. Se asignará sola cuando haya uno.</p>
+              )}
+              {!item.courierDisabled && item.candidates.length > 0 && (
+                <div className="restaurant-actions">
+                  {item.candidates.map((candidate) => (
+                    <button key={candidate.courierId} type="button" className="auth-submit auth-submit-secondary" disabled={busy}
+                      onClick={() => void run(() => assignDelivery(token, item.orderId, candidate.courierId), `Entrega asignada a ${candidate.name}`)}>
+                      Asignar a {candidate.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <Link to="/mi-cuenta" className="auth-switch">Volver a mi cuenta</Link>
+    </AuthLayout>
+  )
+}

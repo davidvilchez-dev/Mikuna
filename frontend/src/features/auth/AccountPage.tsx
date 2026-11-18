@@ -80,8 +80,14 @@ export function AccountPage() {
       {account.role === 'RESTAURANT' && (
         <Link to="/mi-restaurante" className="auth-submit">Mi restaurante</Link>
       )}
+      {account.role === 'COURIER' && (
+        <Link to="/repartidor/entregas" className="auth-submit">Mis entregas</Link>
+      )}
       {account.role === 'ADMIN' && (
-        <Link to="/admin/solicitudes" className="auth-submit">Solicitudes de restaurantes</Link>
+        <>
+          <Link to="/admin/solicitudes" className="auth-submit">Solicitudes de restaurantes</Link>
+          <Link to="/admin/entregas" className="auth-submit auth-submit-secondary">Entregas pendientes</Link>
+        </>
       )}
       <button type="button" className="auth-submit auth-submit-secondary" onClick={logout}>Cerrar sesión</button>
     </AuthLayout>

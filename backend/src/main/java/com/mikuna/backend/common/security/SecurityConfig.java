@@ -51,6 +51,7 @@ public class SecurityConfig {
                         // RF-04: rol por ruta; el estado de la cuenta ya lo comprueba AccountStatusFilter.
                         .requestMatchers("/api/restaurant/**").hasRole("RESTAURANT")
                         .requestMatchers("/api/customer/**").hasRole("CUSTOMER")
+                        .requestMatchers("/api/courier/**").hasRole("COURIER")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth
