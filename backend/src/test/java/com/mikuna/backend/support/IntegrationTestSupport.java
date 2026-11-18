@@ -1,10 +1,12 @@
 package com.mikuna.backend.support;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 
 import com.jayway.jsonpath.JsonPath;
 import com.mikuna.backend.catalog.service.CloudinaryImageStorage;
+import com.mikuna.backend.payment.service.StripeGateway;
 import com.mikuna.backend.account.model.Account;
 import com.mikuna.backend.account.model.Role;
 import com.mikuna.backend.account.repository.AccountRepository;
@@ -45,10 +47,21 @@ public abstract class IntegrationTestSupport {
     @MockitoBean
     protected CloudinaryImageStorage imageStorage;
 
+    /** Stripe nunca se llama en las pruebas (spec 006); por defecto autoriza con un intento fijo. */
+    @MockitoBean
+    protected StripeGateway stripeGateway;
+
     @BeforeEach
     void cleanDatabase() {
+        when(stripeGateway.authorize(anyLong(), any(), any(), any(), any()))
+                .thenReturn(new StripeGateway.Authorization(StripeGateway.Outcome.REQUIRES_CAPTURE, "pi_test_1",
+                        null, null));
         when(imageStorage.upload(any(), any()))
                 .thenReturn(new CloudinaryImageStorage.StoredImage("https://img.test/p.jpg", "mikuna/products/p"));
+        jdbc.update("delete from transacciones_pago");
+        jdbc.update("delete from pagos");
+        jdbc.update("delete from lineas_pedido");
+        jdbc.update("delete from pedidos");
         jdbc.update("delete from lineas_carrito");
         jdbc.update("delete from carritos");
         jdbc.update("delete from direcciones");

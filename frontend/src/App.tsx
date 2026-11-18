@@ -8,6 +8,8 @@ import { RestaurantCatalogPage } from './features/catalog/RestaurantCatalogPage'
 import { RestaurantSearchPage } from './features/catalog/RestaurantSearchPage'
 import { AddressesPage } from './features/cart/AddressesPage'
 import { CartPage } from './features/cart/CartPage'
+import { CheckoutPage } from './features/checkout/CheckoutPage'
+import { OrderPage } from './features/checkout/OrderPage'
 import { AdminRequestsPage } from './features/restaurant/AdminRequestsPage'
 import { RestaurantPage } from './features/restaurant/RestaurantPage'
 
@@ -24,6 +26,8 @@ export default function App() {
       <Route path="/mi-restaurante/productos" element={<ProductsPage />} />
       <Route path="/carrito" element={<CartPage />} />
       <Route path="/mis-direcciones" element={<AddressesPage />} />
+      <Route path="/confirmar-pedido" element={<CheckoutPage />} />
+      <Route path="/pedido/:id" element={<OrderPage />} />
       <Route path="/admin/solicitudes" element={<AdminRequestsPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

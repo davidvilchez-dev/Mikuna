@@ -1,0 +1,4 @@
+.checkout-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.checkout-lines li { display: flex; justify-content: space-between; gap: 12px; }
+.checkout-form { display: grid; gap: 12px; }
+.checkout-card { padding: 14px 12px; border: 2px solid color-mix(in srgb, var(--color-mikuna-indigo) 20%, transparent); border-radius: 12px; background: var(--color-mikuna-white); }

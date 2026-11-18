@@ -43,9 +43,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class CartService {
 
-    static final String REASON_WITHDRAWN = "PRODUCT_WITHDRAWN";
-    static final String REASON_UNAVAILABLE = "PRODUCT_UNAVAILABLE";
-    static final String REASON_RESTAURANT = "RESTAURANT_UNAVAILABLE";
+    public static final String REASON_WITHDRAWN = "PRODUCT_WITHDRAWN";
+    public static final String REASON_UNAVAILABLE = "PRODUCT_UNAVAILABLE";
+    public static final String REASON_RESTAURANT = "RESTAURANT_UNAVAILABLE";
 
     private final CartRepository carts;
     private final ProductRepository products;
@@ -155,12 +155,40 @@ public class CartService {
         return new CartConflictException(CartConflictException.NOT_ORDERABLE, message);
     }
 
+    /** Bloquea y devuelve el carrito del cliente para confirmarlo (spec 006); crea uno vacío si no existe. */
+    public Cart lockForCheckout(UUID customerId) {
+        return loadOrCreateLocked(customerId);
+    }
+
+    /**
+     * Vista vigente del carrito para el checkout: igual que {@link #get} pero sin retirar la dirección fuera de
+     * zona (la confirmación debe rechazarla, no limpiarla en silencio). No modifica el carrito.
+     */
+    public CartResponse checkoutView(Cart cart) {
+        return view(cart, false);
+    }
+
+    /** Resumen del checkout de un cliente sin bloquear su carrito (consulta informativa). */
+    public CartResponse checkoutView(UUID customerId) {
+        return carts.findByCustomerId(customerId).map(this::checkoutView).orElseGet(this::emptyView);
+    }
+
+    /** Vacía el carrito tras confirmar el pedido y conserva la dirección seleccionada. */
+    public void clearAfterCheckout(Cart cart) {
+        cart.clear();
+        carts.save(cart);
+    }
+
     private CartResponse emptyView() {
         return new CartResponse(null, List.of(), null, pricing.compute(List.of(), false), List.of());
     }
 
     /** Construye la vista con los datos vigentes: elegibilidad por línea, dirección revalidada e importes. */
     private CartResponse view(Cart cart) {
+        return view(cart, true);
+    }
+
+    private CartResponse view(Cart cart, boolean dropInvalidAddress) {
         List<String> notices = new ArrayList<>();
         List<CartLine> lines = cart.getLines();
 
@@ -187,7 +215,7 @@ public class CartService {
                     reason));
         }
 
-        CartResponse.AddressInfo address = resolveAddress(cart, notices);
+        CartResponse.AddressInfo address = resolveAddress(cart, notices, dropInvalidAddress);
         TotalsResponse totals = pricing.compute(eligibleTotals, address != null);
         return new CartResponse(restaurantInfo(cart, visible), responseLines, address, totals, notices);
     }
@@ -215,7 +243,7 @@ public class CartService {
     }
 
     /** Dirección seleccionada vigente; si ya no existe o salió de la zona, se retira de la selección. */
-    private CartResponse.AddressInfo resolveAddress(Cart cart, List<String> notices) {
+    private CartResponse.AddressInfo resolveAddress(Cart cart, List<String> notices, boolean dropInvalid) {
         UUID selected = cart.getSelectedAddressId();
         if (selected == null) {
             return null;
@@ -225,8 +253,10 @@ public class CartService {
             return new CartResponse.AddressInfo(address.get().getId(), address.get().getStreet(),
                     address.get().getDistrict());
         }
-        cart.clearAddress();
-        carts.save(cart);
+        if (dropInvalid) {
+            cart.clearAddress();
+            carts.save(cart);
+        }
         notices.add("Tu dirección seleccionada ya no está en la zona de reparto; elige otra");
         return null;
     }

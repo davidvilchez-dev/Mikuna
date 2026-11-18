@@ -1,3 +1,15 @@
+<!--
+Sync Impact Report (temporal; retirar antes del commit)
+Version change: 3.0.0 -> 3.1.0 (MINOR: integración permitida y requisito de pago vigente)
+Principios modificados: III (Stripe permitido en sandbox, claves, tarjetas, RNF-06/08),
+  IV (RF-16/RF-17 vigentes desde 006, idempotencia, sin reembolsos),
+  V (dobles para Stripe en pruebas unitarias).
+Secciones modificadas: tabla de arquitectura (integraciones), aplazamientos (Stripe retirado),
+  tabla RNF (RNF-06, RNF-08), Governance (aprobación 3.1.0).
+Secciones añadidas/eliminadas: ninguna.
+TODO: ninguno. Revisar spec 006 (nombrar Stripe) y plan al planificar.
+-->
+
 # Mikuna Constitution
 
 ## Core Principles
@@ -37,9 +49,11 @@ sin depender de servicios externos reales en las pruebas unitarias.
 - El desarrollo en localhost DEBE utilizar HTTP. NO DEBEN prepararse certificados, autoridades
   certificadoras ni TLS local. La comprobación de HTTPS del despliegue queda aplazada;
   RNF-06 NO DEBE declararse cumplido por una ejecución local.
-- Las únicas integraciones externas permitidas son Cloudinary para imágenes y el servicio de
-  correo electrónico. DEBEN prepararse solo cuando la funcionalidad actual las necesite y usar
-  el cifrado correspondiente a su protocolo: HTTPS para APIs y TLS para transporte de correo.
+- Las únicas integraciones externas permitidas son Cloudinary para imágenes, el servicio de
+  correo electrónico y, desde el incremento 006 (decisión del usuario del 2026-11-17), Stripe
+  exclusivamente en modo de pruebas (sandbox). DEBEN prepararse solo cuando la funcionalidad
+  actual las necesite y usar el cifrado correspondiente a su protocolo: HTTPS para APIs y TLS
+  para transporte de correo.
 - La autenticación DEBE usar tokens sin sesiones en memoria de la API. El inicio, el registro,
   el inicio de sesión, la recuperación de contraseña y RF-09/RF-10 son públicos, conforme a la
   aclaración del usuario del 2026-11-12. Las operaciones personales y de gestión DEBEN protegerse;
@@ -52,8 +66,14 @@ sin depender de servicios externos reales en las pruebas unitarias.
 - Las contraseñas DEBEN almacenarse mediante hashes adaptativos con sal; la recuperación DEBE
   utilizar mecanismos temporales de un solo uso. Los secretos NO DEBEN exponerse en respuestas
   o registros; las credenciales externas reales NO DEBEN incluirse en commits.
-- Los datos sensibles de tarjetas NO DEBEN almacenarse. La integración con la pasarela y la
-  evidencia completa de RNF-08 quedan aplazadas, sin simular su cumplimiento.
+- Los datos sensibles de tarjetas NO DEBEN almacenarse, registrarse ni transitar por el sistema:
+  los captura el formulario de Stripe en el frontend y el backend solo maneja referencias de la
+  pasarela. La integración con Stripe en modo de pruebas se permite desde el incremento 006.
+- Las claves de Stripe (`sk_test_` y `pk_test_`) DEBEN residir solo en `backend/.env`, sin incluirse
+  en commits, registros ni respuestas. El backend DEBE rechazar cualquier clave secreta que no
+  comience con `sk_test_`. NO se admiten claves reales (`sk_live_`) ni otras pasarelas.
+- RNF-06 y RNF-08 NO DEBEN declararse cumplidos por una ejecución local con claves de prueba; su
+  evidencia completa queda pendiente del despliegue.
 
 **Verificación:** revisar validación, permisos, secretos y cifrado de las integraciones permitidas
 que existan; probar rutas públicas y rechazos del incremento.
@@ -75,10 +95,12 @@ que existan; probar rutas públicas y rechazos del incremento.
   entre aceptación y cancelación DEBEN resolverse y probarse en el incremento correspondiente.
   RF-31 DEBE garantizar una única calificación de 1 a 5 por pedido propio entregado, incluso
   ante solicitudes simultáneas.
-- Se conserva como requisito futuro de RF-16/RF-17 autorizar el pago al confirmar, capturarlo al
-  aceptar, liberar la reserva al rechazar o cancelar antes de aceptar y asociar el resultado al
-  pedido. La pasarela, sus webhooks, su idempotencia y su recuperación ante fallos quedan
-  aplazados. NO DEBEN declararse pagos completos sin esa integración y su evidencia.
+- RF-16/RF-17 son requisito vigente desde el incremento 006: el pago DEBE autorizarse al confirmar
+  (reserva con captura manual), capturarse al aceptar, liberarse al rechazar o cancelar antes de
+  aceptar, y cada transacción DEBE asociarse al pedido. NO hay reembolsos. Confirmar o reintentar
+  NO DEBE duplicar pedido ni reserva (idempotencia) y NO DEBE quedar una reserva sin pedido. Los
+  webhooks y la recuperación avanzada ante fallos siguen aplazados. NO DEBEN declararse pagos
+  completos sin la evidencia del incremento.
 
 **Verificación:** pruebas de integración acotadas de las transacciones y carreras introducidas,
 comprobando el estado persistido. No se requieren servicios distribuidos para esta garantía.
@@ -100,6 +122,8 @@ comprobando el estado persistido. No se requieren servicios distribuidos para es
   proyecto (decisión del usuario del 2026-11-17). Los agentes NO DEBEN configurarlo, ampliarlo
   ni ejecutarlo, y sus pruebas NO son condición de aceptación. Las pruebas E2E automatizadas
   de navegador siguen aplazadas y NO DEBEN sustituirse por otra herramienta para el mismo trabajo.
+- Las pruebas unitarias NO DEBEN llamar a Stripe real; DEBEN usar dobles (Mockito). Las pruebas
+  contra el sandbox de Stripe son opcionales y manuales.
 - Se DEBEN verificar compilación, funcionamiento local y reglas relevantes del incremento.
   Las comprobaciones aprobadas NO DEBEN repetirse sin cambios, fallos o dudas concretas que
   lo justifiquen. CI/CD y publicación de cobertura en CI quedan aplazados.
@@ -166,7 +190,7 @@ comercio, reembolsos y conciliación contable.
 | Backend | Una aplicación Java + Spring Boot organizada por funcionalidades. |
 | Persistencia | PostgreSQL local mediante Spring Data JPA; base creada manualmente por el usuario. |
 | Configuración | `src/main/resources/application.properties` del backend. |
-| Integraciones permitidas | Cloudinary y correo (Resend según la propuesta), solo cuando sean necesarios y con cifrado. |
+| Integraciones permitidas | Cloudinary, correo (Resend según la propuesta) y Stripe solo en modo de pruebas, solo cuando sean necesarios y con cifrado. |
 
 La conexión PostgreSQL, el puerto y, cuando correspondan, los parámetros de correo y Cloudinary
 DEBEN centralizarse y quedar configurables en `src/main/resources/application.properties`.
@@ -183,9 +207,10 @@ herramientas de migración por anticipado.
   balanceadores, escalamiento, réplicas, CDN, monitoreo cloud y CI/CD.
 - **Infraestructura adicional:** Redis, RabbitMQ, workers separados, contenedores y demás
   infraestructura adicional quedan aplazados. El correo que se necesite NO DEBE exigirlos.
-- **Otras integraciones:** Stripe sandbox, MapTiler y FCM quedan como referencias aplazadas
-  de pagos, mapas y notificaciones push; no se permite integrarlos durante esta etapa.
-  Cloudinary y correo se preparan exclusivamente cuando sean necesarios para la funcionalidad actual.
+- **Otras integraciones:** MapTiler y FCM quedan como referencias aplazadas de mapas y
+  notificaciones push; no se permite integrarlos durante esta etapa. Cloudinary, correo y Stripe
+  (solo pruebas, desde el incremento 006) se preparan exclusivamente cuando sean necesarios para
+  la funcionalidad actual.
 - **Verificaciones posteriores:** HTTPS del despliegue, E2E automatizadas de navegador,
   validación de infraestructura y evaluaciones de carga y disponibilidad correspondientes
   quedan pendientes. NO DEBEN prepararse certificados ni TLS local para anticiparlas.
@@ -247,9 +272,9 @@ distinguirse de la validación futura. Esta tabla define aplicabilidad, no certi
 | RNF-03 | Atender desde caché al menos el 80 % de consultas repetidas de restaurantes y catálogo. | Caché y medición de aciertos aplazadas. |
 | RNF-04 | Continuar atendiendo si cae una instancia y otras siguen disponibles. | Infraestructura redundante y prueba de caída aplazadas. |
 | RNF-05 | No asignar simultáneamente una entrega a más de un repartidor. | Aplicable al implementar asignación; integración concurrente y estado persistido único. |
-| RNF-06 | HTTPS cliente/plataforma y redirección o rechazo de HTTP en despliegue. | Aplazado para despliegue; desarrollo local por HTTP sin certificados ni TLS local. |
+| RNF-06 | HTTPS cliente/plataforma y redirección o rechazo de HTTP en despliegue. | Aplazado para despliegue; desarrollo local por HTTP sin certificados ni TLS local. La integración local con Stripe de pruebas no lo acredita. |
 | RNF-07 | Denegar el 100 % de accesos sin autenticación o permisos a operaciones protegidas. | Aplicable; pruebas por rol, recurso, 401/403 y rutas públicas declaradas. |
-| RNF-08 | No almacenar datos sensibles de tarjetas y delegar su procesamiento a una pasarela cifrada. | Prohibición de almacenamiento vigente; integración y evidencia completa aplazadas. |
+| RNF-08 | No almacenar datos sensibles de tarjetas y delegar su procesamiento a una pasarela cifrada. | Prohibición de almacenamiento vigente; integración con Stripe de pruebas desde el 006; evidencia completa del despliegue aplazada. |
 | RNF-09 | Un usuario nuevo completa el pedido desde búsqueda hasta confirmación en menos de 5 min y sin ayuda. | Evaluación cronometrada con cinco personas cuando exista el flujo; E2E automatizadas aplazadas. |
 | RNF-10 | Visualizar CPU, tiempo de respuesta y tasa de errores durante operación y carga. | Monitoreo cloud y evidencia del panel durante carga aplazados. |
 | RNF-11 | Al menos 90 % de líneas de lógica de negocio y reporte de ramas sin umbral obligatorio. | Pruebas y reporte locales; publicación en CI aplazada y sin extender el umbral a toda la presentación. |
@@ -311,6 +336,8 @@ esta constitución y señalar la discrepancia pertinente sin ampliar el alcance.
 Toda enmienda DEBE registrar motivo, reglas y RF/RNF afectados, impacto y aprobación explícita
 del responsable del proyecto. Cuando cambie lo ya construido, DEBE indicar su adaptación necesaria.
 Esta solicitud constituye la aprobación de la enmienda 2.0.0; no requiere una nueva confirmación.
+La enmienda 3.1.0 (Stripe en modo de pruebas para el incremento 006) cuenta con la aprobación
+explícita del usuario del 2026-11-17.
 Un conflicto nuevo sobre alcance o reglas de negocio DEBE consultarse cuando afecte al incremento.
 Las decisiones rutinarias se resuelven conforme al principio VII.
 
@@ -326,4 +353,4 @@ y RNF aplazados NO DEBEN declararse cumplidos ni bloquear la entrega local por s
 La infraestructura futura y las pruebas E2E se abordarán después mediante una decisión explícita
 y la planificación correspondiente.
 
-**Version**: 3.0.0 | **Ratified**: 2026-11-12 | **Last Amended**: 2026-11-17
+**Version**: 3.1.0 | **Ratified**: 2026-11-12 | **Last Amended**: 2026-11-17
