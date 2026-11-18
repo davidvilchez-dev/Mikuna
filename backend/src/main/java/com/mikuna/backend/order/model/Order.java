@@ -148,11 +148,16 @@ public class Order implements Persistable<UUID> {
                 EnumSet.of(OrderStatus.ACCEPTED, OrderStatus.REJECTED, OrderStatus.CANCELLED));
         TRANSITIONS.put(OrderStatus.ACCEPTED, EnumSet.of(OrderStatus.PREPARING));
         TRANSITIONS.put(OrderStatus.PREPARING, EnumSet.of(OrderStatus.READY));
+        TRANSITIONS.put(OrderStatus.READY, EnumSet.of(OrderStatus.ASSIGNED));
+        // ASSIGNED a READY solo lo origina el rechazo del repartidor o la liberación del administrador (spec 008).
+        TRANSITIONS.put(OrderStatus.ASSIGNED, EnumSet.of(OrderStatus.PICKED_UP, OrderStatus.READY));
+        TRANSITIONS.put(OrderStatus.PICKED_UP, EnumSet.of(OrderStatus.DELIVERED));
     }
 
     /**
      * Único punto de cambio de estado (FR-007): solo Pendiente a Aceptado/Rechazado/Cancelado, Aceptado a En
-     * preparación y En preparación a Listo para recoger. Rechazado, Cancelado y Listo para recoger son finales.
+     * preparación, En preparación a Listo para recoger y, desde la spec 008, Listo a Asignado, Asignado a Recogido o
+     * de vuelta a Listo (rechazo), y Recogido a Entregado. Rechazado, Cancelado y Entregado son finales.
      */
     public void transitionTo(OrderStatus target) {
         if (!TRANSITIONS.getOrDefault(status, Set.of()).contains(target)) {

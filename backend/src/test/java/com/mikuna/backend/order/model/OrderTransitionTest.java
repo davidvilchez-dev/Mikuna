@@ -11,13 +11,19 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** FR-007: solo las seis transiciones permitidas; Rechazado, Cancelado y Listo para recoger son finales. */
+/**
+ * FR-007 (spec 007) y FR-013 (spec 008): solo las transiciones permitidas; Rechazado, Cancelado y Entregado son
+ * finales. El retroceso Asignado a Listo solo existe por el rechazo del repartidor.
+ */
 public class OrderTransitionTest {
 
     private static final Map<OrderStatus, Set<OrderStatus>> ALLOWED = Map.of(
             OrderStatus.PENDING, Set.of(OrderStatus.ACCEPTED, OrderStatus.REJECTED, OrderStatus.CANCELLED),
             OrderStatus.ACCEPTED, Set.of(OrderStatus.PREPARING),
-            OrderStatus.PREPARING, Set.of(OrderStatus.READY));
+            OrderStatus.PREPARING, Set.of(OrderStatus.READY),
+            OrderStatus.READY, Set.of(OrderStatus.ASSIGNED),
+            OrderStatus.ASSIGNED, Set.of(OrderStatus.PICKED_UP, OrderStatus.READY),
+            OrderStatus.PICKED_UP, Set.of(OrderStatus.DELIVERED));
 
     public static Order orderIn(OrderStatus status) {
         Order order = new Order(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "Local", "k",
@@ -37,6 +43,27 @@ public class OrderTransitionTest {
                 order.transitionTo(OrderStatus.ACCEPTED);
                 order.transitionTo(OrderStatus.PREPARING);
                 order.transitionTo(OrderStatus.READY);
+            }
+            case ASSIGNED -> {
+                order.transitionTo(OrderStatus.ACCEPTED);
+                order.transitionTo(OrderStatus.PREPARING);
+                order.transitionTo(OrderStatus.READY);
+                order.transitionTo(OrderStatus.ASSIGNED);
+            }
+            case PICKED_UP -> {
+                order.transitionTo(OrderStatus.ACCEPTED);
+                order.transitionTo(OrderStatus.PREPARING);
+                order.transitionTo(OrderStatus.READY);
+                order.transitionTo(OrderStatus.ASSIGNED);
+                order.transitionTo(OrderStatus.PICKED_UP);
+            }
+            case DELIVERED -> {
+                order.transitionTo(OrderStatus.ACCEPTED);
+                order.transitionTo(OrderStatus.PREPARING);
+                order.transitionTo(OrderStatus.READY);
+                order.transitionTo(OrderStatus.ASSIGNED);
+                order.transitionTo(OrderStatus.PICKED_UP);
+                order.transitionTo(OrderStatus.DELIVERED);
             }
         }
         return order;
@@ -65,8 +92,20 @@ public class OrderTransitionTest {
     }
 
     @Test
+    void losSaltosYRetrocesosDelRepartoSeRechazan() {
+        assertThatThrownBy(() -> orderIn(OrderStatus.READY).transitionTo(OrderStatus.PICKED_UP))
+                .isInstanceOf(InvalidOrderTransitionException.class);
+        assertThatThrownBy(() -> orderIn(OrderStatus.ASSIGNED).transitionTo(OrderStatus.DELIVERED))
+                .isInstanceOf(InvalidOrderTransitionException.class);
+        assertThatThrownBy(() -> orderIn(OrderStatus.PICKED_UP).transitionTo(OrderStatus.ASSIGNED))
+                .isInstanceOf(InvalidOrderTransitionException.class);
+        assertThatThrownBy(() -> orderIn(OrderStatus.PICKED_UP).transitionTo(OrderStatus.READY))
+                .isInstanceOf(InvalidOrderTransitionException.class);
+    }
+
+    @Test
     void losEstadosFinalesNoTienenSalida() {
-        for (OrderStatus finalStatus : Set.of(OrderStatus.REJECTED, OrderStatus.CANCELLED, OrderStatus.READY)) {
+        for (OrderStatus finalStatus : Set.of(OrderStatus.REJECTED, OrderStatus.CANCELLED, OrderStatus.DELIVERED)) {
             for (OrderStatus to : OrderStatus.values()) {
                 assertThatThrownBy(() -> orderIn(finalStatus).transitionTo(to))
                         .isInstanceOf(InvalidOrderTransitionException.class);

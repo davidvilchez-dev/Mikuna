@@ -39,6 +39,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 
 /** RF-18, RF-19, RF-20: reglas de decisión, cancelación y avance con repositorios y pago simulados. */
 class OrderStatusServiceTest {
@@ -51,6 +52,7 @@ class OrderStatusServiceTest {
     private final PaymentService paymentService = mock(PaymentService.class);
     private final RestaurantRepository restaurants = mock(RestaurantRepository.class);
     private final Restaurant restaurant = mock(Restaurant.class);
+    private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final UUID ownerId = UUID.randomUUID();
     private final UUID restaurantId = UUID.randomUUID();
     private final UUID customerId = UUID.randomUUID();
@@ -59,7 +61,7 @@ class OrderStatusServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new OrderStatusService(orders, changes, payments, paymentService, restaurants, CLOCK);
+        service = new OrderStatusService(orders, changes, payments, paymentService, restaurants, CLOCK, events);
         when(restaurant.getId()).thenReturn(restaurantId);
         when(restaurant.getStatus()).thenReturn(RestaurantStatus.APPROVED);
         when(restaurants.findByOwnerId(ownerId)).thenReturn(Optional.of(restaurant));
@@ -248,6 +250,7 @@ class OrderStatusServiceTest {
         verify(paymentService, times(1)).capture(order.getId());
         verify(paymentService, never()).release(any());
         verify(changes, times(3)).save(any());
+        verify(events, times(1)).publishEvent(new com.mikuna.backend.order.model.OrderReadyEvent(order.getId()));
     }
 
     @Test

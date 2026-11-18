@@ -1,5 +1,6 @@
-/** Estados del pedido (spec 007) y reglas de interfaz que se derivan de ellos. El backend decide siempre. */
+/** Estados del pedido (specs 007 y 008) y reglas de interfaz que se derivan de ellos. El backend decide siempre. */
 export type OrderStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED' | 'PREPARING' | 'READY'
+  | 'ASSIGNED' | 'PICKED_UP' | 'DELIVERED'
 
 export const ORDER_REASON_MAX = 200
 
@@ -10,6 +11,9 @@ export const orderStatusLabels: Record<OrderStatus, string> = {
   CANCELLED: 'Cancelado',
   PREPARING: 'En preparación',
   READY: 'Listo para recoger',
+  ASSIGNED: 'Repartidor asignado',
+  PICKED_UP: 'En camino',
+  DELIVERED: 'Entregado',
 }
 
 export type RestaurantAction = 'accept' | 'reject' | 'start-preparation' | 'mark-ready'

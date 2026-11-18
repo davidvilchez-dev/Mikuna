@@ -13,6 +13,8 @@ import { CheckoutPage } from './features/checkout/CheckoutPage'
 import { OrderPage } from './features/checkout/OrderPage'
 import { AdminRequestsPage } from './features/restaurant/AdminRequestsPage'
 import { RestaurantPage } from './features/restaurant/RestaurantPage'
+import { AdminDeliveriesPage } from './features/delivery/AdminDeliveriesPage'
+import { CourierPage } from './features/delivery/CourierPage'
 
 export default function App() {
   return (
@@ -31,6 +33,8 @@ export default function App() {
       <Route path="/confirmar-pedido" element={<CheckoutPage />} />
       <Route path="/pedido/:id" element={<OrderPage />} />
       <Route path="/admin/solicitudes" element={<AdminRequestsPage />} />
+      <Route path="/repartidor/entregas" element={<CourierPage />} />
+      <Route path="/admin/entregas" element={<AdminDeliveriesPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

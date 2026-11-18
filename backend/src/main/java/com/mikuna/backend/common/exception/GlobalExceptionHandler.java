@@ -109,6 +109,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
     }
 
+    @ExceptionHandler(DeliveryConflictException.class)
+    ResponseEntity<ProblemDetail> handleDeliveryConflict(DeliveryConflictException ex) {
+        ProblemDetail problem = problem(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setProperty("code", ex.getCode());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
+    }
+
     @ExceptionHandler(PaymentStateException.class)
     ResponseEntity<ProblemDetail> handlePaymentState(PaymentStateException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem(HttpStatus.CONFLICT, ex.getMessage()));

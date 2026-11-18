@@ -8,7 +8,9 @@ import {
   type OrderStatus,
 } from './orders-logic'
 
-const all: OrderStatus[] = ['PENDING', 'ACCEPTED', 'REJECTED', 'CANCELLED', 'PREPARING', 'READY']
+const all: OrderStatus[] = [
+  'PENDING', 'ACCEPTED', 'REJECTED', 'CANCELLED', 'PREPARING', 'READY', 'ASSIGNED', 'PICKED_UP', 'DELIVERED',
+]
 
 describe('restaurantActions', () => {
   it('ofrece aceptar o rechazar solo en Pendiente', () => {
@@ -21,7 +23,7 @@ describe('restaurantActions', () => {
   })
 
   it('no ofrece nada en los estados finales', () => {
-    for (const status of ['REJECTED', 'CANCELLED', 'READY'] as OrderStatus[]) {
+    for (const status of ['REJECTED', 'CANCELLED', 'READY', 'ASSIGNED', 'PICKED_UP', 'DELIVERED'] as OrderStatus[]) {
       expect(restaurantActions(status)).toEqual([])
     }
   })

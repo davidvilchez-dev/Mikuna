@@ -5,6 +5,7 @@ import com.mikuna.backend.common.exception.OrderNotFoundException;
 import com.mikuna.backend.common.exception.RestaurantNotEnabledException;
 import com.mikuna.backend.order.model.ActorRole;
 import com.mikuna.backend.order.model.Order;
+import com.mikuna.backend.order.model.OrderReadyEvent;
 import com.mikuna.backend.order.model.OrderStatus;
 import com.mikuna.backend.order.model.OrderStatusChange;
 import com.mikuna.backend.order.repository.OrderRepository;
@@ -21,6 +22,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,16 +47,18 @@ public class OrderStatusService {
     private final PaymentService paymentService;
     private final RestaurantRepository restaurants;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
 
     public OrderStatusService(OrderRepository orders, OrderStatusChangeRepository changes,
             PaymentRepository payments, PaymentService paymentService, RestaurantRepository restaurants,
-            Clock clock) {
+            Clock clock, ApplicationEventPublisher events) {
         this.orders = orders;
         this.changes = changes;
         this.payments = payments;
         this.paymentService = paymentService;
         this.restaurants = restaurants;
         this.clock = clock;
+        this.events = events;
     }
 
     /** Pedidos del restaurante propio en el estado indicado, los más antiguos primero (FR-001). */
@@ -79,10 +83,10 @@ public class OrderStatusService {
         Order order = lockOwnedByRestaurant(accountId, orderId);
         requirePending(order);
         if (paymentService.capture(order.getId()) == CaptureResult.RESERVATION_EXPIRED) {
-            change(order, OrderStatus.CANCELLED, null, ActorRole.SYSTEM, EXPIRED_REASON);
+            changeStatus(order, OrderStatus.CANCELLED, null, ActorRole.SYSTEM, EXPIRED_REASON);
             return result(order, true);
         }
-        change(order, OrderStatus.ACCEPTED, accountId, ActorRole.RESTAURANT, null);
+        changeStatus(order, OrderStatus.ACCEPTED, accountId, ActorRole.RESTAURANT, null);
         return result(order, false);
     }
 
@@ -92,7 +96,7 @@ public class OrderStatusService {
         Order order = lockOwnedByRestaurant(accountId, orderId);
         requirePending(order);
         paymentService.release(order.getId());
-        change(order, OrderStatus.REJECTED, accountId, ActorRole.RESTAURANT, reason);
+        changeStatus(order, OrderStatus.REJECTED, accountId, ActorRole.RESTAURANT, reason);
         return result(order, false);
     }
 
@@ -102,12 +106,12 @@ public class OrderStatusService {
         Order order = orders.findByIdForUpdate(orderId).filter(o -> o.getCustomerId().equals(customerId))
                 .orElseThrow(OrderNotFoundException::new);
         OrderStatus current = order.getStatus();
-        if (current == OrderStatus.ACCEPTED || current == OrderStatus.PREPARING || current == OrderStatus.READY) {
+        if (current != OrderStatus.PENDING && current != OrderStatus.REJECTED && current != OrderStatus.CANCELLED) {
             throw new InvalidOrderTransitionException(InvalidOrderTransitionException.NO_REFUND);
         }
         requirePending(order);
         paymentService.release(order.getId());
-        change(order, OrderStatus.CANCELLED, customerId, ActorRole.CUSTOMER, reason);
+        changeStatus(order, OrderStatus.CANCELLED, customerId, ActorRole.CUSTOMER, reason);
         return result(order, false);
     }
 
@@ -117,15 +121,17 @@ public class OrderStatusService {
         return advance(accountId, orderId, OrderStatus.PREPARING);
     }
 
-    /** PREPARING a READY; queda disponible para la asignación de repartidor (spec 008). */
+    /** PREPARING a READY; publica el evento que crea la entrega para la asignación de repartidor (spec 008). */
     @Transactional
     public Result markReady(UUID accountId, UUID orderId) {
-        return advance(accountId, orderId, OrderStatus.READY);
+        Result result = advance(accountId, orderId, OrderStatus.READY);
+        events.publishEvent(new OrderReadyEvent(orderId));
+        return result;
     }
 
     private Result advance(UUID accountId, UUID orderId, OrderStatus target) {
         Order order = lockOwnedByRestaurant(accountId, orderId);
-        change(order, target, accountId, ActorRole.RESTAURANT, null);
+        changeStatus(order, target, accountId, ActorRole.RESTAURANT, null);
         return result(order, false);
     }
 
@@ -136,7 +142,7 @@ public class OrderStatusService {
     }
 
     /** Aplica la transición validada y deja constancia del cambio en la misma transacción (FR-012). */
-    private void change(Order order, OrderStatus target, UUID actorId, ActorRole role, String reason) {
+    public void changeStatus(Order order, OrderStatus target, UUID actorId, ActorRole role, String reason) {
         OrderStatus from = order.getStatus();
         order.transitionTo(target);
         orders.save(order);
