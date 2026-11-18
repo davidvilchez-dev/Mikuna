@@ -186,4 +186,33 @@ class StripeGatewayTest {
         assertThatThrownBy(() -> gateway.capture("pi_9", "c")).isInstanceOf(PaymentUnavailableException.class);
         assertThatThrownBy(() -> gateway.cancel("pi_9", "r")).isInstanceOf(PaymentUnavailableException.class);
     }
+
+    private static final String EXPIRED_BODY =
+            "{\"error\":{\"code\":\"payment_intent_unexpected_state\",\"payment_intent\":{\"status\":\"canceled\"}}}";
+
+    @Test
+    void capturarUnaReservaVencidaOCanceladaLanzaReservaVencida() {
+        MockRestServiceServer[] server = new MockRestServiceServer[1];
+        StripeGateway gateway = gateway(server);
+        server[0].expect(requestTo("https://api.stripe.com/v1/payment_intents/pi_9/capture"))
+                .andRespond(withBadRequest().body(EXPIRED_BODY).contentType(MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> gateway.capture("pi_9", "c"))
+                .isInstanceOf(com.mikuna.backend.common.exception.ReservationExpiredException.class);
+    }
+
+    @Test
+    void liberarUnIntentoYaCanceladoSeDaPorHechoPeroUnoYaCobradoEsUnFallo() {
+        MockRestServiceServer[] server = new MockRestServiceServer[1];
+        StripeGateway gateway = gateway(server);
+        server[0].expect(requestTo("https://api.stripe.com/v1/payment_intents/pi_9/cancel"))
+                .andRespond(withBadRequest().body(EXPIRED_BODY).contentType(MediaType.APPLICATION_JSON));
+        server[0].expect(requestTo("https://api.stripe.com/v1/payment_intents/pi_8/cancel"))
+                .andRespond(withBadRequest().contentType(MediaType.APPLICATION_JSON).body(
+                        "{\"error\":{\"code\":\"payment_intent_unexpected_state\","
+                                + "\"payment_intent\":{\"status\":\"succeeded\"}}}"));
+
+        gateway.cancel("pi_9", "r1");
+        assertThatThrownBy(() -> gateway.cancel("pi_8", "r2")).isInstanceOf(PaymentUnavailableException.class);
+    }
 }

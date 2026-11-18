@@ -3,9 +3,11 @@ package com.mikuna.backend.order.controller;
 import com.mikuna.backend.common.exception.RegistrationValidationException;
 import com.mikuna.backend.common.security.AccountPrincipal;
 import com.mikuna.backend.order.dto.ConfirmOrderRequest;
+import com.mikuna.backend.order.dto.DecisionRequest;
 import com.mikuna.backend.order.dto.OrderResponse;
 import com.mikuna.backend.order.service.CheckoutService;
 import com.mikuna.backend.order.service.CheckoutTransaction;
+import com.mikuna.backend.order.service.OrderStatusService;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -28,9 +30,11 @@ public class OrderController {
     private static final Pattern KEY = Pattern.compile("^[A-Za-z0-9_-]{1,64}$");
 
     private final CheckoutService service;
+    private final OrderStatusService statusService;
 
-    public OrderController(CheckoutService service) {
+    public OrderController(CheckoutService service, OrderStatusService statusService) {
         this.service = service;
+        this.statusService = statusService;
     }
 
     /** 201 si se registró ahora; 200 si la clave de idempotencia ya se había procesado. */
@@ -44,6 +48,15 @@ public class OrderController {
         }
         CheckoutTransaction.Confirmation result = service.confirm(principal.id(), idempotencyKey, request);
         return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK).body(result.order());
+    }
+
+    /** El cliente cancela un pedido propio solo mientras esté Pendiente; la reserva se libera sin cobro (RF-20). */
+    @PostMapping("/{id}/cancel")
+    public OrderResponse cancel(@AuthenticationPrincipal AccountPrincipal principal, @PathVariable UUID id,
+            @Valid @RequestBody(required = false) DecisionRequest request) {
+        OrderStatusService.Result result = statusService.cancel(principal.id(), id,
+                request == null ? null : request.reason());
+        return OrderResponse.of(result.order(), result.payment());
     }
 
     @GetMapping("/{id}")

@@ -1,5 +1,6 @@
 package com.mikuna.backend.order.model;
 
+import com.mikuna.backend.common.exception.InvalidOrderTransitionException;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -19,7 +20,11 @@ import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Persistable;
 
@@ -134,6 +139,26 @@ public class Order implements Persistable<UUID> {
     public void addLine(UUID productId, String productName, BigDecimal unitPrice, int quantity,
             BigDecimal lineTotal) {
         lines.add(new OrderLine(this, productId, productName, unitPrice, quantity, lineTotal));
+    }
+
+    private static final Map<OrderStatus, Set<OrderStatus>> TRANSITIONS = new EnumMap<>(OrderStatus.class);
+
+    static {
+        TRANSITIONS.put(OrderStatus.PENDING,
+                EnumSet.of(OrderStatus.ACCEPTED, OrderStatus.REJECTED, OrderStatus.CANCELLED));
+        TRANSITIONS.put(OrderStatus.ACCEPTED, EnumSet.of(OrderStatus.PREPARING));
+        TRANSITIONS.put(OrderStatus.PREPARING, EnumSet.of(OrderStatus.READY));
+    }
+
+    /**
+     * Único punto de cambio de estado (FR-007): solo Pendiente a Aceptado/Rechazado/Cancelado, Aceptado a En
+     * preparación y En preparación a Listo para recoger. Rechazado, Cancelado y Listo para recoger son finales.
+     */
+    public void transitionTo(OrderStatus target) {
+        if (!TRANSITIONS.getOrDefault(status, Set.of()).contains(target)) {
+            throw new InvalidOrderTransitionException();
+        }
+        this.status = target;
     }
 
     @PostLoad

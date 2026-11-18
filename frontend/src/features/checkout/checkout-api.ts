@@ -1,5 +1,6 @@
 import { apiRequest } from '../auth/auth-api'
 import type { Cart } from '../cart/cart-api'
+import type { OrderStatus } from '../restaurant/orders-logic'
 import type { CheckoutBlocker } from './checkout-validation'
 
 const CHECKOUT = '/api/customer/checkout'
@@ -21,7 +22,7 @@ export type PaymentStatus = 'AUTHORIZED' | 'CAPTURED' | 'RELEASED'
 
 export interface Order {
   id: string
-  status: 'PENDING'
+  status: OrderStatus
   restaurant: { id: string; name: string }
   lines: { productId: string; name: string; unitPrice: number; quantity: number; lineTotal: number }[]
   delivery: { label: string | null; street: string; district: string; reference: string | null; contactPhone: string | null }
@@ -45,6 +46,11 @@ export function confirmOrder(token: string, confirmationKey: string, paymentMeth
 
 export function getOrder(token: string, id: string): Promise<Order> {
   return apiRequest(ORDERS + '/' + encodeURIComponent(id), { headers: auth(token) })
+}
+
+/** Cancela un pedido propio mientras esté Pendiente; la reserva se libera sin cobro (RF-20). */
+export function cancelOrder(token: string, id: string): Promise<Order> {
+  return apiRequest(ORDERS + '/' + encodeURIComponent(id) + '/cancel', { method: 'POST', headers: auth(token) })
 }
 
 export const paymentStatusLabels: Record<PaymentStatus, string> = {

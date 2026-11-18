@@ -1,0 +1,175 @@
+package com.mikuna.backend.order.service;
+
+import com.mikuna.backend.common.exception.InvalidOrderTransitionException;
+import com.mikuna.backend.common.exception.OrderNotFoundException;
+import com.mikuna.backend.common.exception.RestaurantNotEnabledException;
+import com.mikuna.backend.order.model.ActorRole;
+import com.mikuna.backend.order.model.Order;
+import com.mikuna.backend.order.model.OrderStatus;
+import com.mikuna.backend.order.model.OrderStatusChange;
+import com.mikuna.backend.order.repository.OrderRepository;
+import com.mikuna.backend.order.repository.OrderStatusChangeRepository;
+import com.mikuna.backend.payment.model.Payment;
+import com.mikuna.backend.payment.model.PaymentStatus;
+import com.mikuna.backend.payment.repository.PaymentRepository;
+import com.mikuna.backend.payment.service.CaptureResult;
+import com.mikuna.backend.payment.service.PaymentService;
+import com.mikuna.backend.restaurant.model.Restaurant;
+import com.mikuna.backend.restaurant.model.RestaurantStatus;
+import com.mikuna.backend.restaurant.repository.RestaurantRepository;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Cambios de estado del pedido (RF-18, RF-19, RF-20). Cada operación es una única transacción que bloquea la
+ * fila del pedido antes que la del pago (orden fijo, research §1), valida el estado con la fila bloqueada,
+ * invoca el pago cuando corresponde y registra el cambio. Si el pago falla la excepción revierte todo y el
+ * pedido conserva su estado. El restaurante y el cliente salen siempre del token, nunca de la petición.
+ */
+@Service
+public class OrderStatusService {
+
+    static final String EXPIRED_REASON = "reserva vencida";
+
+    /** Pedido resultante con el estado de su pago; {@code reservationExpired} solo al aceptar sin reserva. */
+    public record Result(Order order, PaymentStatus payment, boolean reservationExpired) {
+    }
+
+    private final OrderRepository orders;
+    private final OrderStatusChangeRepository changes;
+    private final PaymentRepository payments;
+    private final PaymentService paymentService;
+    private final RestaurantRepository restaurants;
+    private final Clock clock;
+
+    public OrderStatusService(OrderRepository orders, OrderStatusChangeRepository changes,
+            PaymentRepository payments, PaymentService paymentService, RestaurantRepository restaurants,
+            Clock clock) {
+        this.orders = orders;
+        this.changes = changes;
+        this.payments = payments;
+        this.paymentService = paymentService;
+        this.restaurants = restaurants;
+        this.clock = clock;
+    }
+
+    /** Pedidos del restaurante propio en el estado indicado, los más antiguos primero (FR-001). */
+    @Transactional(readOnly = true)
+    public List<Result> list(UUID accountId, OrderStatus status) {
+        Restaurant restaurant = enabledRestaurant(accountId);
+        return orders.findByRestaurantIdAndStatusOrderByCreatedAtAsc(restaurant.getId(), status).stream()
+                .map(order -> result(order, false)).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Result get(UUID accountId, UUID orderId) {
+        Restaurant restaurant = enabledRestaurant(accountId);
+        Order order = orders.findById(orderId).filter(o -> o.getRestaurantId().equals(restaurant.getId()))
+                .orElseThrow(OrderNotFoundException::new);
+        return result(order, false);
+    }
+
+    /** PENDING a ACCEPTED con cobro; si la reserva venció, el sistema cancela el pedido sin cobro (FR-011a). */
+    @Transactional
+    public Result accept(UUID accountId, UUID orderId) {
+        Order order = lockOwnedByRestaurant(accountId, orderId);
+        requirePending(order);
+        if (paymentService.capture(order.getId()) == CaptureResult.RESERVATION_EXPIRED) {
+            change(order, OrderStatus.CANCELLED, null, ActorRole.SYSTEM, EXPIRED_REASON);
+            return result(order, true);
+        }
+        change(order, OrderStatus.ACCEPTED, accountId, ActorRole.RESTAURANT, null);
+        return result(order, false);
+    }
+
+    /** PENDING a REJECTED con liberación de la reserva, sin cobro. */
+    @Transactional
+    public Result reject(UUID accountId, UUID orderId, String reason) {
+        Order order = lockOwnedByRestaurant(accountId, orderId);
+        requirePending(order);
+        paymentService.release(order.getId());
+        change(order, OrderStatus.REJECTED, accountId, ActorRole.RESTAURANT, reason);
+        return result(order, false);
+    }
+
+    /** PENDING a CANCELLED por el cliente dueño, con liberación de la reserva, sin cobro. */
+    @Transactional
+    public Result cancel(UUID customerId, UUID orderId, String reason) {
+        Order order = orders.findByIdForUpdate(orderId).filter(o -> o.getCustomerId().equals(customerId))
+                .orElseThrow(OrderNotFoundException::new);
+        OrderStatus current = order.getStatus();
+        if (current == OrderStatus.ACCEPTED || current == OrderStatus.PREPARING || current == OrderStatus.READY) {
+            throw new InvalidOrderTransitionException(InvalidOrderTransitionException.NO_REFUND);
+        }
+        requirePending(order);
+        paymentService.release(order.getId());
+        change(order, OrderStatus.CANCELLED, customerId, ActorRole.CUSTOMER, reason);
+        return result(order, false);
+    }
+
+    /** ACCEPTED a PREPARING; no toca el pago. */
+    @Transactional
+    public Result startPreparation(UUID accountId, UUID orderId) {
+        return advance(accountId, orderId, OrderStatus.PREPARING);
+    }
+
+    /** PREPARING a READY; queda disponible para la asignación de repartidor (spec 008). */
+    @Transactional
+    public Result markReady(UUID accountId, UUID orderId) {
+        return advance(accountId, orderId, OrderStatus.READY);
+    }
+
+    private Result advance(UUID accountId, UUID orderId, OrderStatus target) {
+        Order order = lockOwnedByRestaurant(accountId, orderId);
+        change(order, target, accountId, ActorRole.RESTAURANT, null);
+        return result(order, false);
+    }
+
+    private static void requirePending(Order order) {
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new InvalidOrderTransitionException();
+        }
+    }
+
+    /** Aplica la transición validada y deja constancia del cambio en la misma transacción (FR-012). */
+    private void change(Order order, OrderStatus target, UUID actorId, ActorRole role, String reason) {
+        OrderStatus from = order.getStatus();
+        order.transitionTo(target);
+        orders.save(order);
+        changes.save(new OrderStatusChange(order.getId(), from, target, Instant.now(clock), actorId, role,
+                normalize(reason)));
+    }
+
+    private static String normalize(String reason) {
+        if (reason == null || reason.isBlank()) {
+            return null;
+        }
+        return reason.strip();
+    }
+
+    private Restaurant enabledRestaurant(UUID accountId) {
+        Restaurant restaurant = restaurants.findByOwnerId(accountId).orElseThrow(RestaurantNotEnabledException::new);
+        if (restaurant.getStatus() != RestaurantStatus.APPROVED) {
+            throw new RestaurantNotEnabledException();
+        }
+        return restaurant;
+    }
+
+    /** Bloquea el pedido y comprueba que sea del restaurante del token; ajeno o inexistente es 404. */
+    private Order lockOwnedByRestaurant(UUID accountId, UUID orderId) {
+        Restaurant restaurant = enabledRestaurant(accountId);
+        return orders.findByIdForUpdate(orderId).filter(o -> o.getRestaurantId().equals(restaurant.getId()))
+                .orElseThrow(OrderNotFoundException::new);
+    }
+
+    private Result result(Order order, boolean reservationExpired) {
+        order.getLines().size();
+        PaymentStatus status = payments.findByOrderId(order.getId()).map(Payment::getStatus)
+                .orElse(PaymentStatus.AUTHORIZED);
+        return new Result(order, status, reservationExpired);
+    }
+}

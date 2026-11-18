@@ -163,6 +163,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(problem(HttpStatus.FORBIDDEN, ex.getMessage()));
     }
 
+    @ExceptionHandler(RestaurantNotEnabledException.class)
+    ResponseEntity<ProblemDetail> handleRestaurantNotEnabled(RestaurantNotEnabledException ex) {
+        ProblemDetail problem = problem(HttpStatus.FORBIDDEN, ex.getMessage());
+        problem.setProperty("code", RestaurantNotEnabledException.CODE);
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(problem);
+    }
+
     @ExceptionHandler(RestaurantNotFoundException.class)
     ResponseEntity<ProblemDetail> handleRestaurantNotFound(RestaurantNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem(HttpStatus.NOT_FOUND, ex.getMessage()));

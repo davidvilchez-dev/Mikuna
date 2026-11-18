@@ -352,6 +352,14 @@ export function RestaurantPage() {
         </section>
       )}
 
+      {isApproved && (
+        <section className="restaurant-section" aria-labelledby="orders-title">
+          <h2 id="orders-title">Pedidos</h2>
+          <p className="auth-description">Acepta o rechaza los pedidos nuevos y avanza su preparación.</p>
+          <Link to="/mi-restaurante/pedidos" className="auth-submit">Ver pedidos</Link>
+        </section>
+      )}
+
       <Link to="/mi-cuenta" className="auth-switch">Volver a mi cuenta</Link>
     </AuthLayout>
   )

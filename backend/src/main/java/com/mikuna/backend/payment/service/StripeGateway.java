@@ -1,9 +1,11 @@
 package com.mikuna.backend.payment.service;
 
 import com.mikuna.backend.common.exception.PaymentUnavailableException;
+import com.mikuna.backend.common.exception.ReservationExpiredException;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +31,7 @@ public class StripeGateway {
 
     private static final Logger log = LoggerFactory.getLogger(StripeGateway.class);
     private static final String BASE_URL = "https://api.stripe.com/v1";
+    private static final Pattern ALREADY_CANCELED = Pattern.compile("\"status\"\\s*:\\s*\"canceled\"");
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(15);
 
@@ -106,22 +109,44 @@ public class StripeGateway {
         }
     }
 
-    /** Cobra el monto reservado (captura completa). */
+    /**
+     * Cobra el monto reservado (captura completa). Si la reserva venció o fue cancelada lanza
+     * {@link ReservationExpiredException}; cualquier otro fallo es {@link PaymentUnavailableException}.
+     */
     public void capture(String intentId, String idempotencyKey) {
-        call("capturar", "/payment_intents/" + intentId + "/capture", idempotencyKey);
-    }
-
-    /** Cancela el intento y libera la reserva sin cobrar. */
-    public void cancel(String intentId, String idempotencyKey) {
-        call("liberar", "/payment_intents/" + intentId + "/cancel", idempotencyKey);
-    }
-
-    private void call(String operation, String path, String idempotencyKey) {
         try {
-            post(path, new LinkedMultiValueMap<>(), idempotencyKey);
+            post("/payment_intents/" + intentId + "/capture", new LinkedMultiValueMap<>(), idempotencyKey);
+        } catch (HttpStatusCodeException e) {
+            if (isUnusableReservation(e)) {
+                throw new ReservationExpiredException();
+            }
+            throw unavailable("capturar", e);
         } catch (RestClientException e) {
-            throw unavailable(operation, e);
+            throw unavailable("capturar", e);
         }
+    }
+
+    /**
+     * Cancela el intento y libera la reserva sin cobrar. Si el intento ya estaba cancelado (la reserva venció),
+     * no hay nada que liberar y se considera hecho.
+     */
+    public void cancel(String intentId, String idempotencyKey) {
+        try {
+            post("/payment_intents/" + intentId + "/cancel", new LinkedMultiValueMap<>(), idempotencyKey);
+        } catch (HttpStatusCodeException e) {
+            if (isUnusableReservation(e) && ALREADY_CANCELED.matcher(e.getResponseBodyAsString()).find()) {
+                return;
+            }
+            throw unavailable("liberar", e);
+        } catch (RestClientException e) {
+            throw unavailable("liberar", e);
+        }
+    }
+
+    private static boolean isUnusableReservation(HttpStatusCodeException e) {
+        String body = e.getResponseBodyAsString();
+        return e.getStatusCode().value() == 400
+                && (body.contains("payment_intent_unexpected_state") || body.contains("charge_expired_for_capture"));
     }
 
     private Map<?, ?> post(String path, MultiValueMap<String, String> form, String idempotencyKey) {
