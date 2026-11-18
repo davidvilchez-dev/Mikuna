@@ -4,6 +4,7 @@ import { AccountPage } from './features/auth/AccountPage'
 import { LoginPage } from './features/auth/LoginPage'
 import { RegisterPage } from './features/auth/RegisterPage'
 import { ProductsPage } from './features/catalog/ProductsPage'
+import { OrdersPage } from './features/restaurant/OrdersPage'
 import { RestaurantCatalogPage } from './features/catalog/RestaurantCatalogPage'
 import { RestaurantSearchPage } from './features/catalog/RestaurantSearchPage'
 import { AddressesPage } from './features/cart/AddressesPage'
@@ -24,6 +25,7 @@ export default function App() {
       <Route path="/restaurantes" element={<RestaurantSearchPage />} />
       <Route path="/restaurantes/:id" element={<RestaurantCatalogPage />} />
       <Route path="/mi-restaurante/productos" element={<ProductsPage />} />
+      <Route path="/mi-restaurante/pedidos" element={<OrdersPage />} />
       <Route path="/carrito" element={<CartPage />} />
       <Route path="/mis-direcciones" element={<AddressesPage />} />
       <Route path="/confirmar-pedido" element={<CheckoutPage />} />

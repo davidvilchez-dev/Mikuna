@@ -1,6 +1,6 @@
 package com.mikuna.backend.order.model;
 
-/** Estado del pedido. En este incremento solo existe el inicial; los demás son de la spec 007. */
+/** Estado del pedido (spec 007): nace PENDING y avanza solo por las transiciones de {@link Order#transitionTo}. */
 public enum OrderStatus {
-    PENDING
+    PENDING, ACCEPTED, REJECTED, CANCELLED, PREPARING, READY
 }

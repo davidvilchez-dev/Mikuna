@@ -10,6 +10,7 @@ public class OrderConflictException extends RuntimeException {
     public static final String NO_ADDRESS = "NO_ADDRESS";
     public static final String NOT_ORDERABLE = "NOT_ORDERABLE";
     public static final String AMOUNTS_CHANGED = "AMOUNTS_CHANGED";
+    public static final String RESERVATION_EXPIRED = "RESERVATION_EXPIRED";
 
     private final String code;
     private final transient Object checkout;

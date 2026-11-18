@@ -3,6 +3,7 @@ package com.mikuna.backend.payment.service;
 import com.mikuna.backend.common.exception.PaymentDeclinedException;
 import com.mikuna.backend.common.exception.PaymentStateException;
 import com.mikuna.backend.common.exception.PaymentUnavailableException;
+import com.mikuna.backend.common.exception.ReservationExpiredException;
 import com.mikuna.backend.payment.model.Payment;
 import com.mikuna.backend.payment.model.PaymentStatus;
 import com.mikuna.backend.payment.model.PaymentTransaction;
@@ -136,10 +137,14 @@ public class PaymentService {
         }
     }
 
-    /** Cobra por completo el monto reservado; solo desde {@code AUTHORIZED}. La invoca la spec 007. */
+    /**
+     * Cobra por completo el monto reservado; solo desde {@code AUTHORIZED}. Si la reserva ya venció en la pasarela
+     * no hay cobro: el pago queda {@code RELEASED} (código {@code reservation_expired}) y se devuelve
+     * {@link CaptureResult#RESERVATION_EXPIRED} sin lanzar, para no revertir la transacción del llamador.
+     */
     @Transactional
-    public void capture(UUID orderId) {
-        settle(orderId, TransactionType.CAPTURE);
+    public CaptureResult capture(UUID orderId) {
+        return settle(orderId, TransactionType.CAPTURE);
     }
 
     /** Libera la reserva sin cobrar; solo desde {@code AUTHORIZED}. La invoca la spec 007. */
@@ -148,7 +153,7 @@ public class PaymentService {
         settle(orderId, TransactionType.RELEASE);
     }
 
-    private void settle(UUID orderId, TransactionType type) {
+    private CaptureResult settle(UUID orderId, TransactionType type) {
         Payment payment = payments.findByOrderIdForUpdate(orderId).orElseThrow(PaymentStateException::new);
         if (payment.getStatus() != PaymentStatus.AUTHORIZED) {
             // Ya cobrado o liberado: se rechaza sin llamar a la pasarela.
@@ -161,6 +166,14 @@ public class PaymentService {
             } else {
                 gateway.cancel(payment.getGatewayRef(), "release-" + orderId);
             }
+        } catch (ReservationExpiredException e) {
+            Instant expiredAt = Instant.now(clock);
+            payment.release(expiredAt);
+            payments.save(payment);
+            transactions.save(new PaymentTransaction(orderId, payment.getCustomerId(), null, TransactionType.RELEASE,
+                    TransactionStatus.RELEASED, payment.getAmount(), "reservation_expired", null,
+                    payment.getGatewayRef(), expiredAt));
+            return CaptureResult.RESERVATION_EXPIRED;
         } catch (PaymentUnavailableException e) {
             recorder.record(orderId, payment.getCustomerId(), null, type, TransactionStatus.FAILED,
                     payment.getAmount(), "gateway_unavailable", null, payment.getGatewayRef());
@@ -178,5 +191,6 @@ public class PaymentService {
         payments.save(payment);
         transactions.save(new PaymentTransaction(orderId, payment.getCustomerId(), null, type, done,
                 payment.getAmount(), null, null, payment.getGatewayRef(), now));
+        return CaptureResult.CAPTURED;
     }
 }

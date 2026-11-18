@@ -30,6 +30,7 @@ export default defineConfig({
         'src/features/catalog/catalog-validation.ts',
         'src/features/cart/cart-validation.ts',
         'src/features/checkout/checkout-validation.ts',
+        'src/features/restaurant/orders-logic.ts',
       ],
       reporter: ['text', 'html'],
       thresholds: { lines: 90 },
