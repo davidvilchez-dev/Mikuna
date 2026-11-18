@@ -1,0 +1,169 @@
+package com.mikuna.backend.order.model;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.PostLoad;
+import jakarta.persistence.PostPersist;
+import jakarta.persistence.Transient;
+import jakarta.persistence.OrderBy;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.data.domain.Persistable;
+
+/**
+ * Pedido confirmado (RF-14): nace {@code PENDING} con precios, importes y dirección fijados al confirmar.
+ * El identificador lo genera el servidor antes de autorizar el pago; una confirmación lógica se identifica
+ * por {@code (customer_id, confirmation_key)}, única, para que un reintento no duplique el pedido.
+ */
+@Entity
+@Table(name = "pedidos",
+        uniqueConstraints = @UniqueConstraint(name = Order.UK_CONFIRMATION,
+                columnNames = {"customer_id", "confirmation_key"}),
+        indexes = @Index(name = "ix_pedidos_cliente_fecha", columnList = "customer_id, created_at"))
+public class Order implements Persistable<UUID> {
+
+    public static final String UK_CONFIRMATION = "uk_pedidos_cliente_clave";
+
+    @Id
+    private UUID id;
+
+    @Column(name = "customer_id", nullable = false, updatable = false)
+    private UUID customerId;
+
+    @Column(name = "restaurant_id", nullable = false, updatable = false)
+    private UUID restaurantId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private OrderStatus status;
+
+    @Column(name = "confirmation_key", nullable = false, updatable = false, length = 64)
+    private String confirmationKey;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", nullable = false, updatable = false, length = 16)
+    private PaymentMethod paymentMethod;
+
+    @Column(nullable = false, precision = 10, scale = 2, updatable = false)
+    private BigDecimal subtotal;
+
+    @Column(name = "delivery_fee", nullable = false, precision = 10, scale = 2, updatable = false)
+    private BigDecimal deliveryFee;
+
+    @Column(nullable = false, precision = 10, scale = 2, updatable = false)
+    private BigDecimal commission;
+
+    @Column(nullable = false, precision = 10, scale = 2, updatable = false)
+    private BigDecimal total;
+
+    @Column(name = "restaurant_name", nullable = false, updatable = false)
+    private String restaurantName;
+
+    @Column(name = "delivery_label", updatable = false)
+    private String deliveryLabel;
+
+    @Column(name = "delivery_street", nullable = false, updatable = false)
+    private String deliveryStreet;
+
+    @Column(name = "delivery_district", nullable = false, updatable = false)
+    private String deliveryDistrict;
+
+    @Column(name = "delivery_reference", updatable = false)
+    private String deliveryReference;
+
+    @Column(name = "delivery_phone", updatable = false)
+    private String deliveryPhone;
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("productName ASC, id ASC")
+    private List<OrderLine> lines = new ArrayList<>();
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    /** El identificador se asigna en el servidor: se indica a Spring Data que la entidad es nueva. */
+    @Transient
+    private boolean isNew = true;
+
+    protected Order() {
+        // JPA
+    }
+
+    /** Datos de entrega copiados de la dirección al confirmar. */
+    public record Delivery(String label, String street, String district, String reference, String phone) {
+    }
+
+    /** Importes ya calculados y redondeados en el servidor. */
+    public record Amounts(BigDecimal subtotal, BigDecimal deliveryFee, BigDecimal commission, BigDecimal total) {
+    }
+
+    public Order(UUID id, UUID customerId, UUID restaurantId, String restaurantName, String confirmationKey,
+            PaymentMethod paymentMethod, Amounts amounts, Delivery delivery, Instant createdAt) {
+        this.id = id;
+        this.customerId = customerId;
+        this.restaurantId = restaurantId;
+        this.restaurantName = restaurantName;
+        this.confirmationKey = confirmationKey;
+        this.paymentMethod = paymentMethod;
+        this.status = OrderStatus.PENDING;
+        this.subtotal = amounts.subtotal();
+        this.deliveryFee = amounts.deliveryFee();
+        this.commission = amounts.commission();
+        this.total = amounts.total();
+        this.deliveryLabel = delivery.label();
+        this.deliveryStreet = delivery.street();
+        this.deliveryDistrict = delivery.district();
+        this.deliveryReference = delivery.reference();
+        this.deliveryPhone = delivery.phone();
+        this.createdAt = createdAt;
+    }
+
+    public void addLine(UUID productId, String productName, BigDecimal unitPrice, int quantity,
+            BigDecimal lineTotal) {
+        lines.add(new OrderLine(this, productId, productName, unitPrice, quantity, lineTotal));
+    }
+
+    @PostLoad
+    @PostPersist
+    void markNotNew() {
+        this.isNew = false;
+    }
+
+    @Override
+    public boolean isNew() {
+        return isNew;
+    }
+
+    @Override
+    public UUID getId() { return id; }
+    public UUID getCustomerId() { return customerId; }
+    public UUID getRestaurantId() { return restaurantId; }
+    public OrderStatus getStatus() { return status; }
+    public String getConfirmationKey() { return confirmationKey; }
+    public PaymentMethod getPaymentMethod() { return paymentMethod; }
+    public BigDecimal getSubtotal() { return subtotal; }
+    public BigDecimal getDeliveryFee() { return deliveryFee; }
+    public BigDecimal getCommission() { return commission; }
+    public BigDecimal getTotal() { return total; }
+    public String getRestaurantName() { return restaurantName; }
+    public String getDeliveryLabel() { return deliveryLabel; }
+    public String getDeliveryStreet() { return deliveryStreet; }
+    public String getDeliveryDistrict() { return deliveryDistrict; }
+    public String getDeliveryReference() { return deliveryReference; }
+    public String getDeliveryPhone() { return deliveryPhone; }
+    public List<OrderLine> getLines() { return List.copyOf(lines); }
+    public Instant getCreatedAt() { return createdAt; }
+}

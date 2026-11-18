@@ -94,6 +94,41 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
     }
 
+    @ExceptionHandler(OrderNotFoundException.class)
+    ResponseEntity<ProblemDetail> handleOrderNotFound(OrderNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem(HttpStatus.NOT_FOUND, ex.getMessage()));
+    }
+
+    @ExceptionHandler(OrderConflictException.class)
+    ResponseEntity<ProblemDetail> handleOrderConflict(OrderConflictException ex) {
+        ProblemDetail problem = problem(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setProperty("code", ex.getCode());
+        if (ex.getCheckout() != null) {
+            problem.setProperty("checkout", ex.getCheckout());
+        }
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
+    }
+
+    @ExceptionHandler(PaymentStateException.class)
+    ResponseEntity<ProblemDetail> handlePaymentState(PaymentStateException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem(HttpStatus.CONFLICT, ex.getMessage()));
+    }
+
+    /** 402: autorización rechazada o con verificación adicional; sin detalles internos de la pasarela. */
+    @ExceptionHandler(PaymentDeclinedException.class)
+    ResponseEntity<ProblemDetail> handlePaymentDeclined(PaymentDeclinedException ex) {
+        ProblemDetail problem = problem(HttpStatus.PAYMENT_REQUIRED, ex.getMessage());
+        problem.setProperty("code", ex.getCode());
+        return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED).body(problem);
+    }
+
+    @ExceptionHandler(PaymentUnavailableException.class)
+    ResponseEntity<ProblemDetail> handlePaymentUnavailable(PaymentUnavailableException ex) {
+        ProblemDetail problem = problem(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+        problem.setProperty("code", PaymentUnavailableException.CODE);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(problem);
+    }
+
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
     ResponseEntity<ProblemDetail> handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)

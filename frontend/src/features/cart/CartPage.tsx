@@ -172,7 +172,10 @@ export function CartPage() {
             </>
           )}
         </dl>
-        <p className="auth-hint">Los importes los calcula Mikuna con los precios vigentes. La confirmación del pedido y el pago llegarán en un próximo incremento.</p>
+        <p className="auth-hint">Los importes los calcula Mikuna con los precios vigentes y se vuelven a validar al confirmar el pedido.</p>
+        {cart.lines.length > 0 && totals.pending === null && (
+          <Link to="/confirmar-pedido" className="auth-submit cart-continue">Continuar</Link>
+        )}
       </section>
 
       <Link to="/restaurantes" className="auth-switch">Seguir buscando restaurantes</Link>
