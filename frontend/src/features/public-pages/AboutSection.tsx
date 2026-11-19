@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import { publicPhotos } from './public-content'
 import { PublicIcon } from './components/PublicIcon'
 
@@ -6,11 +7,11 @@ export function AboutSection() {
     <>
       <div className="public-shell about-grid">
         <div className="about-copy">
-          <span className="public-eyebrow">SOBRE NOSOTROS</span>
+          
           <h2 id="about-title">El sabor de Ayacucho,<span> más cerca.</span></h2>
           <p>Mikuna es una propuesta de delivery que conecta a las personas con las cocinas de su ciudad.</p>
           <p>Unimos a quienes preparan, a quienes reparten y a quienes disfrutan cada pedido. Porque detrás de un buen antojo, hay toda una ciudad.</p>
-          <a href="#como-funciona" className="about-link">Conoce cómo funciona</a>
+          <Link to="/como-funciona" className="about-link">Conoce cómo funciona</Link>
         </div>
         <div className="about-photos">
           <figure className="about-photo-main"><img src={publicPhotos.chef.src} alt={publicPhotos.chef.alt} width="1672" height="941" loading="lazy" decoding="async" /><figcaption>El sabor empieza en la cocina</figcaption></figure>

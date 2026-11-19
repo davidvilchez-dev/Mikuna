@@ -5,7 +5,8 @@ import { AuthLayout } from '../auth/AuthLayout'
 import { clearSession, getSession } from '../auth/session-storage'
 import { assignDelivery, listPending, releaseDelivery, type PendingDelivery } from './admin-deliveries-api'
 import { DELIVERY_POLL_MS } from './courier-logic'
-import '../restaurant/restaurant.css'
+import { AdminLayout } from '../admin/AdminLayout'
+import { Badge, EmptyState, ErrorState, LoadingBlock } from '../admin/admin-ui'
 
 const dateFormat = new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -85,43 +86,40 @@ export function AdminDeliveriesPage() {
   }
 
   return (
-    <AuthLayout wide title="Entregas pendientes" description="Asigna a un repartidor las entregas que el sistema no pudo asignar.">
-      {notice && <p className="auth-notice" role="status">{notice}</p>}
-      {view.kind === 'loading' && <p className="auth-description" role="status">Cargando entregas…</p>}
-      {view.kind === 'error' && (
-        <>
-          <p className="auth-alert" role="alert">{view.message}</p>
-          <button type="button" className="auth-submit" onClick={() => { setView({ kind: 'loading' }); reload() }}>Reintentar</button>
-        </>
-      )}
+    <AdminLayout title="Entregas pendientes" description="Asigna a un repartidor las entregas que el sistema no pudo asignar. La lista se actualiza sola.">
+      {notice && <p className="adm-note" role="status">{notice}</p>}
+      {view.kind === 'loading' && <LoadingBlock label="Cargando entregas" />}
+      {view.kind === 'error' && <ErrorState message={view.message} onRetry={() => { setView({ kind: 'loading' }); reload() }} />}
       {view.kind === 'ready' && view.items.length === 0 && (
-        <p className="auth-description" role="status">No hay entregas pendientes de asignación.</p>
+        <EmptyState title="Sin entregas pendientes" text="No hay entregas pendientes de asignación." />
       )}
       {view.kind === 'ready' && view.items.length > 0 && (
-        <ul className="restaurant-list">
+        <ul className="adm-cards">
           {view.items.map((item) => (
-            <li key={item.orderId} className="restaurant-card">
-              <h2>{item.restaurantName}</h2>
-              <dl>
+            <li key={item.orderId}>
+              <div className="adm-cards-head">
+                <h2>{item.restaurantName}</h2>
+                <Badge tone={item.courierDisabled ? 'bad' : 'warn'}>{item.courierDisabled ? 'Repartidor inhabilitado' : 'Sin repartidor'}</Badge>
+              </div>
+              <dl className="adm-facts">
                 <div><dt>Listo desde</dt><dd>{dateFormat.format(new Date(item.readyAt))}</dd></div>
                 <div><dt>Distrito de entrega</dt><dd>{item.district}</dd></div>
-                <div><dt>Situación</dt><dd>{item.courierDisabled ? 'Asignada a un repartidor inhabilitado' : 'Sin repartidor'}</dd></div>
               </dl>
               {item.courierDisabled && (
-                <div className="restaurant-actions">
-                  <button type="button" className="auth-submit" disabled={busy}
+                <div className="adm-actions">
+                  <button type="button" className="adm-btn" disabled={busy}
                     onClick={() => void run(() => releaseDelivery(token, item.orderId), 'Entrega liberada; se intentará reasignar')}>
                     Liberar
                   </button>
                 </div>
               )}
               {!item.courierDisabled && item.candidates.length === 0 && (
-                <p className="auth-description">No hay repartidores disponibles. Se asignará sola cuando haya uno.</p>
+                <p className="adm-note">No hay repartidores disponibles. Se asignará sola cuando haya uno.</p>
               )}
               {!item.courierDisabled && item.candidates.length > 0 && (
-                <div className="restaurant-actions">
+                <div className="adm-actions">
                   {item.candidates.map((candidate) => (
-                    <button key={candidate.courierId} type="button" className="auth-submit auth-submit-secondary" disabled={busy}
+                    <button key={candidate.courierId} type="button" className="adm-btn adm-btn-ghost" disabled={busy}
                       onClick={() => void run(() => assignDelivery(token, item.orderId, candidate.courierId), `Entrega asignada a ${candidate.name}`)}>
                       Asignar a {candidate.name}
                     </button>
@@ -132,7 +130,6 @@ export function AdminDeliveriesPage() {
           ))}
         </ul>
       )}
-      <Link to="/mi-cuenta" className="auth-switch">Volver a mi cuenta</Link>
-    </AuthLayout>
+    </AdminLayout>
   )
 }

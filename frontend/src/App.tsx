@@ -19,11 +19,17 @@ import { NotificationsPage } from './features/notifications/NotificationsPage'
 import { HistoryPage } from './features/history/HistoryPage'
 import { AdminAccountsPage } from './features/admin/AdminAccountsPage'
 import { AdminOrdersPage } from './features/admin/AdminOrdersPage'
+import { PublicInfoPage } from './features/public-pages/PublicInfoPage'
+import { AdminDashboardPage } from './features/admin/AdminDashboardPage'
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/como-funciona" element={<PublicInfoPage page="como-funciona" />} />
+      <Route path="/para-restaurantes" element={<PublicInfoPage page="para-restaurantes" />} />
+      <Route path="/se-repartidor" element={<PublicInfoPage page="se-repartidor" />} />
+      <Route path="/sobre-nosotros" element={<PublicInfoPage page="sobre-nosotros" />} />
       <Route path="/registro" element={<RegisterPage />} />
       <Route path="/iniciar-sesion" element={<LoginPage />} />
       <Route path="/mi-cuenta" element={<AccountPage />} />
@@ -36,7 +42,8 @@ export default function App() {
       <Route path="/mis-direcciones" element={<AddressesPage />} />
       <Route path="/confirmar-pedido" element={<CheckoutPage />} />
       <Route path="/pedido/:id" element={<OrderPage />} />
-      <Route path="/admin/solicitudes" element={<AdminRequestsPage />} />
+      <Route path="/admin" element={<AdminDashboardPage />} />
+      <Route path="/admin/solicitudes"element={<AdminRequestsPage />} />
       <Route path="/repartidor/entregas" element={<CourierPage />} />
       <Route path="/avisos" element={<NotificationsPage />} />
       <Route path="/historial" element={<HistoryPage />} />

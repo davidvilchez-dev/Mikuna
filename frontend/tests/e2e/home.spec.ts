@@ -10,9 +10,10 @@ test.describe('US1 — inicio público', () => {
     await expect(page.getByRole('banner').getByRole('link', { name: 'Mikuna, ir al inicio' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tu antojo, en camino.')
     await expect(page.getByText(description, { exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Empezar a pedir', exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Crear cuenta', exact: true })).toBeVisible()
-    await expect(page.locator('form, input')).toHaveCount(0)
+    await expect(page.getByRole('search', { name: 'Buscar restaurantes por dirección' })).toBeVisible()
+    await expect(page.getByLabel('Tu dirección o distrito')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Ver restaurantes', exact: true })).toBeVisible()
+    await expect(page.locator('#presentacion').getByRole('link', { name: 'Crear cuenta', exact: true })).toBeVisible()
     await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 
@@ -30,13 +31,11 @@ test.describe('US1 — inicio público', () => {
 
 
 const categoryNames = ['Hamburguesas', 'Pollo', 'Pizza', 'Comida peruana', 'Postres', 'Bebidas']
-const futureNames = [
-  'Restaurantes', 'Cómo funciona', 'Para restaurantes', 'Sé repartidor',
-  'Pedir ahora', 'Empezar a pedir', 'Crear cuenta', ...categoryNames,
-]
+const futureNames = categoryNames
 const noticeMessage = 'Esta función estará disponible próximamente'
 
 async function activateFuture(page: import('@playwright/test').Page, name: string) {
+  await page.evaluate(() => document.fonts.ready)
   const action = page.getByRole('button', { name, exact: true })
   if (!await action.isVisible()) {
     await page.locator('[data-mobile-menu-toggle]').click()
@@ -61,8 +60,6 @@ test.describe('US2 — categorías', () => {
       await expect.poll(() => image.evaluate((element: HTMLImageElement) => element.naturalWidth)).toBeGreaterThan(0)
     }
     await expect(section.locator('[data-asset="categoryBurger"]')).toHaveCount(1)
-    await expect(page.locator('footer, form, article')).toHaveCount(0)
-    await expect(page.locator('main > section').last()).toHaveAttribute('id', 'categorias')
   })
 
   test('la categoría responde sin filtrar ni navegar', async ({ page }) => {
@@ -76,7 +73,7 @@ test.describe('US2 — categorías', () => {
 })
 
 test.describe('US3 — navegación y avisos', () => {
-  test('los trece accesos comparten un aviso y conservan la vista', async ({ page }) => {
+  test('las seis categorías comparten un aviso y conservan la vista', async ({ page }) => {
     await page.goto('/')
     for (const name of futureNames) {
       const previous = await activateFuture(page, name)
@@ -87,15 +84,10 @@ test.describe('US3 — navegación y avisos', () => {
     }
   })
 
-  test('logo e Inicio vuelven al comienzo', async ({ page }) => {
+  test('el logo vuelve al comienzo', async ({ page }) => {
     await page.goto('/')
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
     await page.getByRole('link', { name: 'Mikuna, ir al inicio' }).click()
-    await expect.poll(() => page.evaluate(() => scrollY)).toBe(0)
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
-    const home = page.getByRole('link', { name: 'Inicio', exact: true })
-    if (!await home.isVisible()) await page.locator('[data-mobile-menu-toggle]').click()
-    await home.click()
     await expect.poll(() => page.evaluate(() => scrollY)).toBe(0)
   })
 
@@ -109,7 +101,7 @@ test.describe('US3 — navegación y avisos', () => {
     await toggle.focus()
     await page.keyboard.press('Enter')
     await expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    await expect(page.getByRole('button', { name: 'Restaurantes', exact: true })).toBeVisible()
+    await expect(page.getByRole('navigation', { name: 'Navegación principal' }).getByRole('link', { name: 'Restaurantes', exact: true })).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(toggle).toHaveAttribute('aria-expanded', 'false')
     await expect(toggle).toBeFocused()
@@ -123,11 +115,11 @@ test.describe('US3 — navegación y avisos', () => {
     await page.clock.install()
     await page.goto('/')
     await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 1000)
-    await activateFuture(page, 'Empezar a pedir')
+    await activateFuture(page, 'Hamburguesas')
     await page.mouse.move(0, 0)
     await page.clock.runFor(3000)
     await expect(page.getByTestId('coming-soon-notice')).toHaveAttribute('data-visible', 'true')
-    await activateFuture(page, 'Crear cuenta')
+    await activateFuture(page, 'Comida peruana')
     await page.mouse.move(0, 0)
     await page.clock.runFor(4999)
     await expect(page.getByTestId('coming-soon-notice')).toHaveAttribute('data-visible', 'true')
@@ -140,7 +132,7 @@ test.describe('US3 — navegación y avisos', () => {
     await page.clock.install()
     await page.goto('/')
     await page.clock.pauseAt(await page.evaluate(() => Date.now()) + 1000)
-    await activateFuture(page, 'Crear cuenta')
+    await activateFuture(page, 'Comida peruana')
     await page.clock.runFor(1)
     const notice = page.getByTestId('coming-soon-notice')
     await notice.hover()
@@ -152,7 +144,7 @@ test.describe('US3 — navegación y avisos', () => {
     await page.mouse.move(0, 0)
     await page.clock.runFor(12000)
     await expect(notice).toHaveAttribute('data-visible', 'true')
-    await page.getByRole('button', { name: 'Crear cuenta', exact: true }).focus()
+    await page.getByRole('button', { name: 'Comida peruana', exact: true }).focus()
     await page.clock.runFor(12000)
     await expect(notice).toHaveAttribute('data-visible', 'true')
     await page.evaluate(() => {
@@ -165,10 +157,10 @@ test.describe('US3 — navegación y avisos', () => {
 
   test('el cierre manual conserva un foco útil', async ({ page }) => {
     await page.goto('/')
-    await activateFuture(page, 'Crear cuenta')
+    await activateFuture(page, 'Comida peruana')
     await page.getByRole('button', { name: 'Cerrar aviso' }).click()
     await expect(page.getByTestId('coming-soon-notice')).toHaveAttribute('data-visible', 'false')
-    await expect(page.getByRole('button', { name: 'Crear cuenta', exact: true })).toBeFocused()
+    await expect(page.getByRole('button', { name: 'Comida peruana', exact: true })).toBeFocused()
   })
 })
 
@@ -202,7 +194,7 @@ test.describe('US4 — adaptación y fallos', () => {
 
   test('mantiene el aviso dentro de la ventana en menú, acciones y última categoría', async ({ page }) => {
     await page.goto('/')
-    for (const name of ['Restaurantes', 'Crear cuenta', 'Bebidas']) {
+    for (const name of ['Hamburguesas', 'Comida peruana', 'Bebidas']) {
       await activateFuture(page, name)
       const notice = page.getByTestId('coming-soon-notice')
       await expect(page.getByRole('status')).toHaveText(noticeMessage)
@@ -226,32 +218,26 @@ test.describe('US4 — adaptación y fallos', () => {
     }
   })
 
-  test('respeta paleta y proporciones de la referencia de escritorio', async ({ page }) => {
+  test('respeta la paleta de marca', async ({ page }) => {
     await page.goto('/')
     const colors = await page.evaluate(() => ({
       hero: getComputedStyle(document.querySelector('#presentacion')!).backgroundColor,
-      peach: getComputedStyle(document.querySelector('[data-peach-background]')!).backgroundColor,
       title: getComputedStyle(document.querySelector('h1')!).color,
-      orange: getComputedStyle(document.querySelector('[data-action="empezar-a-pedir"]')!).backgroundColor,
-      description: getComputedStyle(document.querySelector('[data-description]')!).color,
+      orange: getComputedStyle(document.querySelector('.header-cta')!).backgroundColor,
       categories: getComputedStyle(document.querySelector('#categorias')!).backgroundColor,
     }))
     expect(colors).toEqual({
-      hero: 'rgb(253, 248, 244)', peach: 'rgb(253, 232, 216)', title: 'rgb(17, 9, 76)',
-      orange: 'rgb(255, 90, 31)', description: 'rgb(70, 75, 83)', categories: 'rgb(255, 255, 255)',
+      hero: 'rgb(255, 255, 255)', title: 'rgb(17, 9, 76)',
+      orange: 'rgb(239, 80, 2)', categories: 'rgb(255, 255, 255)',
     })
-    if ((page.viewportSize()?.width ?? 0) !== 1536) return
-    const ratios = await page.evaluate(() => ({
-      left: document.querySelector('[data-hero-copy]')!.getBoundingClientRect().left / innerWidth,
-      header: document.querySelector('header')!.getBoundingClientRect().height / innerHeight,
-      categories: document.querySelector('#categorias')!.getBoundingClientRect().top / innerHeight,
-    }))
-    expect(ratios.left).toBeGreaterThanOrEqual(0.05)
-    expect(ratios.left).toBeLessThanOrEqual(0.06)
-    expect(ratios.header).toBeGreaterThanOrEqual(0.10)
-    expect(ratios.header).toBeLessThanOrEqual(0.13)
-    expect(ratios.categories).toBeGreaterThanOrEqual(0.60)
-    expect(ratios.categories).toBeLessThanOrEqual(0.68)
+  })
+
+  test('el buscador de dirección valida y avisa', async ({ page }) => {
+    await page.goto('/')
+    await page.getByRole('button', { name: 'Ver restaurantes', exact: true }).click()
+    await expect(page.getByRole('alert')).toContainText('Escribe tu dirección o tu distrito')
+    await page.getByLabel('Tu dirección o distrito').fill('Jr. Inexistente 123, Ciudad Lejana')
+    await expect(page.getByRole('alert')).toHaveCount(0)
   })
 
   test('sigue siendo utilizable cuando fallan todas las imágenes', async ({ page }) => {

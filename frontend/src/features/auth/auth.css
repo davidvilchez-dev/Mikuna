@@ -21,7 +21,7 @@
 .auth-brand { display: inline-flex; }
 .auth-logo { height: 44px; width: auto; }
 .auth-back { font-weight: 700; text-decoration: underline; text-underline-offset: 4px; }
-.auth-back:hover { color: var(--color-mikuna-orange); }
+.auth-back:hover { color: var(--color-mikuna-orange-deep); }
 
 .auth-main {
   flex: 1;
@@ -110,7 +110,7 @@
   padding: 13px 26px;
   border: 2px solid var(--color-mikuna-orange);
   border-radius: 999px;
-  background: var(--color-mikuna-orange);
+  background: var(--color-mikuna-orange-deep);
   color: var(--color-mikuna-white);
   font-size: 18px;
   font-weight: 800;
@@ -127,7 +127,7 @@
 .auth-success p { margin: 0; }
 .auth-notice {
   padding: 12px 14px;
-  border-left: 4px solid var(--color-mikuna-orange);
+  border: 1px solid color-mix(in srgb, var(--color-mikuna-orange) 45%, transparent);
   border-radius: 8px;
   background: var(--color-mikuna-peach);
 }

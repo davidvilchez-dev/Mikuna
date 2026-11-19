@@ -1,5 +1,5 @@
 import type { HomeAssetId, VisualAsset } from './home-types'
-import logoImage from '../../assets/branding/logo-mikuna.png'
+import logoImage from '../../assets/branding/logo-mikuna.svg'
 import wingsImage from '../../assets/home/wings.png'
 import pizzaWholeImage from '../../assets/home/pizza-whole.png'
 import heroBurgerImage from '../../assets/home/burger.png'
@@ -17,10 +17,10 @@ export const homeAssets = {
     id: 'logo',
     src: logoImage,
     alternativeText: 'Mikuna',
-    width: 2146,
-    height: 732,
-    provenance: 'docs/diseno/logo-mikuna.png',
-    sha256: '847F774EC697B24795E53BC4E9BBAED53E1DD065B131453338A134BF28EF77D9',
+    width: 3922,
+    height: 815,
+    provenance: 'Vector trazado de docs/diseno/logo-mikuna.png',
+    sha256: '6EF9998EFDB7A393B074FC3DBF56D7D537F5AA134A6756CD6ACED5435BD14C2E',
   },
   wings: {
     id: 'wings',

@@ -61,7 +61,32 @@ export function ComingSoonNotice({
         const vertical = Math.max(0, Math.min(point.top + height, rect.bottom) - Math.max(point.top, rect.top))
         return sum + horizontal * vertical
       }, 0)
-      const best = candidates.reduce((choice, candidate) => score(candidate) < score(choice) ? candidate : choice)
+      // Si ningún punto fijo queda libre, se busca en una rejilla el más cercano al disparador que no tape controles.
+      const step = 32
+      const fixedCount = candidates.length
+      for (let top = margin; top <= maxY; top += step) {
+        for (let left = margin; left <= maxX; left += step) candidates.push({ left, top })
+      }
+      const anchorX = anchor.left + anchor.width / 2
+      const anchorY = anchor.top + anchor.height / 2
+      const distance = (point: { left: number; top: number }) => Math.hypot(point.left + width / 2 - anchorX, point.top + height / 2 - anchorY)
+      let best = candidates[0]
+      let bestScore = score(best)
+      let bestDistance = distance(best)
+      let bestIndex = 0
+      for (let index = 1; index < candidates.length; index += 1) {
+        const candidate = candidates[index]
+        const candidateScore = score(candidate)
+        if (candidateScore > bestScore) continue
+        const candidateDistance = distance(candidate)
+        const closerGridPoint = index >= fixedCount && bestIndex >= fixedCount && candidateDistance < bestDistance
+        if (candidateScore < bestScore || (candidateScore === bestScore && closerGridPoint)) {
+          best = candidate
+          bestIndex = index
+          bestScore = candidateScore
+          bestDistance = candidateDistance
+        }
+      }
       box.style.left = best.left + 'px'
       box.style.top = best.top + 'px'
     }

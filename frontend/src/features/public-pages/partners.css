@@ -1,0 +1,79 @@
+/* Páginas para restaurantes y repartidores: piezas propias sobre la base de how-it-works.css. */
+
+/* Herramientas del panel */
+.pt-tools { padding-block: 88px 96px; background: var(--color-mikuna-ivory); }
+.pt-lead { max-width: 34rem; margin: 14px 0 0; color: var(--color-mikuna-gray); font-size: 18px; line-height: 1.6; }
+.pt-tool-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; margin: 48px 0 0; padding: 0; list-style: none; }
+.pt-tool { display: flex; min-width: 0; flex-direction: column; }
+.pt-tool-visual { display: flex; min-height: 230px; align-items: center; padding: 8px 6px 28px; }
+.pt-tool-visual .hiw-mock { width: 100%; transition: transform 300ms var(--ease-out); }
+.pt-tool:hover .hiw-mock { transform: translateY(-4px); }
+.pt-tool h4 { margin: 0; font-size: 22px; font-weight: 800; line-height: 1.2; letter-spacing: -0.02em; }
+.pt-tool p { margin: 8px 0 0; color: var(--color-mikuna-gray); font-size: 17px; line-height: 1.6; }
+
+/* Piezas de las mini pantallas */
+.pt-switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; border-radius: 999px; background: #D9DBE1; }
+.pt-switch > span { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--color-mikuna-white); box-shadow: 0 1px 2px rgb(17 9 76 / 0.2); }
+.pt-switch[data-on="true"] { background: var(--color-mikuna-orange); }
+.pt-switch[data-on="true"] > span { left: 19px; }
+.pt-order-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pt-order-head .hiw-mock-title { margin: 0; }
+.pt-chip { padding: 3px 10px; border-radius: 999px; background: #FFF4D6; color: #8A5A00; font-size: 12px; font-weight: 700; }
+.pt-order-items { margin: 0; padding: 12px 14px; border-radius: 14px; background: var(--color-mikuna-ivory); color: var(--color-mikuna-indigo); }
+.pt-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px; }
+.pt-btn { padding: 10px; border-radius: 999px; background: var(--color-mikuna-orange); color: var(--color-mikuna-white); font-weight: 700; text-align: center; }
+.pt-btn-ghost { background: var(--color-mikuna-white); color: var(--color-mikuna-indigo); box-shadow: inset 0 0 0 1px rgb(17 9 76 / 0.16); }
+.pt-history-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 9px 4px; border-top: 1px solid rgb(17 9 76 / 0.07); }
+.pt-history-row span[data-state] { justify-self: start; padding: 2px 9px; border-radius: 999px; background: #DDF5E6; color: #136C3A; font-size: 12px; font-weight: 700; }
+.pt-history-row span[data-state="Cancelado"] { background: #FDE2E1; color: #9B1C1C; }
+.pt-history-check { color: #136C3A; font-weight: 800; }
+.pt-available { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px; border-radius: 14px; background: var(--color-mikuna-ivory); }
+.pt-available strong { display: block; }
+.pt-available small { display: block; color: var(--color-mikuna-gray); font-size: 12px; }
+.pt-live { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 14px; background: #DDF5E6; color: #136C3A; font-weight: 700; }
+.pt-live-dot { width: 10px; height: 10px; border-radius: 50%; background: #1E9E57; box-shadow: 0 0 0 4px rgb(30 158 87 / 0.2); }
+
+/* Alta en tres pasos */
+.pt-onboard { padding-block: 96px 24px; }
+.pt-onboard-steps { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; margin: 48px 0 0; padding: 0; list-style: none; }
+.pt-onboard-steps::before { content: ""; position: absolute; top: 25px; left: 26px; right: 33%; border-top: 2px dashed #FFD9C2; }
+.pt-onboard-steps li { position: relative; min-width: 0; }
+.pt-onboard-steps .hiw-marker { box-shadow: 0 0 0 8px var(--color-mikuna-white); }
+.pt-onboard-steps h4 { margin: 22px 0 0; font-size: 22px; font-weight: 800; line-height: 1.2; letter-spacing: -0.02em; }
+.pt-onboard-steps p { max-width: 22rem; margin: 8px 0 0; color: var(--color-mikuna-gray); font-size: 17px; line-height: 1.6; }
+
+/* Cierre */
+.pt-close { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 48px; margin-bottom: 96px; padding: 56px; border-radius: 36px; background: var(--color-mikuna-ivory); }
+.pt-close-copy h3 { margin: 0; font-family: var(--font-display); font-size: clamp(30px, 3.4vw, 46px); font-weight: 800; line-height: 1.08; letter-spacing: -0.035em; text-wrap: balance; }
+.pt-close-copy p { max-width: 28rem; margin: 14px 0 28px; color: var(--color-mikuna-gray); font-size: 18px; line-height: 1.55; }
+.pt-close-photos { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.pt-close-photos img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 24px; }
+.pt-close-photos img:last-child { margin-top: 36px; }
+.pt-route { display: flex; align-items: center; gap: 14px; color: var(--color-mikuna-indigo); }
+.pt-route-point { display: grid; justify-items: center; gap: 8px; color: var(--color-mikuna-gray); font-size: 14px; font-weight: 600; }
+.pt-route-point .public-icon { width: 64px; height: 64px; padding: 16px; border-radius: 50%; background: var(--color-mikuna-white); color: var(--color-mikuna-indigo); box-shadow: 0 10px 24px -14px rgb(17 9 76 / 0.4); }
+.pt-route-line { flex: 1; min-width: 16px; border-top: 2px dashed var(--color-mikuna-orange); }
+.pt-route-scooter .public-icon { width: 76px; height: 76px; padding: 16px; border-radius: 50%; background: var(--color-mikuna-orange); color: var(--color-mikuna-white); }
+.pt-route-scooter .icon-accent { stroke: currentColor; }
+
+@media (max-width: 1099px) {
+  .pt-tool-grid { grid-template-columns: minmax(0, 1fr); gap: 40px; max-width: 520px; }
+  .pt-tool-visual { min-height: 0; }
+  .pt-onboard-steps { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  .pt-onboard-steps::before { top: 26px; bottom: 26px; left: 25px; right: auto; border-top: 0; border-left: 2px dashed #FFD9C2; }
+  .pt-onboard-steps li { display: grid; grid-template-columns: 52px minmax(0, 1fr); column-gap: 20px; }
+  .pt-onboard-steps .hiw-marker { grid-row: 1 / span 2; }
+  .pt-onboard-steps h4 { margin-top: 12px; }
+  .pt-close { grid-template-columns: minmax(0, 1fr); padding: 40px; }
+}
+@media (max-width: 639px) {
+  .pt-tools { padding-block: 56px 64px; }
+  .pt-onboard { padding-block: 64px 16px; }
+  .pt-onboard-steps li { grid-template-columns: 44px minmax(0, 1fr); }
+  .pt-onboard-steps::before { left: 21px; }
+  .pt-close { margin-bottom: 64px; padding: 28px 20px; border-radius: 26px; }
+  .pt-close .public-button { width: 100%; }
+  .pt-route { gap: 8px; }
+  .pt-route-point .public-icon { width: 52px; height: 52px; padding: 13px; }
+  .pt-route-scooter .public-icon { width: 60px; height: 60px; padding: 13px; }
+}
