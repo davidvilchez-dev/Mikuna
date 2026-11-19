@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { Fragment, useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
 import { AuthLayout } from '../auth/AuthLayout'
 import { clearSession, getSession } from '../auth/session-storage'
 import { accountDetail, listAccounts, toggleAccount, type AccountDetail, type AccountSummary, type Page } from './admin-api'
+import { AdminLayout } from './AdminLayout'
+import { Badge, EmptyState, ErrorState, LoadingBlock, Pager } from './admin-ui'
 import {
   accessLabel,
   actionLabel,
@@ -18,8 +20,6 @@ import {
   type AccountFilters,
   type AccountTab,
 } from './admin-logic'
-import '../restaurant/restaurant.css'
-import './admin.css'
 
 type ViewState =
   | { kind: 'loading' }
@@ -123,19 +123,22 @@ export function AdminAccountsPage() {
     )
   }
 
+  const reload = () => { setView({ kind: 'loading' }); setAttempt((n) => n + 1) }
+  const columns = tab === 'users' ? 5 : tab === 'restaurants' ? 6 : 5
+
   return (
-    <AuthLayout wide title="Cuentas de la plataforma" description="Consulta y gestiona usuarios, restaurantes y repartidores. Las cuentas no se eliminan: se desactivan.">
-      <div className="admin-tabs" role="tablist" aria-label="Tipo de cuenta">
+    <AdminLayout title="Cuentas" description="Consulta y gestiona usuarios, restaurantes y repartidores. Las cuentas no se eliminan: se desactivan.">
+      <div className="adm-seg" role="tablist" aria-label="Tipo de cuenta">
         {TABS.map((id) => (
-          <button key={id} type="button" role="tab" className="admin-tab" aria-selected={tab === id} onClick={() => changeTab(id)}>
+          <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => changeTab(id)}>
             {tabLabels[id]}
           </button>
         ))}
       </div>
 
-      <form className="admin-filters" onSubmit={search} role="search">
-        <label>Buscar por nombre o correo
-          <input type="search" value={draft.q} onChange={(e) => setDraft({ ...draft, q: e.target.value })} maxLength={100} />
+      <form className="adm-toolbar" onSubmit={search} role="search">
+        <label className="adm-grow">Buscar por nombre o correo
+          <input type="search" value={draft.q} onChange={(e) => setDraft({ ...draft, q: e.target.value })} maxLength={100} placeholder="Escribe para buscar" />
         </label>
         {tab === 'users' && (
           <>
@@ -171,80 +174,91 @@ export function AdminAccountsPage() {
             </select>
           </label>
         )}
-        <button type="submit" className="auth-submit">Buscar</button>
+        <button type="submit" className="adm-btn">Buscar</button>
       </form>
 
-      {notice && <p className="auth-notice" role="status">{notice}</p>}
-      {view.kind === 'loading' && <p className="auth-description" role="status">Cargando…</p>}
-      {view.kind === 'error' && (
-        <>
-          <p className="auth-alert" role="alert">{view.message}</p>
-          <button type="button" className="auth-submit" onClick={() => { setView({ kind: 'loading' }); setAttempt((n) => n + 1) }}>Reintentar</button>
-        </>
-      )}
+      {notice && <p className="adm-note" role="status">{notice}</p>}
+      {view.kind === 'loading' && <LoadingBlock />}
+      {view.kind === 'error' && <ErrorState message={view.message} onRetry={reload} />}
       {view.kind === 'ready' && view.data.items.length === 0 && (
-        <p className="auth-description" role="status">No hay cuentas que coincidan con la búsqueda.</p>
+        <EmptyState title="Sin resultados" text="No hay cuentas que coincidan con la búsqueda." />
       )}
       {view.kind === 'ready' && view.data.items.length > 0 && (
-        <ul className="restaurant-list">
-          {view.data.items.map((item) => {
-            const open = selected?.tab === tab && selected.id === item.id
-            const operation = operationLabel(item.operationEnabled, tab)
-            return (
-              <li key={item.id} className="restaurant-card">
-                <h2>{item.name}</h2>
-                <dl>
-                  {item.email && <div><dt>Correo</dt><dd>{item.email}</dd></div>}
-                  {tab === 'users' && <div><dt>Tipo</dt><dd>{roleLabels[item.role]}</dd></div>}
-                  <div>
-                    <dt>Acceso</dt>
-                    <dd><span className={item.accessEnabled ? 'admin-badge' : 'admin-badge admin-badge-off'}>{accessLabel(item.accessEnabled)}</span></dd>
-                  </div>
-                  {operation && (
-                    <div>
-                      <dt>Operación</dt>
-                      <dd><span className={item.operationEnabled ? 'admin-badge' : 'admin-badge admin-badge-off'}>{operation}</span></dd>
-                    </div>
-                  )}
-                  {item.registrationStatus && <div><dt>Registro</dt><dd>{registrationLabels[item.registrationStatus]}</dd></div>}
-                  <div><dt>Registrado</dt><dd>{formatDateTime(item.createdAt)}</dd></div>
-                </dl>
-                <div className="restaurant-actions">
-                  <button type="button" className="auth-submit auth-submit-secondary" aria-expanded={open}
-                    onClick={() => setSelected(open ? null : { tab, id: item.id })}>
-                    {open ? 'Ocultar detalle' : 'Ver detalle'}
-                  </button>
-                </div>
-                {open && detail && detail.account.id === item.id && (
-                  <DetailPanel tab={tab} detail={detail} busy={busy}
-                    onToggle={(target, id, enabledNow) => void toggle(target, id, enabledNow)}
-                    onOpenOwner={() => setSelected({ tab: 'users', id: detail.account.accountId })} />
-                )}
-              </li>
-            )
-          })}
-        </ul>
+        <div className="adm-table-wrap">
+          <table className="adm-table">
+            <thead>
+              <tr>
+                <th scope="col">{tab === 'users' ? 'Persona' : tab === 'restaurants' ? 'Restaurante' : 'Repartidor'}</th>
+                {tab === 'users' && <th scope="col">Tipo</th>}
+                <th scope="col">Acceso</th>
+                {tab !== 'users' && <th scope="col">Operación</th>}
+                {tab === 'restaurants' && <th scope="col">Registro</th>}
+                <th scope="col">Registrado</th>
+                <th scope="col" />
+              </tr>
+            </thead>
+            <tbody>
+              {view.data.items.map((item) => {
+                const open = selected?.tab === tab && selected.id === item.id
+                const operation = operationLabel(item.operationEnabled, tab)
+                return (
+                  <Fragment key={item.id}>
+                    <tr className={open ? 'adm-row-open' : undefined}>
+                      <td>
+                        <div className="adm-cell-main"><strong>{item.name}</strong>{item.email && <span>{item.email}</span>}</div>
+                      </td>
+                      {tab === 'users' && <td>{roleLabels[item.role]}</td>}
+                      <td><Badge tone={item.accessEnabled ? 'ok' : 'bad'}>{accessLabel(item.accessEnabled)}</Badge></td>
+                      {tab !== 'users' && (
+                        <td>{operation ? <Badge tone={item.operationEnabled ? 'ok' : 'bad'}>{operation}</Badge> : '—'}</td>
+                      )}
+                      {tab === 'restaurants' && (
+                        <td>
+                          {item.registrationStatus
+                            ? <Badge tone={item.registrationStatus === 'APPROVED' ? 'ok' : item.registrationStatus === 'REJECTED' ? 'bad' : 'warn'}>{registrationLabels[item.registrationStatus]}</Badge>
+                            : '—'}
+                        </td>
+                      )}
+                      <td>{formatDateTime(item.createdAt)}</td>
+                      <td className="adm-actions-cell">
+                        <button type="button" className="adm-btn adm-btn-ghost adm-btn-sm" aria-expanded={open}
+                          onClick={() => setSelected(open ? null : { tab, id: item.id })}>
+                          {open ? 'Ocultar' : 'Ver detalle'}
+                        </button>
+                      </td>
+                    </tr>
+                    {open && (
+                      <tr>
+                        <td colSpan={columns} className="adm-detail-cell">
+                          {detail && detail.account.id === item.id
+                            ? (
+                              <DetailPanel tab={tab} detail={detail} busy={busy}
+                                onToggle={(target, id, enabledNow) => void toggle(target, id, enabledNow)}
+                                onOpenOwner={() => setSelected({ tab: 'users', id: detail.account.accountId })} />
+                            )
+                            : <div className="adm-detail"><LoadingBlock /></div>}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {view.kind === 'ready' && (
-        <div className="admin-pager">
-          <span role="status">{pageSummary(view.data.page, view.data.totalPages, view.data.totalItems)}</span>
-          <div className="restaurant-actions">
-            <button type="button" className="auth-submit auth-submit-secondary" disabled={page === 0} onClick={() => setPage(page - 1)}>Anterior</button>
-            <button type="button" className="auth-submit auth-submit-secondary" disabled={page + 1 >= view.data.totalPages} onClick={() => setPage(page + 1)}>Siguiente</button>
-          </div>
-        </div>
+        <Pager summary={pageSummary(view.data.page, view.data.totalPages, view.data.totalItems)} page={page} totalPages={view.data.totalPages} onChange={setPage} />
       )}
       {selected?.tab === 'users' && tab !== 'users' && detail && detail.account.id === selected.id && (
-        <section className="restaurant-card" aria-label="Cuenta del titular">
+        <section className="adm-card" aria-label="Cuenta del titular">
           <h2>Cuenta del titular: {detail.account.name}</h2>
           <DetailPanel tab="users" detail={detail} busy={busy}
             onToggle={(target, id, enabledNow) => void toggle(target, id, enabledNow)} />
         </section>
       )}
-      <Link to="/admin/pedidos" className="auth-switch">Ver pedidos y entregas</Link>
-      <Link to="/mi-cuenta" className="auth-switch">Volver a mi cuenta</Link>
-    </AuthLayout>
+    </AdminLayout>
   )
 }
 
@@ -262,27 +276,36 @@ function DetailPanel({ tab, detail, busy, onToggle, onOpenOwner }: PanelProps) {
   const enabledNow = tab === 'users' ? account.accessEnabled : account.operationEnabled !== false
   const info = toggleInfo(tab, enabledNow)
   return (
-    <div className="admin-detail">
+    <div className="adm-detail">
       {detail.restaurant && (
-        <p>{detail.restaurant.category} · {detail.restaurant.address}, {detail.restaurant.zone} · {detail.restaurant.phone}
-          {' '}· {detail.restaurant.available ? 'Disponible' : 'En pausa'}</p>
+        <dl className="adm-facts">
+          <div><dt>Categoría</dt><dd>{detail.restaurant.category}</dd></div>
+          <div><dt>Dirección</dt><dd>{detail.restaurant.address}, {detail.restaurant.zone}</dd></div>
+          <div><dt>Teléfono</dt><dd>{detail.restaurant.phone}</dd></div>
+          <div><dt>Disponibilidad</dt><dd>{detail.restaurant.available ? 'Disponible' : 'En pausa'}</dd></div>
+        </dl>
       )}
-      {detail.courier && <p>{detail.courier.available ? 'Disponible para entregas' : 'No disponible para entregas'}</p>}
-      <div className="restaurant-actions">
-        <button type="button" className="auth-submit" disabled={busy} onClick={() => onToggle(tab, account.id, enabledNow)}>{info.button}</button>
+      {detail.courier && (
+        <dl className="adm-facts">
+          <div><dt>Disponibilidad</dt><dd>{detail.courier.available ? 'Disponible para entregas' : 'No disponible para entregas'}</dd></div>
+        </dl>
+      )}
+      <div className="adm-actions">
+        <button type="button" className={enabledNow ? 'adm-btn adm-btn-danger' : 'adm-btn'} disabled={busy} onClick={() => onToggle(tab, account.id, enabledNow)}>{info.button}</button>
         {tab !== 'users' && onOpenOwner && (
-          <button type="button" className="auth-submit auth-submit-secondary" onClick={onOpenOwner}>Ver cuenta del titular</button>
+          <button type="button" className="adm-btn adm-btn-ghost" onClick={onOpenOwner}>Ver cuenta del titular</button>
         )}
       </div>
       <h3>Acciones del administrador</h3>
-      {detail.actions.length === 0 ? <p className="auth-description">Sin acciones registradas.</p> : (
-        <ul className="admin-log">
+      {detail.actions.length === 0 ? <p>Sin acciones registradas.</p> : (
+        <ol className="adm-timeline">
           {detail.actions.map((action, index) => (
             <li key={index}>
-              {actionLabel(action.action, action.scope)} · {formatDateTime(action.createdAt)} · {action.adminName ?? 'Administrador'}
+              <strong>{actionLabel(action.action, action.scope)}</strong>
+              <small>{formatDateTime(action.createdAt)} · {action.adminName ?? 'Administrador'}</small>
             </li>
           ))}
-        </ul>
+        </ol>
       )}
     </div>
   )

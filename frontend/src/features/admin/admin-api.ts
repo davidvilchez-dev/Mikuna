@@ -123,6 +123,13 @@ export function toggleAccount(token: string, tab: AccountTab, id: string, enable
   return apiRequest(togglePath(tab, id, enableNow), { method: 'POST', headers: headers(token) })
 }
 
+/** Total de un listado administrativo sin traer sus filas: pide una sola y lee el total (métricas del panel). */
+export async function countOf(token: string, path: string, params: Record<string, string> = {}): Promise<number> {
+  const query = new URLSearchParams({ page: '0', size: '1', ...params })
+  const result = await apiRequest<Page<unknown>>(path + '?' + query.toString(), { headers: headers(token) })
+  return result.totalItems
+}
+
 export function listOrders(token: string, status: OrderStatus | '', page: number): Promise<Page<OrderSummary>> {
   return apiRequest('/api/admin/orders' + buildOrdersQuery(status, page), { headers: headers(token) })
 }

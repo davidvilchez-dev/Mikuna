@@ -157,3 +157,20 @@ export function paymentLabel(status: string | undefined): string {
 export function orderStatusLabel(status: string): string {
   return orderStatusLabels[status as OrderStatus] ?? status
 }
+
+export type Tone = 'ok' | 'bad' | 'warn' | 'info' | 'muted'
+
+/** Color del distintivo según el estado del pedido: solo presentación; el backend decide el estado. */
+export function statusTone(status: string): Tone {
+  switch (status) {
+    case 'DELIVERED':
+      return 'ok'
+    case 'REJECTED':
+    case 'CANCELLED':
+      return 'bad'
+    case 'PENDING':
+      return 'warn'
+    default:
+      return 'info'
+  }
+}

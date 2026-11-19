@@ -11,7 +11,8 @@ import {
   type RestaurantStatus,
 } from './restaurant-api'
 import { REJECT_REASON_MAX, validateRejectReason } from './restaurant-validation'
-import './restaurant.css'
+import { AdminLayout } from '../admin/AdminLayout'
+import { Badge, EmptyState, ErrorState, LoadingBlock } from '../admin/admin-ui'
 
 const filters: { status: RestaurantStatus; label: string }[] = [
   { status: 'PENDING', label: 'Pendientes' },
@@ -107,8 +108,8 @@ export function AdminRequestsPage() {
   }
 
   return (
-    <AuthLayout wide title="Solicitudes de restaurantes" description="Revisa las solicitudes y decide cuáles pueden recibir pedidos.">
-      <div className="restaurant-filter" role="group" aria-label="Filtrar por estado">
+    <AdminLayout title="Solicitudes de restaurantes" description="Revisa las solicitudes y decide cuáles pueden recibir pedidos.">
+      <div className="adm-seg" role="group" aria-label="Filtrar por estado">
         {filters.map((filter) => (
           <button key={filter.status} type="button" aria-pressed={status === filter.status}
             onClick={() => { setStatus(filter.status); setState({ kind: 'loading' }); setRejectingId(null); setNotice(null) }}>
@@ -116,24 +117,24 @@ export function AdminRequestsPage() {
           </button>
         ))}
       </div>
-      {notice && <p className="auth-notice" role="status">{notice}</p>}
+      {notice && <p className="adm-note" role="status">{notice}</p>}
 
-      {state.kind === 'loading' && <p className="auth-description" role="status">Cargando solicitudes…</p>}
-      {state.kind === 'error' && (
-        <>
-          <p className="auth-alert" role="alert">{state.message}</p>
-          <button type="button" className="auth-submit" onClick={reload}>Reintentar</button>
-        </>
-      )}
+      {state.kind === 'loading' && <LoadingBlock label="Cargando solicitudes" />}
+      {state.kind === 'error' && <ErrorState message={state.message} onRetry={reload} />}
       {state.kind === 'ready' && state.items.length === 0 && (
-        <p className="auth-description" role="status">No hay restaurantes en este estado.</p>
+        <EmptyState title="Todo al día" text="No hay restaurantes en este estado." />
       )}
       {state.kind === 'ready' && state.items.length > 0 && (
-        <ul className="restaurant-list">
+        <ul className="adm-cards">
           {state.items.map((item) => (
-            <li key={item.id} className="restaurant-card">
-              <h2>{item.name}</h2>
-              <dl>
+            <li key={item.id}>
+              <div className="adm-cards-head">
+                <h2>{item.name}</h2>
+                <Badge tone={item.status === 'APPROVED' ? 'ok' : item.status === 'REJECTED' ? 'bad' : 'warn'}>
+                  {item.status === 'APPROVED' ? 'Aprobado' : item.status === 'REJECTED' ? 'Rechazado' : 'Pendiente'}
+                </Badge>
+              </div>
+              <dl className="adm-facts">
                 <div><dt>Categoría</dt><dd>{item.category}</dd></div>
                 <div><dt>Zona</dt><dd>{item.zone}</dd></div>
                 <div><dt>Dirección</dt><dd>{item.address}</dd></div>
@@ -142,30 +143,28 @@ export function AdminRequestsPage() {
                 <div><dt>Enviada</dt><dd>{dateFormat.format(new Date(item.submittedAt))}</dd></div>
                 {item.description && <div><dt>Descripción</dt><dd>{item.description}</dd></div>}
                 {item.status === 'APPROVED' && (
-                  <div><dt>Habilitado para recibir pedidos</dt><dd>{item.acceptingOrders ? 'Sí' : 'No'} · {item.available ? 'Disponible' : 'En pausa'}</dd></div>
+                  <div><dt>Recibe pedidos</dt><dd>{item.acceptingOrders ? 'Sí' : 'No'} · {item.available ? 'Disponible' : 'En pausa'}</dd></div>
                 )}
                 {item.status === 'REJECTED' && <div><dt>Motivo del rechazo</dt><dd>{item.rejectionReason}</dd></div>}
               </dl>
 
               {item.status === 'PENDING' && rejectingId !== item.id && (
-                <div className="restaurant-actions">
-                  <button type="button" className="auth-submit" disabled={busy}
+                <div className="adm-actions">
+                  <button type="button" className="adm-btn" disabled={busy}
                     onClick={() => void resolve(item, () => approveRestaurant(token, item.id), 'solicitud aprobada')}>Aprobar</button>
-                  <button type="button" className="auth-submit auth-submit-secondary" disabled={busy}
+                  <button type="button" className="adm-btn adm-btn-danger" disabled={busy}
                     onClick={() => { setRejectingId(item.id); setReason(''); setReasonError(undefined) }}>Rechazar</button>
                 </div>
               )}
               {item.status === 'PENDING' && rejectingId === item.id && (
-                <div className="auth-form">
-                  <div className="restaurant-field-textarea">
-                    <label htmlFor={'reason-' + item.id}>Motivo del rechazo (obligatorio)</label>
-                    <textarea id={'reason-' + item.id} value={reason} maxLength={REJECT_REASON_MAX + 50}
-                      aria-invalid={reasonError ? true : undefined} onChange={(e) => setReason(e.target.value)} />
-                    {reasonError && <p className="auth-error">{reasonError}</p>}
-                  </div>
-                  <div className="restaurant-actions">
-                    <button type="button" className="auth-submit" disabled={busy} onClick={() => confirmReject(item)}>Confirmar rechazo</button>
-                    <button type="button" className="auth-submit auth-submit-secondary" disabled={busy} onClick={() => setRejectingId(null)}>Cancelar</button>
+                <div className="adm-reject">
+                  <label htmlFor={'reason-' + item.id}>Motivo del rechazo (obligatorio)</label>
+                  <textarea id={'reason-' + item.id} value={reason} maxLength={REJECT_REASON_MAX + 50}
+                    aria-invalid={reasonError ? true : undefined} onChange={(e) => setReason(e.target.value)} />
+                  {reasonError && <p className="adm-field-error">{reasonError}</p>}
+                  <div className="adm-actions">
+                    <button type="button" className="adm-btn adm-btn-danger" disabled={busy} onClick={() => confirmReject(item)}>Confirmar rechazo</button>
+                    <button type="button" className="adm-btn adm-btn-ghost" disabled={busy} onClick={() => setRejectingId(null)}>Cancelar</button>
                   </div>
                 </div>
               )}
@@ -173,7 +172,6 @@ export function AdminRequestsPage() {
           ))}
         </ul>
       )}
-      <Link to="/mi-cuenta" className="auth-switch">Volver a mi cuenta</Link>
-    </AuthLayout>
+    </AdminLayout>
   )
 }

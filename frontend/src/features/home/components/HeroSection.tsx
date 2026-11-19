@@ -1,41 +1,40 @@
 import { Link } from 'react-router'
-import { heroActions, heroContent } from '../home-content'
-import type { ShowComingSoon } from '../home-types'
+import { heroActions, heroContent, heroHighlights } from '../home-content'
+import { PublicIcon } from '../../public-pages/components/PublicIcon'
+import { AddressSearch } from './AddressSearch'
 import { HeroFoodComposition } from './HeroFoodComposition'
 
-export function HeroSection({ onComingSoon }: { onComingSoon: ShowComingSoon }) {
+export function HeroSection() {
+  const account = heroActions.find((action) => action.behavior === 'route' && action.to)
   return (
-    <section id="presentacion" className="hero-section bg-mikuna-ivory" aria-labelledby="titulo-principal">
-      <div className="hero-shell">
-        <div className="hero-copy" data-hero-copy>
-          <h1 id="titulo-principal" data-keep-clear>
-            <span>Tu antojo,</span>{' '}<span className="text-mikuna-orange">en camino.</span>
-          </h1>
-          <p className="hero-description text-mikuna-gray" data-description data-keep-clear>{heroContent.description}</p>
-          <div className="hero-actions">
-            {heroActions.map((action) => action.behavior === 'route' && action.to ? (
-              <Link key={action.id} to={action.to} className="hero-action action-secondary text-mikuna-indigo" data-action={action.id}>
-                <span data-keep-clear>{action.label}</span>
-              </Link>
-            ) : (
-              <button
-                key={action.id}
-                type="button"
-                className={action.appearance === 'primary' ? 'hero-action action-primary bg-mikuna-orange text-mikuna-white' : 'hero-action action-secondary text-mikuna-indigo'}
-                data-action={action.id}
-                onClick={(event) => onComingSoon(event.currentTarget)}
-              >
-                <span data-keep-clear>{action.label}</span>
-                {action.appearance === 'primary' && (
-                  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <path d="M4 12h16m-7-7 7 7-7 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
-              </button>
-            ))}
+    <section id="presentacion" className="hero-section" aria-labelledby="titulo-principal">
+      <div className="hero-card">
+        <div className="hero-glow" aria-hidden="true" />
+        <div className="hero-shell">
+          <div className="hero-copy" data-hero-copy>
+            <p className="hero-eyebrow">Delivery en Ayacucho</p>
+            <h1 id="titulo-principal" data-keep-clear>
+              <span>Tu antojo,</span>{' '}<span className="hero-accent">en camino.</span>
+            </h1>
+            <p className="hero-description" data-description data-keep-clear>{heroContent.description}</p>
+            <AddressSearch />
+            {account && (
+              <p className="hero-account">
+                ¿Primera vez en Mikuna?{' '}
+                <Link to={account.to!} data-action={account.id}>{account.label}</Link>
+              </p>
+            )}
           </div>
+          <HeroFoodComposition />
         </div>
-        <HeroFoodComposition />
+        <ul className="hero-highlights">
+          {heroHighlights.map((item) => (
+            <li key={item.title}>
+              <span className="highlight-icon"><PublicIcon name={item.icon} /></span>
+              <span><strong>{item.title}</strong><small>{item.text}</small></span>
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   )
