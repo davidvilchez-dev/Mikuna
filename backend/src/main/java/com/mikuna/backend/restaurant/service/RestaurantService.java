@@ -138,7 +138,7 @@ public class RestaurantService {
     }
 
     private RestaurantResponse respond(Restaurant restaurant) {
-        boolean ownerEnabled = accounts.findById(restaurant.getOwnerId()).map(Account::isEnabled).orElse(false);
+        boolean ownerEnabled = accounts.findById(restaurant.getOwnerId()).map(Account::canOperate).orElse(false);
         return RestaurantResponse.from(restaurant, eligibility.canReceiveOrders(restaurant, ownerEnabled));
     }
 

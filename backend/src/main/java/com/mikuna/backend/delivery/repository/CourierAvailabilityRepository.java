@@ -17,7 +17,7 @@ public interface CourierAvailabilityRepository extends JpaRepository<CourierAvai
      * (pedido ASSIGNED o PICKED_UP con su {@code courier_id}) y sin rechazo previo de esa entrega.
      */
     String CANDIDATE = """
-            ca.available = true and a.status = 'ENABLED' and a.role = 'COURIER'
+            ca.available = true and a.status = 'ENABLED' and a.operation_enabled = true and a.role = 'COURIER'
             and not exists (select 1 from entregas d join pedidos o on o.id = d.order_id
                             where d.courier_id = ca.courier_id and o.status in ('ASSIGNED', 'PICKED_UP'))
             and not exists (select 1 from rechazos_entrega r

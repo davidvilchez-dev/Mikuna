@@ -87,7 +87,7 @@ public class RestaurantReviewService {
 
     private AdminRestaurantResponse respond(Restaurant restaurant) {
         Optional<Account> owner = accounts.findById(restaurant.getOwnerId());
-        boolean ownerEnabled = owner.map(Account::isEnabled).orElse(false);
+        boolean ownerEnabled = owner.map(Account::canOperate).orElse(false);
         return AdminRestaurantResponse.from(restaurant, eligibility.canReceiveOrders(restaurant, ownerEnabled),
                 owner.map(Account::getName).orElse(""), owner.map(Account::getEmail).orElse(""));
     }

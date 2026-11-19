@@ -121,6 +121,18 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
     }
 
+    @ExceptionHandler(AdminAccountProtectedException.class)
+    ResponseEntity<ProblemDetail> handleAdminProtected(AdminAccountProtectedException ex) {
+        ProblemDetail problem = problem(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setProperty("code", AdminAccountProtectedException.CODE);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
+    }
+
+    @ExceptionHandler(AccountNotFoundException.class)
+    ResponseEntity<ProblemDetail> handleAccountNotFound(AccountNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem(HttpStatus.NOT_FOUND, ex.getMessage()));
+    }
+
     @ExceptionHandler(LocationRejectedException.class)
     ResponseEntity<ProblemDetail> handleLocationRejected(LocationRejectedException ex) {
         ProblemDetail problem = problem(HttpStatus.CONFLICT, ex.getMessage());
