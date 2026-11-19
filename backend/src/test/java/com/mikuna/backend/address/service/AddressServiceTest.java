@@ -51,7 +51,7 @@ class AddressServiceTest {
     }
 
     private static AddressRequest request(String street, String district) {
-        return new AddressRequest("  Casa ", street, district, " ", "");
+        return new AddressRequest("  Casa ", street, district, " ", "", null, null);
     }
 
     private static Address saved(UUID customer) {
@@ -72,6 +72,35 @@ class AddressServiceTest {
         assertThat(response.label()).isEqualTo("Casa");
         assertThat(response.reference()).isNull();
         assertThat(response.contactPhone()).isNull();
+    }
+
+    @Test
+    void guardaElPuntoMarcadoEnElMapa() {
+        AddressRequest withPoint = new AddressRequest("Casa", "Jr. Lima 123", "Ayacucho", null, null, -13.1588, -74.2236);
+
+        AddressResponse response = service.create(CUSTOMER, withPoint);
+
+        assertThat(response.latitude()).isEqualTo(-13.1588);
+        assertThat(response.longitude()).isEqualTo(-74.2236);
+    }
+
+    @Test
+    void sinPuntoEnElMapaLasCoordenadasQuedanVacias() {
+        AddressResponse response = service.create(CUSTOMER, request("Jr. Lima 123", "Ayacucho"));
+
+        assertThat(response.latitude()).isNull();
+        assertThat(response.longitude()).isNull();
+    }
+
+    @Test
+    void editarConPuntoActualizaLasCoordenadas() {
+        Address address = saved(CUSTOMER);
+        when(addresses.findByIdAndCustomerId(address.getId(), CUSTOMER)).thenReturn(Optional.of(address));
+
+        service.update(CUSTOMER, address.getId(),
+                new AddressRequest("Casa", "Av. Nueva 55", "Ayacucho", null, null, -13.16, -74.22));
+        assertThat(address.getLatitude()).isEqualTo(-13.16);
+        assertThat(address.getLongitude()).isEqualTo(-74.22);
     }
 
     @Test

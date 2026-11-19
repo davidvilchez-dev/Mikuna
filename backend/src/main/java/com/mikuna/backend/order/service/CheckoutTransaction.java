@@ -88,7 +88,7 @@ public class CheckoutTransaction {
                     confirmationKey, request.paymentMethod(),
                     new Order.Amounts(totals.subtotal(), totals.deliveryFee(), totals.commission(), totals.total()),
                     new Order.Delivery(address.getLabel(), address.getStreet(), address.getDistrict(),
-                            address.getReference(), address.getContactPhone()),
+                            address.getReference(), address.getContactPhone(), address.getLatitude(), address.getLongitude()),
                     Instant.now(clock));
             for (CartResponse.Line line : view.lines()) {
                 order.addLine(line.productId(), line.name(), line.unitPrice(), line.quantity(), line.lineTotal());
