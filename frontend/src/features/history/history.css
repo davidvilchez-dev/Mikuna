@@ -1,8 +1,22 @@
-.history-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 16px; }
-.history-filters label { display: grid; gap: 4px; font-weight: 700; }
+/* Historial de pedidos y entregas. */
+.history-filters {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 16px; padding: 16px;
+  border: 1px solid var(--app-border); border-radius: 16px; background: var(--color-mikuna-white);
+}
+.history-filters label { display: grid; gap: 6px; color: var(--color-mikuna-gray); font-size: 14px; font-weight: 600; }
 .history-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
-.history-item { display: grid; gap: 6px; padding: 14px; border: 2px solid color-mix(in srgb, var(--color-mikuna-indigo) 15%, transparent); border-radius: 12px; background: var(--color-mikuna-white); }
-.history-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; }
-.history-time { font-size: 0.85rem; }
-.history-rating { font-weight: 700; }
+.history-item {
+  display: grid; gap: 8px; padding: 18px 20px; border: 1px solid var(--app-border); border-radius: 16px;
+  background: var(--color-mikuna-white); box-shadow: var(--app-shadow);
+}
+.history-item p { margin: 0; }
+.history-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+.history-head strong { font-size: 18px; }
+.history-head span:not(.history-time) {
+  padding: 3px 12px; border-radius: 999px; background: var(--color-mikuna-peach); color: var(--color-mikuna-orange-deep); font-size: 13px; font-weight: 700;
+}
+.history-time { margin-left: auto; color: var(--color-mikuna-gray); font-size: 14px; }
+.history-item .checkout-lines li { padding: 6px 0; border-bottom: 0; color: var(--color-mikuna-gray); font-size: 15px; }
+.history-rating { color: var(--color-mikuna-gray); font-size: 14px; font-weight: 600; }
 .rating-control { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.history-item .auth-switch { font-weight: 700; }

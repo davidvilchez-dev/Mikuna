@@ -1,0 +1,38 @@
+/* ---------- Historial y ventas ---------- */
+.rs-tab[aria-pressed='true'] { border-color: var(--color-mikuna-indigo); background: var(--color-mikuna-indigo); color: var(--color-mikuna-white); }
+
+.rv-stats { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 14px; }
+.rv-sales {
+  display: grid; align-content: start; gap: 4px; padding: 22px; border-radius: 16px; background: var(--color-mikuna-indigo); color: var(--color-mikuna-white);
+}
+.rv-sales-icon { display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; margin-bottom: 8px; border-radius: 12px; background: var(--color-mikuna-orange); }
+.rv-sales-icon .app-icon { width: 22px; height: 22px; }
+.rv-sales small { color: rgb(255 255 255 / 0.75); font-size: 14px; font-weight: 700; }
+.rv-sales strong { font-size: clamp(34px, 4vw, 46px); font-weight: 800; line-height: 1.05; }
+.rv-sales > span:last-child { color: rgb(255 255 255 / 0.7); font-size: 13px; }
+.rv-mini { display: grid; align-content: center; gap: 6px; padding: 18px; border: 1px solid var(--app-border); border-radius: 16px; background: var(--color-mikuna-white); box-shadow: var(--app-shadow); }
+.rv-mini small { color: var(--color-mikuna-gray); font-size: 14px; font-weight: 700; }
+.rv-mini strong { font-size: 28px; font-weight: 800; }
+
+.rv-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.rv-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.rv-list li { display: grid; gap: 4px; padding: 14px 0; border-top: 1px solid var(--app-border); }
+.rv-list li:first-child { border-top: 0; }
+.rv-row-main { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.rv-row-main strong { font-size: 17px; }
+.rv-list p { margin: 0; overflow-wrap: anywhere; }
+.rv-row-foot { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.rv-row-foot small { color: var(--color-mikuna-gray); }
+.rv-row-foot b { font-size: 17px; }
+.app-shell .rv-more { justify-self: center; }
+
+.rv-top { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.rv-top li { display: grid; gap: 6px; }
+.rv-top li > div { display: flex; justify-content: space-between; gap: 10px; font-weight: 700; }
+.rv-top b { color: var(--color-mikuna-orange-deep); }
+.rv-bar { display: block; height: 8px; overflow: hidden; border-radius: 999px; background: #EDEEF2; }
+.rv-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--color-mikuna-orange); }
+
+@media (max-width: 1000px) { .rv-stats { grid-template-columns: 1fr 1fr 1fr; } .rv-sales { grid-column: 1 / -1; } }
+@media (max-width: 860px) { .rv-grid { grid-template-columns: 1fr; } }
+@media (max-width: 480px) { .rv-stats { grid-template-columns: 1fr 1fr; } .rv-mini:last-child { grid-column: 1 / -1; } }

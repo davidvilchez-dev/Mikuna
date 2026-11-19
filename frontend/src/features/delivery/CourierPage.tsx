@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
+import { AppIcon } from '../auth/AppIcon'
 import { AuthLayout } from '../auth/AuthLayout'
 import { clearSession, getSession } from '../auth/session-storage'
 import {
@@ -15,17 +16,21 @@ import {
 import {
   DELIVERY_POLL_MS,
   DELIVERY_REASON_MAX,
-  availabilityLabel,
+  DELIVERY_STEPS,
   courierActions,
   courierDoneMessages,
   courierStatusHints,
-  courierStatusLabel,
-  formatDestination,
+  currentStep,
+  navigationUrl,
+  phoneHref,
   validateDeliveryReason,
   type CourierAction,
 } from './courier-logic'
 import { sharingMessages, startLocationSharing, type SharingState } from './location-sender'
-import '../restaurant/restaurant.css'
+import './courier.css'
+
+/** Leaflet solo se descarga cuando hay una entrega con punto marcado. */
+const DeliveryMap = lazy(() => import('./DeliveryMap'))
 
 type ViewState =
   | { kind: 'loading' }
@@ -33,13 +38,13 @@ type ViewState =
   | { kind: 'forbidden' }
   | { kind: 'error'; message: string }
 
-/** Disponibilidad y entrega actual del repartidor (RF-21, RF-23, RF-25). Se actualiza sola cada pocos segundos. */
+/** Panel del repartidor: disponibilidad (RF-21, RF-23) y entrega en curso (RF-25). Se actualiza sola cada pocos segundos. */
 export function CourierPage() {
   const navigate = useNavigate()
   const [session] = useState(() => getSession())
   const [view, setView] = useState<ViewState>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null)
   const [rejecting, setRejecting] = useState(false)
   const [reason, setReason] = useState('')
   const [reasonError, setReasonError] = useState<string | undefined>()
@@ -95,10 +100,10 @@ export function CourierPage() {
     setNotice(null)
     try {
       await setAvailability(token, available)
-      setNotice(available ? 'Ahora estás disponible para recibir entregas' : 'Ya no recibirás nuevas entregas')
+      setNotice({ text: available ? 'Estás en línea: te asignaremos la siguiente entrega' : 'Te desconectaste: no recibirás nuevas entregas', ok: true })
       reload()
     } catch (error) {
-      setNotice(fail(error))
+      setNotice({ text: fail(error), ok: false })
     } finally {
       setBusy(false)
     }
@@ -110,13 +115,13 @@ export function CourierPage() {
     setNotice(null)
     try {
       await actOnDelivery(token, delivery.orderId, action, reasonText)
-      setNotice(courierDoneMessages[action])
+      setNotice({ text: courierDoneMessages[action], ok: true })
       setRejecting(false)
       setReason('')
       reload()
     } catch (error) {
       // 404/409: la entrega cambió (reasignada o ya registrada); se muestra el motivo y se recarga.
-      setNotice(fail(error))
+      setNotice({ text: fail(error), ok: false })
       reload()
     } finally {
       setBusy(false)
@@ -132,7 +137,7 @@ export function CourierPage() {
 
   if (view.kind === 'forbidden') {
     return (
-      <AuthLayout title="Mis entregas">
+      <AuthLayout title="Entregas">
         <p className="auth-alert" role="alert">Esta sección es solo para repartidores con la cuenta habilitada.</p>
         <Link to="/mi-cuenta" className="auth-submit auth-submit-secondary">Volver a mi cuenta</Link>
       </AuthLayout>
@@ -140,8 +145,10 @@ export function CourierPage() {
   }
 
   return (
-    <AuthLayout wide title="Mis entregas" description="Indica si estás disponible y gestiona la entrega que tengas asignada.">
-      {notice && <p className="auth-notice" role="status">{notice}</p>}
+    <AuthLayout wide title="Entregas" description="Conéctate para recibir pedidos y sigue tu ruta.">
+      {notice && (notice.ok
+        ? <p className="app-success" role="status"><AppIcon name="check" />{notice.text}</p>
+        : <p className="auth-alert" role="alert">{notice.text}</p>)}
       {view.kind === 'loading' && <p className="auth-description" role="status">Cargando…</p>}
       {view.kind === 'error' && (
         <>
@@ -150,71 +157,137 @@ export function CourierPage() {
         </>
       )}
       {view.kind === 'ready' && (
-        <>
-          <div className="restaurant-card">
-            <h2>{availabilityLabel(view.availability.available)}</h2>
-            <div className="restaurant-actions">
-              <button type="button" className={view.availability.available ? 'auth-submit auth-submit-secondary' : 'auth-submit'}
-                disabled={busy} onClick={() => void toggle(!view.availability.available)}>
-                {view.availability.available ? 'Dejar de estar disponible' : 'Estoy disponible'}
-              </button>
+        <div className="cr">
+          <section className={view.availability.available ? 'cr-status cr-status-on' : 'cr-status'} aria-label="Disponibilidad">
+            <span className="cr-dot" aria-hidden="true" />
+            <div className="cr-status-text">
+              <strong>{view.availability.available ? 'Estás en línea' : 'Estás desconectado'}</strong>
+              <small>
+                {hasActiveDelivery
+                  ? sharingMessages[sharing]
+                  : view.availability.available ? 'Esperando el siguiente pedido' : 'Conéctate para recibir pedidos'}
+              </small>
             </div>
-          </div>
+            <button type="button" role="switch" aria-checked={view.availability.available} aria-label="Estar en línea"
+              className="cr-switch" disabled={busy} onClick={() => void toggle(!view.availability.available)}>
+              <span className="cr-switch-knob" />
+            </button>
+          </section>
 
           {view.deliveries.length === 0 && (
-            <p className="auth-description" role="status">
-              {view.availability.available
-                ? 'No tienes entregas asignadas. Te asignaremos la siguiente en cuanto haya un pedido listo.'
-                : 'No tienes entregas asignadas. Activa tu disponibilidad para recibir pedidos.'}
-            </p>
+            <div className="cr-empty" role="status">
+              <span className={view.availability.available ? 'cr-empty-icon cr-pulse' : 'cr-empty-icon'}><AppIcon name="scooter" /></span>
+              <strong>{view.availability.available ? 'Buscando pedidos para ti…' : 'No estás recibiendo pedidos'}</strong>
+              <p>
+                {view.availability.available
+                  ? 'Te asignaremos la siguiente entrega en cuanto haya un pedido listo. Mantén esta pantalla abierta.'
+                  : 'Activa el interruptor de arriba para ponerte en línea y empezar a recibir entregas.'}
+              </p>
+              {!view.availability.available && (
+                <button type="button" className="auth-submit" disabled={busy} onClick={() => void toggle(true)}>Ponerme en línea</button>
+              )}
+            </div>
           )}
-          {hasActiveDelivery && <p className="auth-description" role="status">{sharingMessages[sharing]}</p>}
-          <ul className="restaurant-list">
-            {view.deliveries.map((delivery) => (
-              <li key={delivery.orderId} className="restaurant-card">
-                <h2>{courierStatusLabel(delivery.status)}</h2>
-                {courierStatusHints[delivery.status] && <p className="auth-description">{courierStatusHints[delivery.status]}</p>}
-                <dl>
-                  <div><dt>Recoger en</dt><dd>{delivery.restaurant.name}</dd></div>
-                  <div><dt>Productos</dt><dd>{delivery.lines.map((line) => `${line.quantity} x ${line.productName}`).join(', ')}</dd></div>
-                  <div><dt>Entregar en</dt><dd>{formatDestination(delivery.delivery)}</dd></div>
-                  {delivery.delivery.phone && <div><dt>Contacto</dt><dd>{delivery.delivery.phone}</dd></div>}
-                </dl>
+
+          {view.deliveries.map((delivery) => {
+            const step = currentStep(delivery.status)
+            const phone = phoneHref(delivery.delivery.phone)
+            const { latitude, longitude } = delivery.delivery
+            const hasPoint = latitude !== null && longitude !== null
+            const options = courierActions(delivery.status)
+            const main = options.find((option) => option.action !== 'reject')
+            const canReject = options.some((option) => option.action === 'reject')
+            return (
+              <article key={delivery.orderId} className="cr-delivery">
+                <ol className="cr-steps" aria-label="Avance de la entrega">
+                  {DELIVERY_STEPS.map((label, index) => (
+                    <li key={label} className={index < step ? 'cr-step cr-step-done' : index === step ? 'cr-step cr-step-active' : 'cr-step'} aria-current={index === step ? 'step' : undefined}>
+                      <span className="cr-step-mark">{index < step ? <AppIcon name="check" /> : index + 1}</span>
+                      {label}
+                    </li>
+                  ))}
+                </ol>
+                {courierStatusHints[delivery.status] && <p className="cr-hint">{courierStatusHints[delivery.status]}</p>}
+
+                <div className="cr-body">
+                  <div className="cr-info">
+                    <div className="cr-block">
+                      <span className="cr-block-icon"><AppIcon name="store" /></span>
+                      <div>
+                        <small>Recoger en</small>
+                        <strong>{delivery.restaurant.name}</strong>
+                        {delivery.restaurant.address && <span>{delivery.restaurant.address}{delivery.restaurant.zone ? `, ${delivery.restaurant.zone}` : ''}</span>}
+                        {delivery.restaurant.phone && <a className="cr-inline" href={phoneHref(delivery.restaurant.phone) ?? undefined}>Llamar al local · {delivery.restaurant.phone}</a>}
+                      </div>
+                    </div>
+                    <div className="cr-block">
+                      <span className="cr-block-icon cr-block-icon-dest"><AppIcon name="pin" /></span>
+                      <div>
+                        <small>Entregar en{delivery.delivery.label ? ` · ${delivery.delivery.label}` : ''}</small>
+                        <strong>{delivery.delivery.street}</strong>
+                        <span>{delivery.delivery.district}</span>
+                        {delivery.delivery.reference && <span className="cr-reference">Referencia: {delivery.delivery.reference}</span>}
+                      </div>
+                    </div>
+                    <div className="cr-block">
+                      <span className="cr-block-icon"><AppIcon name="box" /></span>
+                      <div>
+                        <small>Productos</small>
+                        <ul className="cr-lines">
+                          {delivery.lines.map((line) => <li key={line.productName}><b>{line.quantity}×</b> {line.productName}</li>)}
+                        </ul>
+                      </div>
+                    </div>
+                    <div className="cr-links">
+                      <a className="cr-link cr-link-primary" href={navigationUrl({ ...delivery.delivery })} target="_blank" rel="noopener noreferrer">
+                        <AppIcon name="navigate" />Cómo llegar
+                      </a>
+                      {phone && <a className="cr-link" href={phone}><AppIcon name="phone" />Llamar al cliente</a>}
+                    </div>
+                  </div>
+
+                  <div className="cr-map-wrap">
+                    {hasPoint ? (
+                      <Suspense fallback={<p className="auth-description" role="status">Cargando el mapa…</p>}>
+                        <DeliveryMap latitude={latitude} longitude={longitude} />
+                      </Suspense>
+                    ) : (
+                      <div className="cr-nomap">
+                        <AppIcon name="pin" />
+                        <strong>El cliente no marcó el punto en el mapa</strong>
+                        <p>Usa la dirección y la referencia, o toca «Cómo llegar» para buscarla.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {!rejecting && (
-                  <div className="restaurant-actions">
-                    {courierActions(delivery.status).map((option) => (
-                      <button key={option.action} type="button"
-                        className={option.action === 'reject' ? 'auth-submit auth-submit-secondary' : 'auth-submit'}
-                        disabled={busy}
-                        onClick={() => {
-                          if (option.action === 'reject') { setRejecting(true); setReason(''); setReasonError(undefined) }
-                          else void run(delivery, option.action)
-                        }}>
-                        {option.label}
-                      </button>
-                    ))}
+                  <div className="cr-actions">
+                    {main && (
+                      <button type="button" className="auth-submit cr-main" disabled={busy} onClick={() => void run(delivery, main.action)}>{main.label}</button>
+                    )}
+                    {canReject && (
+                      <button type="button" className="cr-reject" disabled={busy} onClick={() => { setRejecting(true); setReason(''); setReasonError(undefined) }}>Rechazar entrega</button>
+                    )}
                   </div>
                 )}
                 {rejecting && (
-                  <div className="auth-form">
-                    <div className="restaurant-field-textarea">
-                      <label htmlFor="delivery-reason">Motivo del rechazo (opcional)</label>
-                      <textarea id="delivery-reason" value={reason} maxLength={DELIVERY_REASON_MAX + 50}
-                        aria-invalid={reasonError ? true : undefined} onChange={(e) => setReason(e.target.value)} />
-                      {reasonError && <p className="auth-error">{reasonError}</p>}
-                    </div>
-                    <div className="restaurant-actions">
+                  <div className="cr-reject-panel">
+                    <label htmlFor="delivery-reason">Motivo del rechazo <span className="addr-optional">(opcional)</span></label>
+                    <textarea id="delivery-reason" rows={3} value={reason} maxLength={DELIVERY_REASON_MAX + 50}
+                      aria-invalid={reasonError ? true : undefined} onChange={(e) => setReason(e.target.value)} />
+                    {reasonError && <p className="auth-error">{reasonError}</p>}
+                    <div className="cr-actions">
                       <button type="button" className="auth-submit" disabled={busy} onClick={() => confirmReject(delivery)}>Confirmar rechazo</button>
                       <button type="button" className="auth-submit auth-submit-secondary" disabled={busy} onClick={() => setRejecting(false)}>Cancelar</button>
                     </div>
                   </div>
                 )}
-              </li>
-            ))}
-          </ul>
-        </>
+              </article>
+            )
+          })}
+        </div>
       )}
-      <Link to="/mi-cuenta" className="auth-switch">Volver a mi cuenta</Link>
     </AuthLayout>
   )
 }

@@ -103,7 +103,7 @@ export function NotificationsPage() {
       {view.kind === 'error' && <p className="auth-alert" role="alert">{view.message}</p>}
       {view.kind === 'ready' && (
         <>
-          <div className="notice-actions">
+          <div className="notice-actions notices-bar">
             <label className="notices-filter">
               <input type="checkbox" checked={unreadOnly} onChange={(e) => { setView({ kind: 'loading' }); setUnreadOnly(e.target.checked) }} />
               Solo no leídos

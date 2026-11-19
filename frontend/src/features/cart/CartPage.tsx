@@ -109,8 +109,14 @@ export function CartPage() {
       {cart.notices.map((message) => <p className="catalog-banner" role="status" key={message}>{message}</p>)}
 
       {cart.lines.length === 0 ? (
-        <p className="auth-notice" role="status">Tu carrito está vacío. Explora los restaurantes y agrega productos.</p>
+        <div className="app-empty" role="status">
+          <strong>Tu carrito está vacío</strong>
+          <p>Explora los restaurantes y agrega productos para empezar tu pedido.</p>
+          <Link to="/restaurantes" className="auth-submit">Explorar restaurantes</Link>
+        </div>
       ) : (
+      <div className="cart-layout">
+      <div className="cart-main">
         <ul className="cart-list">
           {cart.lines.map((line) => (
             <li className={'cart-line' + (line.available ? '' : ' cart-line-unavailable')} key={line.id}>
@@ -132,13 +138,11 @@ export function CartPage() {
             </li>
           ))}
         </ul>
-      )}
-
-      {cart.lines.length > 0 && (
-        <button type="button" className="auth-submit auth-submit-secondary cart-clear" disabled={busy}
+        <button type="button" className="cart-clear" disabled={busy}
           onClick={() => { if (window.confirm('¿Vaciar el carrito?')) void run(() => clearCart(token)) }}>Vaciar carrito</button>
-      )}
+      </div>
 
+      <aside className="cart-side">
       <section className="cart-section" aria-labelledby="cart-address-title">
         <h2 id="cart-address-title">Dirección de entrega</h2>
         {addresses.length === 0 ? (
@@ -177,8 +181,10 @@ export function CartPage() {
           <Link to="/confirmar-pedido" className="auth-submit cart-continue">Continuar</Link>
         )}
       </section>
-
-      <Link to="/restaurantes" className="auth-switch">Seguir buscando restaurantes</Link>
+      <Link to="/restaurantes" className="cart-more">Seguir buscando restaurantes</Link>
+      </aside>
+      </div>
+      )}
     </AuthLayout>
   )
 }

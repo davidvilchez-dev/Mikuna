@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
-import { AuthLayout } from '../auth/AuthLayout'
+import { AppIcon } from '../auth/AppIcon'
+import { RestaurantLayout } from '../restaurant/RestaurantLayout'
 import { clearSession, getSession } from '../auth/session-storage'
 import {
   createProduct,
@@ -97,30 +98,30 @@ export function ProductsPage() {
   }
 
   if (state.kind === 'loading') {
-    return <AuthLayout title="Mi catálogo" wide><p className="auth-description" role="status">Cargando tus productos…</p></AuthLayout>
+    return <RestaurantLayout title="Mi catálogo" wide><p className="auth-description" role="status">Cargando tus productos…</p></RestaurantLayout>
   }
 
   if (state.kind === 'forbidden') {
     return (
-      <AuthLayout title="Mi catálogo" wide>
+      <RestaurantLayout title="Mi catálogo" wide>
         <p className="auth-alert" role="alert">{state.message || 'Tu restaurante debe estar aprobado para gestionar productos.'}</p>
         <Link to="/mi-restaurante" className="auth-submit auth-submit-secondary">Ir a mi restaurante</Link>
-      </AuthLayout>
+      </RestaurantLayout>
     )
   }
 
   if (state.kind === 'error') {
     return (
-      <AuthLayout title="Mi catálogo" wide>
+      <RestaurantLayout title="Mi catálogo" wide>
         <p className="auth-alert" role="alert">{state.message}</p>
         <button type="button" className="auth-submit" onClick={() => { setState({ kind: 'loading' }); setAttempt((n) => n + 1) }}>Reintentar</button>
-      </AuthLayout>
+      </RestaurantLayout>
     )
   }
 
   if (mode.kind === 'create') {
     return (
-      <AuthLayout title="Nuevo producto" description="Se publica como disponible apenas lo guardes.">
+      <RestaurantLayout title="Nuevo producto" description="Se publica como disponible apenas lo guardes.">
         <ProductForm
           initial={emptyData}
           submitLabel="Guardar producto"
@@ -135,14 +136,14 @@ export function ProductsPage() {
             }
           }}
         />
-      </AuthLayout>
+      </RestaurantLayout>
     )
   }
 
   if (mode.kind === 'edit') {
     const { product } = mode
     return (
-      <AuthLayout title={'Editar: ' + product.name}>
+      <RestaurantLayout title={'Editar: ' + product.name}>
         <ProductForm
           initial={toData(product)}
           currentImageUrl={product.imageUrl}
@@ -163,48 +164,54 @@ export function ProductsPage() {
             }
           }}
         />
-      </AuthLayout>
+      </RestaurantLayout>
     )
   }
 
   const { data } = state
   return (
-    <AuthLayout title="Mi catálogo" description="Los clientes solo ven los productos disponibles." wide>
-      {notice && <p className="auth-notice" role="status">{notice}</p>}
-      <div className="restaurant-actions">
-        <button type="button" className="auth-submit" onClick={() => { setNotice(null); setMode({ kind: 'create' }) }}>Nuevo producto</button>
-        <Link to="/mi-restaurante" className="auth-submit auth-submit-secondary">Mi restaurante</Link>
+    <RestaurantLayout title="Mi carta" description="Los clientes solo ven los productos disponibles." wide>
+      {notice && <p className="app-success" role="status"><AppIcon name="check" />{notice}</p>}
+      <div className="rs-toolbar">
+        <span>{data.totalItems} {data.totalItems === 1 ? 'producto' : 'productos'}</span>
+        <button type="button" className="auth-submit" onClick={() => { setNotice(null); setMode({ kind: 'create' }) }}>+ Nuevo producto</button>
       </div>
 
       {data.items.length === 0 ? (
-        <p className="auth-description">Aún no tienes productos. Crea el primero para que los clientes lo vean.</p>
+        <div className="rs-empty">
+          <span className="rs-empty-icon"><AppIcon name="box" /></span>
+          <strong>Aún no tienes productos</strong>
+          <p>Crea el primero para que los clientes lo vean en tu restaurante.</p>
+        </div>
       ) : (
-        <ul className="restaurant-list">
+        <ul className="rs-products">
           {data.items.map((product) => (
-            <li className="restaurant-card catalog-item" key={product.id}>
-              <img className="catalog-thumb" src={product.imageUrl} alt={product.name} loading="lazy" />
-              <div className="catalog-item-body">
+            <li className={product.available ? 'rs-product' : 'rs-product rs-product-off'} key={product.id}>
+              <div className="rs-product-photo">
+                <img src={product.imageUrl} alt={product.name} loading="lazy" />
+                {!product.available && <span className="rs-product-tag">No disponible</span>}
+              </div>
+              <div className="rs-product-body">
+                <small>{product.category}</small>
                 <h2>{product.name}</h2>
-                <p className="catalog-meta">{product.category} · {formatPrice(product.price)}</p>
                 {product.description && <p>{product.description}</p>}
-                <p>
-                  <span className={product.available ? 'restaurant-badge restaurant-badge-ok' : 'restaurant-badge restaurant-badge-bad'}>
-                    {product.available ? 'Disponible' : 'No disponible'}
-                  </span>
-                </p>
-                <div className="restaurant-actions">
-                  <button type="button" className="auth-submit auth-submit-secondary" disabled={busy}
-                    onClick={() => { setNotice(null); setMode({ kind: 'edit', product }) }}>Editar</button>
-                  <button type="button" className="auth-submit auth-submit-secondary" disabled={busy}
+                <strong className="rs-price">{formatPrice(product.price)}</strong>
+              </div>
+              <div className="rs-product-foot">
+                <label className="rs-toggle">
+                  <button type="button" role="switch" aria-checked={product.available} className="rs-switch rs-switch-sm" disabled={busy}
                     onClick={() => run(() => setProductAvailability(token, product.id, !product.available, product.version),
                       product.available ? 'Producto marcado como no disponible' : 'Producto marcado como disponible')}>
-                    {product.available ? 'Marcar no disponible' : 'Marcar disponible'}
+                    <span className="rs-switch-knob" />
                   </button>
-                  <button type="button" className="auth-submit auth-submit-secondary" disabled={busy}
-                    onClick={() => { if (window.confirm(`¿Retirar «${product.name}»? Esta acción no se puede deshacer.`)) void run(() => withdrawProduct(token, product.id, product.version), 'Producto retirado') }}>
-                    Retirar
-                  </button>
-                </div>
+                  {product.available ? 'Disponible' : 'Agotado'}
+                </label>
+                <button type="button" className="rs-link" disabled={busy}
+                  onClick={() => { setNotice(null); setMode({ kind: 'edit', product }) }}>Editar</button>
+                <button type="button" className="rs-link rs-link-danger" disabled={busy}
+                  onClick={() => { if (window.confirm(`¿Retirar «${product.name}»? Esta acción no se puede deshacer.`)) void run(() => withdrawProduct(token, product.id, product.version), 'Producto retirado') }}>
+                  Retirar
+                </button>
               </div>
             </li>
           ))}
@@ -218,6 +225,6 @@ export function ProductsPage() {
           <button type="button" className="auth-submit auth-submit-secondary" disabled={page + 1 >= data.totalPages} onClick={() => setPage(page + 1)}>Siguiente</button>
         </nav>
       )}
-    </AuthLayout>
+    </RestaurantLayout>
   )
 }

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { ApiError, GENERIC_ERROR, login } from './auth-api'
 import { validateLogin } from './auth-validation'
-import { AuthLayout } from './AuthLayout'
+import { AuthSplitLayout } from './AuthSplitLayout'
 import { FormField } from './FormField'
 import { saveSession } from './session-storage'
 
@@ -25,7 +25,7 @@ export function LoginPage() {
     setSubmitting(true)
     try {
       const result = await login(email, password)
-      saveSession({ token: result.accessToken, expiresAt: Date.parse(result.expiresAt) })
+      saveSession({ token: result.accessToken, expiresAt: Date.parse(result.expiresAt), role: result.account.role, name: result.account.name })
       navigate('/mi-cuenta', { replace: true })
     } catch (error) {
       setFormError(error instanceof ApiError ? error.message : GENERIC_ERROR)
@@ -34,10 +34,10 @@ export function LoginPage() {
   }
 
   return (
-    <AuthLayout title="Inicia sesión" description="Accede con tu correo y contraseña.">
+    <AuthSplitLayout visual="login" imageLeft title="Te damos la bienvenida" description="Inicia sesión con tu correo y contraseña.">
       <form className="auth-form" onSubmit={handleSubmit} noValidate>
-        <FormField id="email" label="Correo electrónico" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} error={errors.email} />
-        <FormField id="password" label="Contraseña" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} error={errors.password} />
+        <FormField id="email" label="Correo electrónico" type="email" icon="mail" placeholder="ejemplo@correo.com" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} error={errors.email} />
+        <FormField id="password" label="Contraseña" type="password" icon="lock" placeholder="••••••••" revealable autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} error={errors.password} />
 
         {formError && <p className="auth-alert" role="alert">{formError}</p>}
 
@@ -46,6 +46,6 @@ export function LoginPage() {
         </button>
         <p className="auth-switch">¿Aún no tienes cuenta? <Link to="/registro">Crea una</Link></p>
       </form>
-    </AuthLayout>
+    </AuthSplitLayout>
   )
 }
