@@ -17,6 +17,8 @@ import { AdminDeliveriesPage } from './features/delivery/AdminDeliveriesPage'
 import { CourierPage } from './features/delivery/CourierPage'
 import { NotificationsPage } from './features/notifications/NotificationsPage'
 import { HistoryPage } from './features/history/HistoryPage'
+import { AdminAccountsPage } from './features/admin/AdminAccountsPage'
+import { AdminOrdersPage } from './features/admin/AdminOrdersPage'
 
 export default function App() {
   return (
@@ -39,6 +41,8 @@ export default function App() {
       <Route path="/avisos" element={<NotificationsPage />} />
       <Route path="/historial" element={<HistoryPage />} />
       <Route path="/admin/entregas" element={<AdminDeliveriesPage />} />
+      <Route path="/admin/cuentas" element={<AdminAccountsPage />} />
+      <Route path="/admin/pedidos" element={<AdminOrdersPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

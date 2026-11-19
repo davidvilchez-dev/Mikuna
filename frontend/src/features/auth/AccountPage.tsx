@@ -87,6 +87,8 @@ export function AccountPage() {
         <>
           <Link to="/admin/solicitudes" className="auth-submit">Solicitudes de restaurantes</Link>
           <Link to="/admin/entregas" className="auth-submit auth-submit-secondary">Entregas pendientes</Link>
+          <Link to="/admin/cuentas" className="auth-submit auth-submit-secondary">Cuentas de la plataforma</Link>
+          <Link to="/admin/pedidos" className="auth-submit auth-submit-secondary">Pedidos y entregas</Link>
         </>
       )}
       <button type="button" className="auth-submit auth-submit-secondary" onClick={logout}>Cerrar sesión</button>

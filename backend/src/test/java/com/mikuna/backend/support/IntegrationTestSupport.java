@@ -58,6 +58,7 @@ public abstract class IntegrationTestSupport {
                         null, null));
         when(imageStorage.upload(any(), any()))
                 .thenReturn(new CloudinaryImageStorage.StoredImage("https://img.test/p.jpg", "mikuna/products/p"));
+        jdbc.update("delete from acciones_admin_cuenta");
         jdbc.update("delete from calificaciones");
         jdbc.update("delete from avisos");
         jdbc.update("delete from hitos_entrega");

@@ -21,13 +21,13 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, UUID> {
     @Query("""
             select distinct r from Restaurant r left join fetch r.schedule
             where r.status = 'APPROVED'
-              and exists (select 1 from Account a where a.id = r.ownerId and a.status = 'ENABLED')""")
+              and exists (select 1 from Account a where a.id = r.ownerId and a.status = 'ENABLED' and a.operationEnabled = true)""")
     List<Restaurant> findVisible();
 
     @Query("""
             select distinct r from Restaurant r left join fetch r.schedule
             where r.id = :id and r.status = 'APPROVED'
-              and exists (select 1 from Account a where a.id = r.ownerId and a.status = 'ENABLED')""")
+              and exists (select 1 from Account a where a.id = r.ownerId and a.status = 'ENABLED' and a.operationEnabled = true)""")
     Optional<Restaurant> findVisibleById(@Param("id") UUID id);
 
     /** El estado llega como texto (valor de RestaurantStatus); de la más antigua a la más reciente. */

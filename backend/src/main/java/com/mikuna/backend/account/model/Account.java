@@ -39,6 +39,13 @@ public class Account {
     @Column(nullable = false, length = 20)
     private String status;
 
+    /**
+     * Habilitación para operar (spec 011): restaurante que recibe pedidos o repartidor candidato a entregas.
+     * Es independiente de {@code status} (acceso): quien no opera conserva el inicio de sesión y su historial.
+     */
+    @Column(name = "operation_enabled", nullable = false, columnDefinition = "boolean not null default true")
+    private boolean operationEnabled = true;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -68,6 +75,15 @@ public class Account {
 
     public boolean isEnabled() {
         return AccountStatus.ENABLED.name().equals(status);
+    }
+
+    public boolean isOperationEnabled() {
+        return operationEnabled;
+    }
+
+    /** Puede iniciar sesión y, además, operar (recibir pedidos o ser candidato a entregas). */
+    public boolean canOperate() {
+        return isEnabled() && operationEnabled;
     }
 
     public UUID getId() { return id; }

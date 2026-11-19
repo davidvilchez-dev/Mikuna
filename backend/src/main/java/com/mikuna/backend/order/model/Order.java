@@ -38,7 +38,8 @@ import org.springframework.data.domain.Persistable;
         uniqueConstraints = @UniqueConstraint(name = Order.UK_CONFIRMATION,
                 columnNames = {"customer_id", "confirmation_key"}),
         indexes = {@Index(name = "ix_pedidos_cliente_fecha", columnList = "customer_id, created_at"),
-                @Index(name = "ix_pedidos_restaurante_fecha", columnList = "restaurant_id, created_at")})
+                @Index(name = "ix_pedidos_restaurante_fecha", columnList = "restaurant_id, created_at"),
+                @Index(name = "ix_pedidos_estado_fecha", columnList = "status, created_at")})
 public class Order implements Persistable<UUID> {
 
     public static final String UK_CONFIRMATION = "uk_pedidos_cliente_clave";
