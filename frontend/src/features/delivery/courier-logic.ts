@@ -60,3 +60,34 @@ export function formatDestination(destination: Destination): string {
   const base = `${destination.street}, ${destination.district}`
   return destination.reference ? `${base} (${destination.reference})` : base
 }
+
+/** Pasos que ve el repartidor; el servidor decide siempre las transiciones. */
+export const DELIVERY_STEPS = ['Recoger el pedido', 'Entregar al cliente'] as const
+
+/** Paso en curso (0: recoger, 1: entregar). */
+export function currentStep(status: OrderStatus): number {
+  return status === 'PICKED_UP' ? 1 : 0
+}
+
+export interface Place {
+  street: string
+  district: string
+  latitude: number | null
+  longitude: number | null
+}
+
+/** Enlace para abrir la ruta en la app de mapas del teléfono: al punto exacto si existe, o a la dirección escrita. */
+export function navigationUrl(place: Place): string {
+  if (place.latitude !== null && place.longitude !== null) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}&travelmode=driving`
+  }
+  const query = encodeURIComponent(`${place.street}, ${place.district}, Ayacucho, Perú`)
+  return `https://www.google.com/maps/search/?api=1&query=${query}`
+}
+
+/** Teléfono apto para `tel:`: conserva dígitos y el signo +; devuelve `null` si no hay números. */
+export function phoneHref(phone: string | null): string | null {
+  if (!phone) return null
+  const digits = phone.replace(/[^\d+]/g, '')
+  return /\d/.test(digits) ? 'tel:' + digits : null
+}

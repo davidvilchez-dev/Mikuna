@@ -1,0 +1,46 @@
+/* ---------- Resumen del restaurante ---------- */
+.rd-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.rd-stat {
+  display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 12px; row-gap: 2px; padding: 18px; border: 1px solid var(--app-border);
+  border-radius: 16px; background: var(--color-mikuna-white); box-shadow: var(--app-shadow);
+}
+.rd-stat-icon { grid-row: span 2; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; background: #F1F2F4; color: var(--color-mikuna-indigo); }
+.rd-stat-icon .app-icon { width: 22px; height: 22px; }
+.rd-stat-label { color: var(--color-mikuna-gray); font-size: 14px; font-weight: 700; }
+.rd-stat strong { grid-column: 1 / -1; margin-top: 8px; font-size: 34px; font-weight: 800; line-height: 1; }
+.rd-stat small { grid-column: 1 / -1; color: var(--color-mikuna-gray); font-size: 13px; }
+.rd-stat-alert { border: 2px solid var(--color-mikuna-orange); }
+.rd-stat-alert .rd-stat-icon { background: var(--color-mikuna-orange); color: var(--color-mikuna-white); }
+.rd-stat-alert strong { color: var(--color-mikuna-orange-deep); }
+
+.rd-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.rd-side { display: grid; gap: 16px; }
+.rd-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.rd-more { display: inline-flex; align-items: center; gap: 6px; color: var(--color-mikuna-orange-deep); font-weight: 800; font-size: 15px; }
+.rd-more .app-icon { width: 17px; height: 17px; }
+.rd-more:hover { text-decoration: underline; text-underline-offset: 4px; }
+
+.rd-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.rd-list li + li { border-top: 1px solid var(--app-border); }
+.rd-list a { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 12px; padding: 14px 4px; border-radius: 10px; }
+.rd-list a:hover { background: #FAFAFB; }
+.rd-list strong { font-size: 17px; }
+.rd-list span { overflow: hidden; color: var(--color-mikuna-gray); text-overflow: ellipsis; white-space: nowrap; }
+.rd-list em { font-style: normal; font-weight: 800; }
+
+.rd-quiet { display: grid; justify-items: center; gap: 8px; padding: 28px 12px; text-align: center; }
+.rd-quiet p { margin: 0; max-width: 320px; color: var(--color-mikuna-gray); }
+.rd-hours { margin: 0; font-size: 30px; font-weight: 800; }
+.rd-note { margin: 0; color: var(--color-mikuna-gray); }
+.rd-tip { display: grid; justify-items: start; gap: 8px; padding: 20px; border-radius: 16px; background: var(--color-mikuna-indigo); color: var(--color-mikuna-white); }
+.rd-tip strong { font-size: 18px; }
+.rd-tip p { margin: 0; color: rgb(255 255 255 / 0.8); }
+.rl .rd-tip .auth-submit { margin-top: 4px; min-height: 46px; font-size: 16px; }
+.rd-wait { display: grid; justify-items: center; gap: 10px; padding: 56px 24px; border: 1px solid var(--app-border); border-radius: 16px; background: var(--color-mikuna-white); text-align: center; }
+.rd-wait strong { font-size: 22px; }
+.rd-wait p { margin: 0 0 8px; max-width: 420px; color: var(--color-mikuna-gray); }
+
+@media (max-width: 1000px) { .rd-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 860px) { .rd-grid { grid-template-columns: 1fr; } }
+@media (max-width: 420px) { .rd-list a { grid-template-columns: 1fr auto; } .rd-list span { grid-column: 1 / -1; grid-row: 2; } }
+.rd-stat-link { transition: border-color 160ms; } .rd-stat-link:hover { border-color: var(--color-mikuna-orange); } .rd-stat-link small { color: var(--color-mikuna-orange-deep); font-weight: 700; }

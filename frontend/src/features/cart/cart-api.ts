@@ -4,6 +4,16 @@ import type { Attention } from '../catalog/catalog-api'
 const ADDRESSES = '/api/customer/addresses'
 const CART = '/api/customer/cart'
 
+/** Aviso a la pantalla de que el carrito o las direcciones cambiaron (el encabezado vuelve a leer su contador). */
+export const CART_CHANGED = 'mikuna:cart-changed'
+
+function notifyChange<T>(request: Promise<T>): Promise<T> {
+  return request.then((value) => {
+    window.dispatchEvent(new Event(CART_CHANGED))
+    return value
+  })
+}
+
 function auth(token: string): HeadersInit {
   return { Authorization: 'Bearer ' + token }
 }
@@ -17,6 +27,9 @@ export interface Address {
   district: string
   reference: string | null
   contactPhone: string | null
+  /** Punto exacto marcado en el mapa; las direcciones anteriores no lo tienen. */
+  latitude: number | null
+  longitude: number | null
   createdAt: string
   updatedAt: string
 }
@@ -27,6 +40,8 @@ export interface AddressData {
   district: string
   reference: string
   contactPhone: string
+  latitude: number | null
+  longitude: number | null
 }
 
 function addressBody(data: AddressData): string {
@@ -36,6 +51,8 @@ function addressBody(data: AddressData): string {
     district: data.district.trim(),
     reference: data.reference.trim() || null,
     contactPhone: data.contactPhone.trim() || null,
+    latitude: data.latitude,
+    longitude: data.longitude,
   })
 }
 
@@ -44,15 +61,15 @@ export function listAddresses(token: string): Promise<Address[]> {
 }
 
 export function createAddress(token: string, data: AddressData): Promise<Address> {
-  return apiRequest(ADDRESSES, { method: 'POST', headers: auth(token), body: addressBody(data) })
+  return notifyChange(apiRequest(ADDRESSES, { method: 'POST', headers: auth(token), body: addressBody(data) }))
 }
 
 export function updateAddress(token: string, id: string, data: AddressData): Promise<Address> {
-  return apiRequest(`${ADDRESSES}/${id}`, { method: 'PUT', headers: auth(token), body: addressBody(data) })
+  return notifyChange(apiRequest(`${ADDRESSES}/${id}`, { method: 'PUT', headers: auth(token), body: addressBody(data) }))
 }
 
 export function deleteAddress(token: string, id: string): Promise<void> {
-  return apiRequest(`${ADDRESSES}/${id}`, { method: 'DELETE', headers: auth(token) })
+  return notifyChange(apiRequest(`${ADDRESSES}/${id}`, { method: 'DELETE', headers: auth(token) }))
 }
 
 // ---------- Carrito (rol CUSTOMER, con token) ----------
@@ -100,21 +117,21 @@ export function getCart(token: string): Promise<Cart> {
 }
 
 export function addToCart(token: string, productId: string, quantity: number): Promise<Cart> {
-  return apiRequest(`${CART}/lines`, { method: 'POST', headers: auth(token), body: JSON.stringify({ productId, quantity }) })
+  return notifyChange(apiRequest(`${CART}/lines`, { method: 'POST', headers: auth(token), body: JSON.stringify({ productId, quantity }) }))
 }
 
 export function changeQuantity(token: string, lineId: string, quantity: number): Promise<Cart> {
-  return apiRequest(`${CART}/lines/${lineId}`, { method: 'PUT', headers: auth(token), body: JSON.stringify({ quantity }) })
+  return notifyChange(apiRequest(`${CART}/lines/${lineId}`, { method: 'PUT', headers: auth(token), body: JSON.stringify({ quantity }) }))
 }
 
 export function removeLine(token: string, lineId: string): Promise<Cart> {
-  return apiRequest(`${CART}/lines/${lineId}`, { method: 'DELETE', headers: auth(token) })
+  return notifyChange(apiRequest(`${CART}/lines/${lineId}`, { method: 'DELETE', headers: auth(token) }))
 }
 
 export function clearCart(token: string): Promise<Cart> {
-  return apiRequest(CART, { method: 'DELETE', headers: auth(token) })
+  return notifyChange(apiRequest(CART, { method: 'DELETE', headers: auth(token) }))
 }
 
 export function selectAddress(token: string, addressId: string): Promise<Cart> {
-  return apiRequest(`${CART}/address`, { method: 'PUT', headers: auth(token), body: JSON.stringify({ addressId }) })
+  return notifyChange(apiRequest(`${CART}/address`, { method: 'PUT', headers: auth(token), body: JSON.stringify({ addressId }) }))
 }

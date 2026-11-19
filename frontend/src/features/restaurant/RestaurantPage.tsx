@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
+import { AppIcon } from '../auth/AppIcon'
 import { AuthLayout } from '../auth/AuthLayout'
+import { RestaurantLayout } from './RestaurantLayout'
 import { FormField } from '../auth/FormField'
 import { clearSession, getSession } from '../auth/session-storage'
 import {
   getMyRestaurant,
   resubmitMyRestaurant,
-  setAvailability,
+
   submitRestaurant,
   updateMyRestaurant,
   updateSchedule,
@@ -156,7 +158,7 @@ function ScheduleEditor({ restaurant, editable, token, onChange, onFailure }: Sc
         )
       })}
       {editable && <button type="button" className="auth-submit" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Guardar horario'}</button>}
-      {message && <p className="auth-notice" role="status">{message}</p>}
+      {message && <p className="app-success" role="status"><AppIcon name="check" />{message}</p>}
     </div>
   )
 }
@@ -169,7 +171,6 @@ export function RestaurantPage() {
   const [attempt, setAttempt] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
-  const [busy, setBusy] = useState(false)
 
   const token = session?.token ?? ''
 
@@ -206,7 +207,7 @@ export function RestaurantPage() {
   }
 
   if (state.kind === 'loading') {
-    return <AuthLayout title="Mi restaurante"><p className="auth-description" role="status">Cargando tu restaurante…</p></AuthLayout>
+    return <RestaurantLayout title="Mi restaurante"><p className="auth-description" role="status">Cargando tu restaurante…</p></RestaurantLayout>
   }
 
   if (state.kind === 'forbidden') {
@@ -220,10 +221,10 @@ export function RestaurantPage() {
 
   if (state.kind === 'error') {
     return (
-      <AuthLayout title="Mi restaurante">
+      <RestaurantLayout title="Mi restaurante">
         <p className="auth-alert" role="alert">{state.message}</p>
         <button type="button" className="auth-submit" onClick={() => { setState({ kind: 'loading' }); setAttempt((n) => n + 1) }}>Reintentar</button>
-      </AuthLayout>
+      </RestaurantLayout>
     )
   }
 
@@ -253,114 +254,75 @@ export function RestaurantPage() {
 
   const { restaurant } = state
   const isApproved = restaurant.status === 'APPROVED'
-  const badgeClass = isApproved ? 'restaurant-badge restaurant-badge-ok' : restaurant.status === 'REJECTED' ? 'restaurant-badge restaurant-badge-bad' : 'restaurant-badge'
+  const statusClass = isApproved ? 'rs-chip rs-chip-ok' : restaurant.status === 'REJECTED' ? 'rs-chip rs-chip-bad' : 'rs-chip'
 
-  async function run(action: () => Promise<Restaurant>, message: string) {
-    if (busy) return
-    setBusy(true)
-    try {
-      show(await action(), message)
-    } catch (error) {
-      setNotice(handleFailure(error))
-    } finally {
-      setBusy(false)
-    }
-  }
 
   return (
-    <AuthLayout title={restaurant.name} description={restaurant.category}>
-      <p><span className={badgeClass}>{statusLabels[restaurant.status]}</span></p>
-      {notice && <p className="auth-notice" role="status">{notice}</p>}
+    <RestaurantLayout title="Mi negocio" description="Tus datos, tu horario y tu estado en Mikuna.">
+      {notice && <p className="app-success" role="status"><AppIcon name="check" />{notice}</p>}
+
+      <section className={restaurant.available && isApproved ? 'rs-hero' : 'rs-hero'} aria-label="Estado del restaurante">
+        <span className="rs-hero-icon"><AppIcon name="store" /></span>
+        <div className="rs-hero-text">
+          <h2>{restaurant.name}</h2>
+          <p>{restaurant.category} · {restaurant.zone}</p>
+          <span className={statusClass}>{statusLabels[restaurant.status]}</span>
+        </div>
+      </section>
 
       {restaurant.status === 'PENDING' && (
         <p className="auth-notice">Aún no puedes recibir pedidos: un administrador debe aprobar tu solicitud. Mientras tanto puedes corregir tus datos.</p>
       )}
       {restaurant.status === 'REJECTED' && (
-        <>
-          <p className="auth-alert" role="alert">Tu solicitud fue rechazada: {restaurant.rejectionReason}</p>
-          <p className="auth-description">Corrige tus datos y vuelve a enviarla.</p>
-        </>
-      )}
-      {isApproved && (
-        <p className="auth-notice" role="status">
-          {restaurant.acceptingOrders ? 'Estás recibiendo pedidos ahora.' : 'Ahora no recibes pedidos: activa tu disponibilidad y revisa que estés dentro de tu horario.'}
-        </p>
+        <p className="auth-alert" role="alert">Tu solicitud fue rechazada: {restaurant.rejectionReason}. Corrige tus datos y vuelve a enviarla.</p>
       )}
 
-      {editing ? (
-        <RestaurantForm
-          initial={toInput(restaurant)}
-          submitLabel={restaurant.status === 'REJECTED' ? 'Guardar y reenviar solicitud' : 'Guardar cambios'}
-          onSubmit={async (input) => {
-            try {
-              const saved = await updateMyRestaurant(token, input)
-              show(restaurant.status === 'REJECTED' ? await resubmitMyRestaurant(token) : saved,
-                restaurant.status === 'REJECTED' ? 'Solicitud reenviada: queda pendiente de aprobación.' : 'Cambios guardados')
-            } catch (error) {
-              if (error instanceof ApiError && error.status === 401) handleFailure(error)
-              throw error
-            }
-          }}
-        />
-      ) : (
-        <>
-          <dl className="auth-details">
-            <div><dt>Dirección</dt><dd>{restaurant.address}</dd></div>
-            <div><dt>Distrito o zona</dt><dd>{restaurant.zone}</dd></div>
-            <div><dt>Teléfono</dt><dd>{restaurant.phone}</dd></div>
-            {restaurant.description && <div><dt>Descripción</dt><dd>{restaurant.description}</dd></div>}
-          </dl>
-          <button type="button" className="auth-submit auth-submit-secondary" onClick={() => setEditing(true)}>
-            {restaurant.status === 'REJECTED' ? 'Corregir y reenviar' : 'Editar datos'}
-          </button>
-        </>
-      )}
-
-      <section className="restaurant-section" aria-labelledby="schedule-title">
-        <h2 id="schedule-title">Horario de atención</h2>
-        {!isApproved && <p className="auth-description">Podrás definir tu horario y tu disponibilidad cuando tu restaurante sea aprobado.</p>}
-        <ScheduleEditor
-          key={restaurant.id + restaurant.schedule.map((d) => (d.opensAt ?? '-') + (d.closesAt ?? '-')).join()}
-          restaurant={restaurant}
-          editable={isApproved}
-          token={token}
-          onChange={(updated) => show(updated, null)}
-          onFailure={handleFailure}
-        />
-      </section>
-
-      <section className="restaurant-section" aria-labelledby="availability-title">
-        <h2 id="availability-title">Disponibilidad</h2>
-        <p className="auth-description">
-          {restaurant.available ? 'Estás disponible para recibir pedidos dentro de tu horario.' : 'Estás en pausa: no recibirás pedidos.'}
-        </p>
-        <button
-          type="button"
-          className="auth-submit"
-          disabled={!isApproved || busy}
-          onClick={() => run(() => setAvailability(token, !restaurant.available), restaurant.available ? 'Disponibilidad en pausa' : 'Disponibilidad activada')}
-        >
-          {restaurant.available ? 'Pausar disponibilidad' : 'Activar disponibilidad'}
-        </button>
-      </section>
-
-      {isApproved && (
-        <section className="restaurant-section" aria-labelledby="catalog-title">
-          <h2 id="catalog-title">Catálogo</h2>
-          <p className="auth-description">Administra los productos que verán tus clientes.</p>
-          <Link to="/mi-restaurante/productos" className="auth-submit">Mi catálogo</Link>
+      <div className="rs-grid">
+        <section className="rs-card" aria-labelledby="data-title">
+          <h2 id="data-title">Datos del negocio</h2>
+          {editing ? (
+            <RestaurantForm
+              initial={toInput(restaurant)}
+              submitLabel={restaurant.status === 'REJECTED' ? 'Guardar y reenviar solicitud' : 'Guardar cambios'}
+              onSubmit={async (input) => {
+                try {
+                  const saved = await updateMyRestaurant(token, input)
+                  show(restaurant.status === 'REJECTED' ? await resubmitMyRestaurant(token) : saved,
+                    restaurant.status === 'REJECTED' ? 'Solicitud reenviada: queda pendiente de aprobación.' : 'Cambios guardados')
+                } catch (error) {
+                  if (error instanceof ApiError && error.status === 401) handleFailure(error)
+                  throw error
+                }
+              }}
+            />
+          ) : (
+            <>
+              <dl className="rs-data">
+                <div><dt>Dirección</dt><dd>{restaurant.address}</dd></div>
+                <div><dt>Distrito o zona</dt><dd>{restaurant.zone}</dd></div>
+                <div><dt>Teléfono</dt><dd>{restaurant.phone}</dd></div>
+                {restaurant.description && <div><dt>Descripción</dt><dd>{restaurant.description}</dd></div>}
+              </dl>
+              <button type="button" className="auth-submit auth-submit-secondary rs-edit" onClick={() => setEditing(true)}>
+                {restaurant.status === 'REJECTED' ? 'Corregir y reenviar' : 'Editar datos'}
+              </button>
+            </>
+          )}
         </section>
-      )}
 
-      {isApproved && (
-        <section className="restaurant-section" aria-labelledby="orders-title">
-          <h2 id="orders-title">Pedidos</h2>
-          <p className="auth-description">Acepta o rechaza los pedidos nuevos y avanza su preparación.</p>
-          <Link to="/mi-restaurante/pedidos" className="auth-submit">Ver pedidos</Link>
+        <section className="rs-card" aria-labelledby="schedule-title">
+          <h2 id="schedule-title">Horario de atención</h2>
+          {!isApproved && <p className="auth-description">Podrás definir tu horario cuando tu restaurante sea aprobado.</p>}
+          <ScheduleEditor
+            key={restaurant.id + restaurant.schedule.map((d) => (d.opensAt ?? '-') + (d.closesAt ?? '-')).join()}
+            restaurant={restaurant}
+            editable={isApproved}
+            token={token}
+            onChange={(updated) => show(updated, null)}
+            onFailure={handleFailure}
+          />
         </section>
-      )}
-
-      <Link to="/mi-cuenta" className="auth-switch">Volver a mi cuenta</Link>
-    </AuthLayout>
+      </div>
+    </RestaurantLayout>
   )
 }

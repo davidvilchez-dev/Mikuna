@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
+import { AppIcon } from '../auth/AppIcon'
 import { AuthLayout } from '../auth/AuthLayout'
 import { clearSession, getSession } from '../auth/session-storage'
 import { AddressForm } from './AddressForm'
 import { createAddress, deleteAddress, listAddresses, updateAddress, type Address, type AddressData } from './cart-api'
 import '../restaurant/restaurant.css'
 import './cart.css'
+import './address.css'
 
 type ViewState =
   | { kind: 'loading' }
@@ -16,7 +18,7 @@ type ViewState =
 
 type Mode = { kind: 'list' } | { kind: 'create' } | { kind: 'edit'; address: Address }
 
-const emptyData: AddressData = { label: '', street: '', district: '', reference: '', contactPhone: '' }
+const emptyData: AddressData = { label: '', street: '', district: '', reference: '', contactPhone: '', latitude: null, longitude: null }
 
 function toData(address: Address): AddressData {
   return {
@@ -25,6 +27,8 @@ function toData(address: Address): AddressData {
     district: address.district,
     reference: address.reference ?? '',
     contactPhone: address.contactPhone ?? '',
+    latitude: address.latitude,
+    longitude: address.longitude,
   }
 }
 
@@ -35,7 +39,7 @@ export function AddressesPage() {
   const [state, setState] = useState<ViewState>({ kind: 'loading' })
   const [mode, setMode] = useState<Mode>({ kind: 'list' })
   const [attempt, setAttempt] = useState(0)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null)
   const [busy, setBusy] = useState(false)
 
   const token = session?.token ?? ''
@@ -65,7 +69,7 @@ export function AddressesPage() {
   if (!session) return <Navigate to="/iniciar-sesion" replace />
 
   const reload = (message: string | null) => {
-    setNotice(message)
+    setNotice(message ? { text: message, ok: true } : null)
     setMode({ kind: 'list' })
     setState({ kind: 'loading' })
     setAttempt((n) => n + 1)
@@ -78,7 +82,7 @@ export function AddressesPage() {
       await deleteAddress(token, address.id)
       reload('Dirección eliminada')
     } catch (error) {
-      setNotice(handleFailure(error))
+      setNotice({ text: handleFailure(error), ok: false })
     } finally {
       setBusy(false)
     }
@@ -101,7 +105,7 @@ export function AddressesPage() {
 
   if (mode.kind === 'create') {
     return (
-      <AuthLayout title="Nueva dirección" wide>
+      <AuthLayout title="Nueva dirección" description="Marca el punto en el mapa y cuéntanos cómo llegar.">
         <AddressForm initial={emptyData} submitLabel="Guardar dirección"
           onSubmit={async (data) => { await createAddress(token, data); reload('Dirección guardada') }}
           onCancel={() => setMode({ kind: 'list' })} />
@@ -111,7 +115,7 @@ export function AddressesPage() {
   if (mode.kind === 'edit') {
     const address = mode.address
     return (
-      <AuthLayout title="Editar dirección" wide>
+      <AuthLayout title="Editar dirección">
         <AddressForm initial={toData(address)} submitLabel="Guardar cambios"
           onSubmit={async (data) => { await updateAddress(token, address.id, data); reload('Dirección actualizada') }}
           onCancel={() => setMode({ kind: 'list' })} />
@@ -120,32 +124,39 @@ export function AddressesPage() {
   }
 
   return (
-    <AuthLayout title="Mis direcciones" description="Elige la dirección de entrega de tu pedido desde el carrito." wide>
-      {notice && <p className="auth-notice" role="status">{notice}</p>}
-      {state.addresses.length === 0 ? (
-        <p className="auth-notice" role="status">Aún no registraste direcciones.</p>
-      ) : (
-        <ul className="cart-list">
-          {state.addresses.map((address) => (
-            <li className="cart-address" key={address.id}>
-              <div>
-                <h2>{address.label ?? address.street}</h2>
-                <p>{address.street} · {address.district}</p>
-                {address.reference && <p>Referencia: {address.reference}</p>}
-                {address.contactPhone && <p>Teléfono: {address.contactPhone}</p>}
+    <AuthLayout title="Mis direcciones" description="Guarda tus direcciones y elige a dónde llegan tus pedidos." wide>
+      {notice && (notice.ok
+        ? <p className="app-success" role="status"><AppIcon name="check" />{notice.text}</p>
+        : <p className="auth-alert" role="alert">{notice.text}</p>)}
+      <ul className="addr-grid">
+        {state.addresses.map((address) => (
+          <li key={address.id}>
+            <article className="addr-card">
+              <div className="addr-card-head">
+                <span className="addr-card-icon"><AppIcon name="pin" /></span>
+                <div className="addr-card-body">
+                  <h2>{address.label ?? 'Dirección'}</h2>
+                  <p className="addr-street">{address.street}</p>
+                  <p>{address.district}</p>
+                  {address.reference && <p>Referencia: {address.reference}</p>}
+                  {address.contactPhone && <p>Teléfono: {address.contactPhone}</p>}
+                  {address.latitude !== null && <p className="addr-located"><AppIcon name="check" /> Ubicación marcada en el mapa</p>}
+                </div>
               </div>
-              <div className="restaurant-actions">
+              <div className="addr-card-actions">
                 <button type="button" className="auth-submit auth-submit-secondary" onClick={() => setMode({ kind: 'edit', address })} disabled={busy}>Editar</button>
                 <button type="button" className="auth-submit auth-submit-secondary" onClick={() => remove(address)} disabled={busy}>Eliminar</button>
               </div>
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="restaurant-actions">
-        <button type="button" className="auth-submit" onClick={() => setMode({ kind: 'create' })}>Agregar dirección</button>
-        <Link to="/carrito" className="auth-submit auth-submit-secondary">Ir al carrito</Link>
-      </div>
+            </article>
+          </li>
+        ))}
+        <li>
+          <button type="button" className="addr-add" onClick={() => setMode({ kind: 'create' })}>
+            <span className="addr-add-plus" aria-hidden="true">+</span>
+            Agregar nueva dirección
+          </button>
+        </li>
+      </ul>
     </AuthLayout>
   )
 }

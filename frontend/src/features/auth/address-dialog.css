@@ -1,0 +1,63 @@
+/* ---------- Panel de direcciones ---------- */
+.addr-dialog {
+  width: min(520px, calc(100vw - 24px)); max-height: min(720px, calc(100dvh - 24px)); margin: auto; padding: 0; border: 0; border-radius: 20px;
+  background: var(--color-mikuna-white); color: var(--color-mikuna-indigo); box-shadow: 0 24px 64px color-mix(in srgb, var(--color-mikuna-indigo) 30%, transparent);
+  overflow: auto; overscroll-behavior: contain;
+}
+.addr-dialog::backdrop { background: color-mix(in srgb, var(--color-mikuna-indigo) 55%, transparent); }
+.addr-dialog[open] { animation: addr-dialog-in 200ms var(--ease-out); }
+@keyframes addr-dialog-in { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .addr-dialog[open] { animation: none; } }
+
+.addr-dialog-inner { display: grid; gap: 16px; padding: 12px 24px 24px; }
+.addr-dialog-head { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
+.addr-dialog-icon {
+  display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin: 0 -10px; border: 0; border-radius: 50%;
+  background: transparent; color: var(--color-mikuna-indigo); transition: background 160ms;
+}
+.addr-dialog-icon:hover { background: #F1F2F4; }
+.addr-dialog-icon:focus-visible { outline: 3px solid var(--color-mikuna-indigo); outline-offset: 0; }
+.addr-dialog h2 { margin: -4px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
+
+.addr-options { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.addr-option {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; width: 100%; padding: 14px; border: 1.5px solid color-mix(in srgb, var(--color-mikuna-indigo) 12%, transparent);
+  border-radius: 14px; background: var(--color-mikuna-white); color: inherit; text-align: left; transition: border-color 160ms, background 160ms;
+}
+.addr-option:hover:not(:disabled) { border-color: color-mix(in srgb, var(--color-mikuna-indigo) 40%, transparent); }
+.addr-option:focus-visible { outline: 3px solid var(--color-mikuna-indigo); outline-offset: 2px; }
+.addr-option:disabled { opacity: 0.6; cursor: progress; }
+.addr-option-active { border-color: var(--color-mikuna-orange); background: #FFF8F3; }
+.addr-option-icon { display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 12px; background: var(--color-mikuna-peach); color: var(--color-mikuna-orange-deep); }
+.addr-option-icon .app-icon { width: 20px; height: 20px; }
+.addr-option-text { display: grid; gap: 2px; min-width: 0; }
+.addr-option-text strong { font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
+.addr-option-text small { color: var(--color-mikuna-gray); font-size: 14px; overflow-wrap: anywhere; }
+.addr-option-check { width: 22px; height: 22px; color: var(--color-mikuna-orange-deep); }
+.addr-empty { padding: 20px 8px; color: var(--color-mikuna-gray); text-align: center; }
+
+.addr-dialog-new {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; border: 0; border-radius: 999px;
+  background: var(--color-mikuna-orange-deep); color: var(--color-mikuna-white); font-size: 16px; font-weight: 700; transition: background 160ms;
+}
+.addr-dialog-new span { font-size: 22px; line-height: 1; }
+.addr-dialog-new:hover { background: var(--color-mikuna-indigo); }
+.addr-dialog-new:focus-visible { outline: 3px solid var(--color-mikuna-indigo); outline-offset: 3px; }
+.addr-dialog-manage { justify-self: center; color: var(--color-mikuna-gray); font-weight: 600; text-decoration: underline; text-underline-offset: 4px; }
+.addr-dialog-manage:hover { color: var(--color-mikuna-orange-deep); }
+
+/* El formulario dentro del panel usa el mismo marco de campos que el resto de la aplicación */
+.addr-dialog input:not([type='radio']), .addr-dialog textarea {
+  width: 100%; min-height: 48px; padding: 10px 14px; border: 1.5px solid color-mix(in srgb, var(--color-mikuna-indigo) 16%, transparent); border-radius: 12px;
+  background: #FAFAFB; color: inherit; font: inherit; font-size: 16px; transition: border-color 160ms, box-shadow 160ms, background 160ms;
+}
+.addr-dialog input:not([type='radio']):focus-visible, .addr-dialog textarea:focus-visible {
+  outline: 0; border-color: var(--color-mikuna-orange); background: var(--color-mikuna-white); box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-mikuna-orange) 18%, transparent);
+}
+.addr-dialog textarea { resize: vertical; }
+.addr-dialog .auth-submit { min-height: 46px; padding: 0 22px; font-size: 16px; font-weight: 700; width: auto; margin-top: 0; }
+.addr-dialog .auth-submit:hover:not(:disabled) { background: var(--color-mikuna-indigo); border-color: var(--color-mikuna-indigo); }
+.addr-dialog .auth-submit-secondary { background: var(--color-mikuna-white); color: var(--color-mikuna-indigo); border-color: color-mix(in srgb, var(--color-mikuna-indigo) 22%, transparent); }
+.addr-dialog .auth-submit-secondary:hover:not(:disabled) { color: var(--color-mikuna-white); }
+.addr-dialog .auth-field { display: grid; gap: 6px; }
+.addr-dialog .auth-field label { font-weight: 700; font-size: 15px; }

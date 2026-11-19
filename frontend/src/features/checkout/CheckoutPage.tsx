@@ -71,6 +71,8 @@ function CheckoutView({ checkout, token, onRefresh, onFailure }: ViewProps) {
 
   return (
     <AuthLayout title="Confirmar pedido" description={cart.restaurant ? `Pedido en ${cart.restaurant.name}` : undefined} wide>
+      <div className="cart-layout">
+      <div className="cart-main">
       <section className="cart-section" aria-labelledby="checkout-lines-title">
         <h2 id="checkout-lines-title">Tu pedido</h2>
         <ul className="checkout-lines">
@@ -79,17 +81,6 @@ function CheckoutView({ checkout, token, onRefresh, onFailure }: ViewProps) {
           ))}
         </ul>
         {cart.address && <p className="auth-hint">Entrega en: {cart.address.street}, {cart.address.district}</p>}
-      </section>
-
-      <section className="cart-section" aria-labelledby="checkout-totals-title">
-        <h2 id="checkout-totals-title">Importes</h2>
-        <dl className="cart-totals">
-          <div><dt>Subtotal</dt><dd>{formatPrice(totals.subtotal)}</dd></div>
-          <div><dt>Envío</dt><dd>{totals.deliveryFee === null ? '-' : formatPrice(totals.deliveryFee)}</dd></div>
-          <div><dt>Comisión</dt><dd>{totals.commission === null ? '-' : formatPrice(totals.commission)}</dd></div>
-          <div className="cart-total"><dt>Total</dt><dd>{totals.total === null ? '-' : formatPrice(totals.total)}</dd></div>
-        </dl>
-        <p className="auth-hint">Al confirmar se reserva el monto en tu tarjeta; solo se cobra cuando el restaurante acepte el pedido.</p>
       </section>
 
       {!checkout.ready ? (
@@ -102,6 +93,21 @@ function CheckoutView({ checkout, token, onRefresh, onFailure }: ViewProps) {
           <PaymentForm checkout={checkout} token={token} onRefresh={onRefresh} onFailure={onFailure} />
         </Elements>
       )}
+      </div>
+
+      <aside className="cart-side">
+      <section className="cart-section" aria-labelledby="checkout-totals-title">
+        <h2 id="checkout-totals-title">Importes</h2>
+        <dl className="cart-totals">
+          <div><dt>Subtotal</dt><dd>{formatPrice(totals.subtotal)}</dd></div>
+          <div><dt>Envío</dt><dd>{totals.deliveryFee === null ? '-' : formatPrice(totals.deliveryFee)}</dd></div>
+          <div><dt>Comisión</dt><dd>{totals.commission === null ? '-' : formatPrice(totals.commission)}</dd></div>
+          <div className="cart-total"><dt>Total</dt><dd>{totals.total === null ? '-' : formatPrice(totals.total)}</dd></div>
+        </dl>
+        <p className="auth-hint">Al confirmar se reserva el monto en tu tarjeta; solo se cobra cuando el restaurante acepte el pedido.</p>
+      </section>
+      </aside>
+      </div>
     </AuthLayout>
   )
 }

@@ -1,10 +1,13 @@
-.auth-header-links { display: flex; align-items: center; gap: 16px; }
-.notifications-bell { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; text-decoration: underline; text-underline-offset: 4px; }
-.notifications-bell:hover { color: var(--color-mikuna-orange-deep); }
-.notifications-badge { min-width: 22px; padding: 2px 7px; border-radius: 999px; background: var(--color-mikuna-orange-deep); color: var(--color-mikuna-white); font-size: 0.8rem; text-align: center; text-decoration: none; }
+/* Avisos de pedidos y entregas. */
 .notices-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.notice { display: grid; gap: 4px; padding: 12px 14px; border: 2px solid color-mix(in srgb, var(--color-mikuna-indigo) 15%, transparent); border-radius: 12px; background: var(--color-mikuna-white); }
-.notice-unread { border-color: var(--color-mikuna-orange); font-weight: 700; }
-.notice-time { font-size: 0.85rem; font-weight: 400; }
-.notice-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.notices-filter { display: flex; align-items: center; gap: 8px; }
+.notice {
+  display: grid; gap: 6px; padding: 16px 20px; border: 1px solid var(--app-border); border-radius: 16px;
+  background: var(--color-mikuna-white); box-shadow: var(--app-shadow);
+}
+.notice-unread { border-color: color-mix(in srgb, var(--color-mikuna-orange) 45%, transparent); background: #FFF8F3; font-weight: 700; }
+.notice-time { color: var(--color-mikuna-gray); font-size: 14px; font-weight: 400; }
+.notice-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.notices-bar { margin-bottom: 16px; justify-content: space-between; }
+.notice .auth-submit { min-height: 38px; font-size: 14px; }
+.notices-filter { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.notices-filter input { width: 18px; height: 18px; accent-color: var(--color-mikuna-orange); }

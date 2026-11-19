@@ -1,7 +1,23 @@
-.checkout-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.checkout-lines li { display: flex; justify-content: space-between; gap: 12px; }
-.checkout-form { display: grid; gap: 12px; }
-.checkout-card { padding: 14px 12px; border: 2px solid color-mix(in srgb, var(--color-mikuna-indigo) 20%, transparent); border-radius: 12px; background: var(--color-mikuna-white); }
-.tracking-stages { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 6px; }
-.tracking-stages li { display: flex; justify-content: space-between; gap: 12px; }
-.tracking-location { display: grid; gap: 4px; padding: 12px 14px; border: 2px solid var(--color-mikuna-orange); border-radius: 12px; background: var(--color-mikuna-white); }
+/* Confirmar pedido y seguimiento. */
+.checkout-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.checkout-lines li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--app-border); }
+.checkout-lines li:last-child { border-bottom: 0; }
+.checkout-lines li span + span { font-weight: 700; white-space: nowrap; }
+.checkout-form { display: grid; gap: 14px; }
+.checkout-card {
+  padding: 15px 14px; border: 1.5px solid color-mix(in srgb, var(--color-mikuna-indigo) 16%, transparent);
+  border-radius: 12px; background: #FAFAFB;
+}
+
+.tracking-stages { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.tracking-stages li { position: relative; display: flex; justify-content: space-between; gap: 12px; padding: 8px 0 8px 24px; }
+.tracking-stages li::before {
+  content: ""; position: absolute; left: 3px; top: 15px; width: 10px; height: 10px; border-radius: 50%; background: var(--color-mikuna-orange-deep);
+}
+.tracking-stages li::after {
+  content: ""; position: absolute; left: 7px; top: 27px; bottom: -8px; width: 2px; background: color-mix(in srgb, var(--color-mikuna-orange) 30%, transparent);
+}
+.tracking-stages li:last-child::after { display: none; }
+.tracking-stages li span:last-child { color: var(--color-mikuna-gray); font-size: 14px; }
+.tracking-location { display: grid; gap: 4px; padding: 14px 16px; border-radius: 12px; background: var(--color-mikuna-peach); }
+.tracking-location a { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }

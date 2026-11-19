@@ -126,17 +126,13 @@ export function OrderPage() {
   return (
     <AuthLayout title="Mi pedido" description={`${order.restaurant.name} - ${orderStatusLabels[status]}`} wide>
       {notice && <p className="auth-notice" role="status">{notice}</p>}
-      <p className="catalog-banner" role="status">Tu pago: {paymentStatusLabels[order.payment.status]}.</p>
-      {canCustomerCancel(status) && (
-        <button type="button" className="auth-submit auth-submit-secondary" disabled={busy} onClick={() => void cancel()}>
-          Cancelar pedido
-        </button>
-      )}
       {status === 'DELIVERED' && (
         <p className="catalog-banner" role="status">
           Tu pedido fue entregado. <Link to="/historial">Califícalo en tu historial</Link>.
         </p>
       )}
+      <div className="cart-layout">
+      <div className="cart-main">
       {tracking && (
         <section className="cart-section" aria-labelledby="order-tracking-title">
           <h2 id="order-tracking-title">Seguimiento</h2>
@@ -166,6 +162,8 @@ export function OrderPage() {
         </ul>
         <p className="auth-hint">Entrega en: {order.delivery.street}, {order.delivery.district}{order.delivery.reference ? ` (${order.delivery.reference})` : ''}</p>
       </section>
+      </div>
+      <aside className="cart-side">
       <section className="cart-section" aria-labelledby="order-totals-title">
         <h2 id="order-totals-title">Importes</h2>
         <dl className="cart-totals">
@@ -174,8 +172,16 @@ export function OrderPage() {
           <div><dt>Comisión</dt><dd>{formatPrice(order.totals.commission)}</dd></div>
           <div className="cart-total"><dt>Total</dt><dd>{formatPrice(order.totals.total)}</dd></div>
         </dl>
+        <p className="auth-hint">Tu pago: {paymentStatusLabels[order.payment.status]}.</p>
       </section>
-      <Link to="/restaurantes" className="auth-switch">Seguir buscando restaurantes</Link>
+      {canCustomerCancel(status) && (
+        <button type="button" className="auth-submit auth-submit-secondary cart-cancel" disabled={busy} onClick={() => void cancel()}>
+          Cancelar pedido
+        </button>
+      )}
+      <Link to="/restaurantes" className="cart-more">Seguir buscando restaurantes</Link>
+      </aside>
+      </div>
     </AuthLayout>
   )
 }

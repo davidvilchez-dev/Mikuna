@@ -1,3 +1,4 @@
+﻿@import './restaurant-account.css';
 .restaurant-section { display: grid; gap: 14px; margin-top: 28px; padding-top: 24px; border-top: 1px solid color-mix(in srgb, var(--color-mikuna-indigo) 12%, transparent); }
 .restaurant-section h2 { margin: 0; font-size: 22px; font-weight: 800; }
 
@@ -71,3 +72,4 @@
   cursor: pointer;
 }
 .restaurant-filter button[aria-pressed='true'] { background: var(--color-mikuna-indigo); color: var(--color-mikuna-white); }
+

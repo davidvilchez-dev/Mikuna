@@ -1,0 +1,57 @@
+/* ---------- Marco de las pantallas con sesión ---------- */
+.app-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #F5F6F8;
+  color: var(--color-mikuna-indigo);
+  --app-border: color-mix(in srgb, var(--color-mikuna-indigo) 8%, transparent);
+  --app-shadow: 0 1px 2px color-mix(in srgb, var(--color-mikuna-indigo) 5%, transparent);
+}
+
+.app-main { padding: clamp(24px, 4vw, 48px) clamp(16px, 3vw, 32px) 64px; }
+.app-container { width: min(600px, 100%); margin-inline: auto; }
+.app-container-wide { width: min(1080px, 100%); }
+.app-title { margin-bottom: 24px; }
+.app-title h1 { margin: 0; font-size: clamp(28px, 4vw, 36px); font-weight: 800; line-height: 1.1; letter-spacing: -0.03em; }
+.app-title .auth-description { margin: 8px 0 0; font-size: 17px; }
+.app-card {
+  padding: clamp(20px, 4vw, 32px); border: 1px solid color-mix(in srgb, var(--color-mikuna-indigo) 8%, transparent);
+  border-radius: 16px; background: var(--color-mikuna-white);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-mikuna-indigo) 5%, transparent);
+}
+
+/* ----- Controles comunes dentro del marco ----- */
+.app-shell .auth-submit {
+  width: auto; min-height: 46px; margin-top: 0; padding: 0 22px; font-size: 16px; font-weight: 700;
+  border-width: 1.5px; text-align: center; text-decoration: none;
+}
+.app-shell .auth-submit:hover:not(:disabled) { background: var(--color-mikuna-indigo); border-color: var(--color-mikuna-indigo); }
+.app-shell .auth-submit-secondary { background: var(--color-mikuna-white); color: var(--color-mikuna-indigo); border-color: color-mix(in srgb, var(--color-mikuna-indigo) 22%, transparent); }
+.app-shell .auth-submit-secondary:hover:not(:disabled) { background: var(--color-mikuna-indigo); color: var(--color-mikuna-white); }
+.app-shell .auth-form { margin-top: 0; }
+.app-shell .auth-form .auth-submit { justify-self: start; }
+
+.app-shell .auth-field input,
+.app-shell input[type='date'],
+.app-shell select,
+.app-shell textarea {
+  min-height: 48px; padding: 10px 14px; border: 1.5px solid color-mix(in srgb, var(--color-mikuna-indigo) 16%, transparent);
+  border-radius: 12px; background: #FAFAFB; color: inherit; font: inherit; font-size: 16px;
+  transition: border-color 160ms, box-shadow 160ms, background 160ms;
+}
+.app-shell .auth-field input:hover, .app-shell input[type='date']:hover, .app-shell select:hover { border-color: color-mix(in srgb, var(--color-mikuna-indigo) 35%, transparent); }
+.app-shell .auth-field input:focus-visible, .app-shell input[type='date']:focus-visible, .app-shell select:focus-visible, .app-shell textarea:focus-visible {
+  outline: 0; border-color: var(--color-mikuna-orange); background: var(--color-mikuna-white);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-mikuna-orange) 18%, transparent);
+}
+.app-shell select { background: var(--color-mikuna-white); }
+
+.app-shell .auth-notice { border-radius: 12px; border: 0; background: var(--color-mikuna-peach); }
+.app-shell .auth-alert { border-radius: 12px; }
+.app-shell .auth-switch { text-align: left; }
+
+.app-success {
+  display: flex; align-items: center; gap: 12px; margin: 0 0 16px; padding: 14px 16px; border: 1.5px solid color-mix(in srgb, #067647 35%, transparent);
+  border-radius: 14px; background: #F3FBF6; color: #067647; font-weight: 700;
+}
+.app-success .app-icon { box-sizing: content-box; width: 20px; height: 20px; padding: 9px; border-radius: 10px; background: #DCFAE6; }

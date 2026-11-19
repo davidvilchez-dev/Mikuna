@@ -13,8 +13,17 @@ export interface Availability {
 export interface CourierDelivery {
   orderId: string
   status: OrderStatus
-  restaurant: { name: string }
-  delivery: { label: string | null; street: string; district: string; reference: string | null; phone: string | null }
+  restaurant: { name: string; address: string | null; zone: string | null; phone: string | null }
+  delivery: {
+    label: string | null
+    street: string
+    district: string
+    reference: string | null
+    phone: string | null
+    /** Punto exacto que marcó el cliente en el mapa; los pedidos anteriores no lo tienen. */
+    latitude: number | null
+    longitude: number | null
+  }
   lines: { productName: string; quantity: number }[]
   assignedAt: string | null
 }
