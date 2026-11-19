@@ -56,6 +56,32 @@ class AddressIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void guardaYDevuelveElPuntoMarcadoEnElMapa() throws Exception {
+        String body = """
+                {"label":"Casa","street":"Psje. Tarapaca","district":"Ayacucho","reference":"","contactPhone":"",
+                 "latitude":-13.158812,"longitude":-74.223310}""";
+        create(token, body).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.latitude").value(-13.158812))
+                .andExpect(jsonPath("$.longitude").value(-74.22331));
+
+        mvc.perform(get(URL).header("Authorization", "Bearer " + token)).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].latitude").value(-13.158812));
+    }
+
+    @Test
+    void aceptaCoordenadasNulasYRechazaUnPuntoIncompletoOFueraDeRango() throws Exception {
+        create(token, """
+                {"street":"Jr. Lima 123","district":"Ayacucho","latitude":null,"longitude":null}""")
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.latitude").doesNotExist());
+        create(token, """
+                {"street":"Jr. Lima 123","district":"Ayacucho","latitude":-13.15}""")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors.locationComplete").exists());
+        create(token, """
+                {"street":"Jr. Lima 123","district":"Ayacucho","latitude":123,"longitude":-74.2}""")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors.latitude").exists());
+    }
+
+    @Test
     void elDistritoSeComparaSinTildesNiMayusculas() throws Exception {
         create(token, json("Jr. Lima 123", "san juan BAUTISTA")).andExpect(status().isCreated());
     }

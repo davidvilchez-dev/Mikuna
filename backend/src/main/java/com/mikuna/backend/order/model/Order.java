@@ -94,6 +94,13 @@ public class Order implements Persistable<UUID> {
     @Column(name = "delivery_phone", updatable = false)
     private String deliveryPhone;
 
+    /** Punto exacto de entrega copiado de la dirección al confirmar; los pedidos anteriores no lo tienen. */
+    @Column(name = "delivery_latitude", updatable = false)
+    private Double deliveryLatitude;
+
+    @Column(name = "delivery_longitude", updatable = false)
+    private Double deliveryLongitude;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("productName ASC, id ASC")
     private List<OrderLine> lines = new ArrayList<>();
@@ -110,7 +117,12 @@ public class Order implements Persistable<UUID> {
     }
 
     /** Datos de entrega copiados de la dirección al confirmar. */
-    public record Delivery(String label, String street, String district, String reference, String phone) {
+    public record Delivery(String label, String street, String district, String reference, String phone,
+            Double latitude, Double longitude) {
+
+        public Delivery(String label, String street, String district, String reference, String phone) {
+            this(label, street, district, reference, phone, null, null);
+        }
     }
 
     /** Importes ya calculados y redondeados en el servidor. */
@@ -135,6 +147,8 @@ public class Order implements Persistable<UUID> {
         this.deliveryDistrict = delivery.district();
         this.deliveryReference = delivery.reference();
         this.deliveryPhone = delivery.phone();
+        this.deliveryLatitude = delivery.latitude();
+        this.deliveryLongitude = delivery.longitude();
         this.createdAt = createdAt;
     }
 
@@ -196,6 +210,8 @@ public class Order implements Persistable<UUID> {
     public String getDeliveryDistrict() { return deliveryDistrict; }
     public String getDeliveryReference() { return deliveryReference; }
     public String getDeliveryPhone() { return deliveryPhone; }
+    public Double getDeliveryLatitude() { return deliveryLatitude; }
+    public Double getDeliveryLongitude() { return deliveryLongitude; }
     public List<OrderLine> getLines() { return List.copyOf(lines); }
     public Instant getCreatedAt() { return createdAt; }
 }

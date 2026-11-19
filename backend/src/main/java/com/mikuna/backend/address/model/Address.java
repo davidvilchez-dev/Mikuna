@@ -39,6 +39,13 @@ public class Address {
     @Column(name = "contact_phone", length = 20)
     private String contactPhone;
 
+    /** Punto exacto de entrega marcado en el mapa; ambos o ninguno (las direcciones anteriores no lo tienen). */
+    @Column
+    private Double latitude;
+
+    @Column
+    private Double longitude;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -51,20 +58,32 @@ public class Address {
 
     public static Address create(UUID customerId, String label, String street, String district, String reference,
             String contactPhone, Instant now) {
+        return create(customerId, label, street, district, reference, contactPhone, null, null, now);
+    }
+
+    public static Address create(UUID customerId, String label, String street, String district, String reference,
+            String contactPhone, Double latitude, Double longitude, Instant now) {
         Address address = new Address();
         address.customerId = customerId;
         address.createdAt = now;
         address.updatedAt = now;
-        address.update(label, street, district, reference, contactPhone);
+        address.update(label, street, district, reference, contactPhone, latitude, longitude);
         return address;
     }
 
     public void update(String label, String street, String district, String reference, String contactPhone) {
+        update(label, street, district, reference, contactPhone, latitude, longitude);
+    }
+
+    public void update(String label, String street, String district, String reference, String contactPhone,
+            Double latitude, Double longitude) {
         this.label = blankToNull(label);
         this.street = street.trim();
         this.district = district.trim();
         this.reference = blankToNull(reference);
         this.contactPhone = blankToNull(contactPhone);
+        this.latitude = latitude;
+        this.longitude = longitude;
     }
 
     private static String blankToNull(String value) {
@@ -94,6 +113,8 @@ public class Address {
     public String getDistrict() { return district; }
     public String getReference() { return reference; }
     public String getContactPhone() { return contactPhone; }
+    public Double getLatitude() { return latitude; }
+    public Double getLongitude() { return longitude; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

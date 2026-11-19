@@ -45,10 +45,35 @@ class CourierDeliveryIntegrationTest extends DeliveryTestSupport {
                 .andExpect(jsonPath("$[0].orderId").value(id.toString()))
                 .andExpect(jsonPath("$[0].status").value("ASSIGNED"))
                 .andExpect(jsonPath("$[0].restaurant.name").value("La Picantería"))
+                .andExpect(jsonPath("$[0].restaurant.address").isNotEmpty())
+                .andExpect(jsonPath("$[0].restaurant.zone").value("Ayacucho"))
+                .andExpect(jsonPath("$[0].restaurant.phone").isNotEmpty())
                 .andExpect(jsonPath("$[0].delivery.street").value("Jr. Lima 123"))
                 .andExpect(jsonPath("$[0].lines[0].productName").value("Lomo saltado"))
                 .andExpect(jsonPath("$[0].lines[0].quantity").value(2));
         getAs(tokenB, COURIER + "/deliveries").andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void elRepartidorRecibeElPuntoExactoDeEntregaCuandoElPedidoLoTiene() throws Exception {
+        setAvailable(tokenA, true);
+        UUID withPoint = readyOrder("c-punto");
+        jdbc.update("update pedidos set delivery_latitude = ?, delivery_longitude = ? where id = ?",
+                -13.158812, -74.22331, withPoint);
+
+        getAs(tokenA, COURIER + "/deliveries").andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].delivery.latitude").value(-13.158812))
+                .andExpect(jsonPath("$[0].delivery.longitude").value(-74.22331));
+    }
+
+    @Test
+    void sinPuntoMarcadoLasCoordenadasDelDestinoVanVacias() throws Exception {
+        setAvailable(tokenA, true);
+        readyOrder("c-sin-punto");
+
+        getAs(tokenA, COURIER + "/deliveries").andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].delivery.latitude").doesNotExist())
+                .andExpect(jsonPath("$[0].delivery.longitude").doesNotExist());
     }
 
     @Test

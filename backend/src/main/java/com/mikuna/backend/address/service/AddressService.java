@@ -42,7 +42,7 @@ public class AddressService {
                     "Alcanzaste el máximo de " + MAX_ADDRESSES + " direcciones");
         }
         Address address = Address.create(customerId, request.label(), request.street(), request.district(),
-                request.reference(), request.contactPhone(), Instant.now(clock));
+                request.reference(), request.contactPhone(), request.latitude(), request.longitude(), Instant.now(clock));
         return AddressResponse.from(addresses.save(address));
     }
 
@@ -56,7 +56,7 @@ public class AddressService {
         Address address = addresses.findByIdAndCustomerId(id, customerId).orElseThrow(AddressNotFoundException::new);
         requireCovered(request.district());
         address.update(request.label(), request.street(), request.district(), request.reference(),
-                request.contactPhone());
+                request.contactPhone(), request.latitude(), request.longitude());
         return AddressResponse.from(addresses.save(address));
     }
 

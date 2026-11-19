@@ -12,6 +12,8 @@ import com.mikuna.backend.order.model.Order;
 import com.mikuna.backend.order.model.OrderStatus;
 import com.mikuna.backend.order.repository.OrderRepository;
 import com.mikuna.backend.order.service.OrderStatusService;
+import com.mikuna.backend.restaurant.model.Restaurant;
+import com.mikuna.backend.restaurant.repository.RestaurantRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -34,17 +36,19 @@ public class CourierDeliveryService {
     private final DeliveryRejectionRepository rejections;
     private final CourierAvailabilityRepository availability;
     private final OrderStatusService orderStatus;
+    private final RestaurantRepository restaurants;
     private final DeliveryDispatcher dispatcher;
     private final Clock clock;
 
     public CourierDeliveryService(OrderRepository orders, DeliveryRepository deliveries,
             DeliveryRejectionRepository rejections, CourierAvailabilityRepository availability,
-            OrderStatusService orderStatus, DeliveryDispatcher dispatcher, Clock clock) {
+            OrderStatusService orderStatus, RestaurantRepository restaurants, DeliveryDispatcher dispatcher, Clock clock) {
         this.orders = orders;
         this.deliveries = deliveries;
         this.rejections = rejections;
         this.availability = availability;
         this.orderStatus = orderStatus;
+        this.restaurants = restaurants;
         this.dispatcher = dispatcher;
         this.clock = clock;
     }
@@ -53,7 +57,7 @@ public class CourierDeliveryService {
     @Transactional(readOnly = true)
     public List<CourierDeliveryResponse> listActive(UUID courierId) {
         return deliveries.findActiveByCourier(courierId, ACTIVE).stream()
-                .map(d -> orders.findById(d.getOrderId()).map(o -> CourierDeliveryResponse.of(o, d)).orElse(null))
+                .map(d -> orders.findById(d.getOrderId()).map(o -> CourierDeliveryResponse.of(o, d, place(o))).orElse(null))
                 .filter(r -> r != null).toList();
     }
 
@@ -63,7 +67,7 @@ public class CourierDeliveryService {
         Order order = orders.findByIdForUpdate(orderId).orElseThrow(OrderNotFoundException::new);
         Delivery delivery = ownDelivery(courierId, orderId);
         orderStatus.changeStatus(order, OrderStatus.PICKED_UP, courierId, ActorRole.COURIER, null);
-        return CourierDeliveryResponse.of(order, delivery);
+        return CourierDeliveryResponse.of(order, delivery, place(order));
     }
 
     /** PICKED_UP a DELIVERED; el repartidor queda libre y se intenta asignarle la siguiente pendiente (FR-007). */
@@ -77,7 +81,7 @@ public class CourierDeliveryService {
             availability.save(row);
         });
         AfterCommit.run(() -> dispatcher.courierBecameFree(courierId));
-        return CourierDeliveryResponse.of(order, delivery);
+        return CourierDeliveryResponse.of(order, delivery, place(order));
     }
 
     /**
@@ -92,7 +96,12 @@ public class CourierDeliveryService {
         rejections.save(new DeliveryRejection(delivery.getId(), courierId, Instant.now(clock)));
         delivery.release();
         AfterCommit.run(() -> dispatcher.dispatch(orderId));
-        return CourierDeliveryResponse.of(order, delivery);
+        return CourierDeliveryResponse.of(order, delivery, place(order));
+    }
+
+    /** Datos del local para recoger el pedido; sin ellos (restaurante borrado) la entrega sigue con solo el nombre. */
+    private Restaurant place(Order order) {
+        return restaurants.findById(order.getRestaurantId()).orElse(null);
     }
 
     private Delivery ownDelivery(UUID courierId, UUID orderId) {
