@@ -101,6 +101,24 @@ public class Order implements Persistable<UUID> {
     @Column(name = "delivery_longitude", updatable = false)
     private Double deliveryLongitude;
 
+    /** Nota del cliente para el restaurante. */
+    @Column(name = "store_note", updatable = false, length = 300)
+    private String storeNote;
+
+    /** Hora de entrega elegida; {@code null} es entrega inmediata. */
+    @Column(name = "scheduled_for", updatable = false)
+    private Instant scheduledFor;
+
+    /** Quien recibe, si no es el cliente; {@code null} es "yo mismo". */
+    @Column(name = "receiver_name", updatable = false, length = 80)
+    private String receiverName;
+
+    @Column(name = "receiver_phone", updatable = false, length = 20)
+    private String receiverPhone;
+
+    @Column(name = "receiver_note", updatable = false, length = 300)
+    private String receiverNote;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("productName ASC, id ASC")
     private List<OrderLine> lines = new ArrayList<>();
@@ -150,6 +168,16 @@ public class Order implements Persistable<UUID> {
         this.deliveryLatitude = delivery.latitude();
         this.deliveryLongitude = delivery.longitude();
         this.createdAt = createdAt;
+    }
+
+    /** Opciones elegidas en la confirmación (nota, horario, receptor); se fijan una sola vez. */
+    public void applyOptions(String storeNote, Instant scheduledFor, String receiverName, String receiverPhone,
+            String receiverNote) {
+        this.storeNote = storeNote;
+        this.scheduledFor = scheduledFor;
+        this.receiverName = receiverName;
+        this.receiverPhone = receiverPhone;
+        this.receiverNote = receiverNote;
     }
 
     public void addLine(UUID productId, String productName, BigDecimal unitPrice, int quantity,
@@ -212,6 +240,11 @@ public class Order implements Persistable<UUID> {
     public String getDeliveryPhone() { return deliveryPhone; }
     public Double getDeliveryLatitude() { return deliveryLatitude; }
     public Double getDeliveryLongitude() { return deliveryLongitude; }
+    public String getStoreNote() { return storeNote; }
+    public Instant getScheduledFor() { return scheduledFor; }
+    public String getReceiverName() { return receiverName; }
+    public String getReceiverPhone() { return receiverPhone; }
+    public String getReceiverNote() { return receiverNote; }
     public List<OrderLine> getLines() { return List.copyOf(lines); }
     public Instant getCreatedAt() { return createdAt; }
 }

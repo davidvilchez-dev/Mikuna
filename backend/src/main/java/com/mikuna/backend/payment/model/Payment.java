@@ -22,6 +22,8 @@ import java.util.UUID;
 @Table(name = "pagos", uniqueConstraints = @UniqueConstraint(name = "uk_pagos_pedido", columnNames = "order_id"))
 public class Payment {
 
+    public static final String CASH_REF = "CASH";
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -67,6 +69,15 @@ public class Payment {
         payment.createdAt = now;
         payment.updatedAt = now;
         return payment;
+    }
+
+    /** Pago en efectivo: sin pasarela; solo registra el estado y se paga en mano contra entrega. */
+    public static Payment cash(UUID orderId, UUID customerId, BigDecimal amount, String currency, Instant now) {
+        return authorized(orderId, customerId, amount, currency, CASH_REF, now);
+    }
+
+    public boolean isCash() {
+        return CASH_REF.equals(gatewayRef);
     }
 
     /** Pasa de AUTHORIZED a CAPTURED; cualquier otro estado de origen se rechaza. */

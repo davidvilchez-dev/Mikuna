@@ -9,11 +9,13 @@ import com.mikuna.backend.cart.service.CartService;
 import com.mikuna.backend.common.exception.AddressNotFoundException;
 import com.mikuna.backend.common.exception.OrderConflictException;
 import com.mikuna.backend.common.exception.OrderNotFoundException;
+import com.mikuna.backend.common.exception.RegistrationValidationException;
 import com.mikuna.backend.order.dto.CheckoutResponse;
 import com.mikuna.backend.order.dto.ConfirmOrderRequest;
 import com.mikuna.backend.order.dto.OrderResponse;
 import com.mikuna.backend.order.model.Order;
 import com.mikuna.backend.order.model.OrderPlacedEvent;
+import com.mikuna.backend.order.model.PaymentMethod;
 import com.mikuna.backend.order.repository.OrderRepository;
 import com.mikuna.backend.payment.model.Payment;
 import com.mikuna.backend.payment.model.PaymentStatus;
@@ -21,6 +23,7 @@ import com.mikuna.backend.payment.repository.PaymentRepository;
 import com.mikuna.backend.payment.service.PaymentService;
 import com.mikuna.backend.payment.service.StripeProperties;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -42,6 +45,9 @@ public class CheckoutTransaction {
     /** Resultado de confirmar: el pedido y si se creó ahora ({@code false} es una repetición de la clave). */
     public record Confirmation(OrderResponse order, boolean created) {
     }
+
+    static final Duration MIN_LEAD = Duration.ofMinutes(25);
+    static final Duration MAX_LEAD = Duration.ofHours(48);
 
     private final CartService carts;
     private final OrderRepository orders;
@@ -79,8 +85,9 @@ public class CheckoutTransaction {
 
         TotalsResponse totals = view.totals();
         UUID orderId = UUID.randomUUID();
-        String intentId = paymentService.authorize(customerId, orderId, totals.total(), request.paymentMethodId(),
-                confirmationKey);
+        boolean cash = request.paymentMethod() == PaymentMethod.CASH;
+        String intentId = cash ? null : paymentService.authorize(customerId, orderId, totals.total(),
+                request.paymentMethodId(), confirmationKey);
         try {
             Address address = addresses.findByIdAndCustomerId(cart.getSelectedAddressId(), customerId)
                     .orElseThrow(AddressNotFoundException::new);
@@ -90,17 +97,22 @@ public class CheckoutTransaction {
                     new Order.Delivery(address.getLabel(), address.getStreet(), address.getDistrict(),
                             address.getReference(), address.getContactPhone(), address.getLatitude(), address.getLongitude()),
                     Instant.now(clock));
+            applyOptions(order, request);
             for (CartResponse.Line line : view.lines()) {
                 order.addLine(line.productId(), line.name(), line.unitPrice(), line.quantity(), line.lineTotal());
             }
             orders.saveAndFlush(order);
-            paymentService.recordAuthorized(customerId, orderId, confirmationKey, totals.total(), intentId);
+            if (cash) {
+                paymentService.recordCash(customerId, orderId, confirmationKey, totals.total());
+            } else {
+                paymentService.recordAuthorized(customerId, orderId, confirmationKey, totals.total(), intentId);
+            }
             carts.clearAfterCheckout(cart);
             events.publishEvent(new OrderPlacedEvent(orderId));
             return new Confirmation(OrderResponse.of(order, PaymentStatus.AUTHORIZED), true);
         } catch (RuntimeException e) {
             // Una clave duplicada comparte la misma reserva con el pedido ya registrado: no se libera.
-            if (!isDuplicateConfirmation(e)) {
+            if (!cash && !isDuplicateConfirmation(e)) {
                 paymentService.cancelQuietly(customerId, confirmationKey, totals.total(), intentId);
             }
             throw e;
@@ -161,11 +173,31 @@ public class CheckoutTransaction {
         if (view.lines().stream().anyMatch(line -> line.quantity() < 1 || line.quantity() > Cart.MAX_QUANTITY)) {
             throw conflict(OrderConflictException.NOT_ORDERABLE, "Hay productos con una cantidad no permitida");
         }
+        if (request.paymentMethod() == PaymentMethod.CARD && request.paymentMethodId() == null) {
+            throw new RegistrationValidationException("paymentMethodId", "Falta el método de pago de la tarjeta");
+        }
+        Instant now = Instant.now(clock);
+        Instant scheduled = request.scheduledFor();
+        if (scheduled != null && (scheduled.isBefore(now.plus(MIN_LEAD)) || scheduled.isAfter(now.plus(MAX_LEAD)))) {
+            throw new RegistrationValidationException("scheduledFor",
+                    "Elige una hora de entrega entre 30 minutos y 48 horas desde ahora");
+        }
         if (request.expectedTotal().compareTo(view.totals().total()) != 0) {
             throw new OrderConflictException(OrderConflictException.AMOUNTS_CHANGED,
                     "Los importes cambiaron; revisa el resumen y confirma de nuevo",
                     CheckoutResponse.of(view, stripe.publishableKey()));
         }
+    }
+
+    private void applyOptions(Order order, ConfirmOrderRequest request) {
+        ConfirmOrderRequest.Receiver receiver = request.receiver();
+        order.applyOptions(blankToNull(request.storeNote()), request.scheduledFor(),
+                receiver == null ? null : receiver.name().strip(), receiver == null ? null : receiver.phone().strip(),
+                receiver == null ? null : blankToNull(receiver.note()));
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.strip();
     }
 
     private static OrderConflictException conflict(String code, String message) {

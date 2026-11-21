@@ -121,6 +121,14 @@ public class PaymentService {
                 TransactionStatus.AUTHORIZED, amount, null, null, intentId, now));
     }
 
+    /** Registra un pago en efectivo: no hay reserva en la pasarela, solo el seguimiento del estado. */
+    public void recordCash(UUID customerId, UUID orderId, String confirmationKey, BigDecimal amount) {
+        Instant now = Instant.now(clock);
+        payments.saveAndFlush(Payment.cash(orderId, customerId, amount, properties.currency(), now));
+        transactions.save(new PaymentTransaction(orderId, customerId, confirmationKey, TransactionType.AUTHORIZATION,
+                TransactionStatus.AUTHORIZED, amount, "cash", null, Payment.CASH_REF, now));
+    }
+
     /**
      * Compensación: libera una reserva cuyo pedido no llegó a guardarse. Es de mejor esfuerzo y nunca lanza;
      * su resultado queda registrado en una transacción aparte. Sin pedido, no hay {@code order_id}.
@@ -161,7 +169,9 @@ public class PaymentService {
         }
         boolean capture = type == TransactionType.CAPTURE;
         try {
-            if (capture) {
+            if (payment.isCash()) {
+                // Efectivo: no hay pasarela que llamar.
+            } else if (capture) {
                 gateway.capture(payment.getGatewayRef(), "capture-" + orderId);
             } else {
                 gateway.cancel(payment.getGatewayRef(), "release-" + orderId);

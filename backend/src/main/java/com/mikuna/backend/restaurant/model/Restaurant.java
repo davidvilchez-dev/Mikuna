@@ -69,6 +69,18 @@ public class Restaurant {
     @Column(nullable = false)
     private boolean available;
 
+    @Column(name = "logo_url", length = 500)
+    private String logoUrl;
+
+    @Column(name = "logo_public_id", length = 200)
+    private String logoPublicId;
+
+    @Column(name = "cover_url", length = 500)
+    private String coverUrl;
+
+    @Column(name = "cover_public_id", length = 200)
+    private String coverPublicId;
+
     @Version
     private long version;
 
@@ -113,6 +125,16 @@ public class Restaurant {
         this.schedule.addAll(days);
     }
 
+    public void changeLogo(String url, String publicId) {
+        this.logoUrl = url;
+        this.logoPublicId = publicId;
+    }
+
+    public void changeCover(String url, String publicId) {
+        this.coverUrl = url;
+        this.coverPublicId = publicId;
+    }
+
     public void setAvailable(boolean available) {
         this.available = available;
     }
@@ -131,5 +153,9 @@ public class Restaurant {
     public UUID getResolvedBy() { return resolvedBy; }
     public Instant getResolvedAt() { return resolvedAt; }
     public boolean isAvailable() { return available; }
+    public String getLogoUrl() { return logoUrl; }
+    public String getLogoPublicId() { return logoPublicId; }
+    public String getCoverUrl() { return coverUrl; }
+    public String getCoverPublicId() { return coverPublicId; }
     public List<OpeningHour> getSchedule() { return List.copyOf(schedule); }
 }

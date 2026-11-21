@@ -54,7 +54,7 @@ public class PublicCatalogService {
                 .filter(r -> nameQuery.isEmpty() || fold(r.getName()).contains(nameQuery))
                 .filter(r -> categoryQuery.isEmpty() || fold(r.getCategory()).equals(categoryQuery))
                 .filter(r -> zoneQuery.isEmpty() || fold(r.getZone()).equals(zoneQuery))
-                .map(r -> PublicRestaurantResponse.from(r, eligibility.attentionStatus(r)))
+                .map(r -> PublicRestaurantResponse.from(r, eligibility.attentionStatus(r), fallbackCover(r)))
                 .sorted(Comparator
                         .comparing((PublicRestaurantResponse r) -> r.attention() == AttentionStatus.OPEN ? 0 : 1)
                         .thenComparing(r -> fold(r.name()))
@@ -79,8 +79,18 @@ public class PublicCatalogService {
                 products.findByRestaurantIdAndActiveTrueAndAvailableTrue(restaurant.getId(),
                         PageRequest.of(page, size, Sort.by("category", "name"))),
                 PublicProductResponse::from);
-        return new CatalogResponse(PublicRestaurantResponse.from(restaurant, eligibility.attentionStatus(restaurant)),
+        return new CatalogResponse(PublicRestaurantResponse.from(restaurant, eligibility.attentionStatus(restaurant),
+                fallbackCover(restaurant)),
                 page0);
+    }
+
+    /** Sin portada propia, la tarjeta usa la foto del primer plato disponible. */
+    private String fallbackCover(Restaurant restaurant) {
+        if (restaurant.getCoverUrl() != null) {
+            return null;
+        }
+        return products.findFirstByRestaurantIdAndActiveTrueAndAvailableTrueOrderByCategoryAscNameAsc(restaurant.getId())
+                .map(Product::getImageUrl).orElse(null);
     }
 
     private static List<String> distinct(Stream<String> values) {

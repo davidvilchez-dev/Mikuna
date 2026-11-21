@@ -9,10 +9,12 @@ import java.util.UUID;
  * aprobación ni datos de cuenta.
  */
 public record PublicRestaurantResponse(UUID id, String name, String category, String description, String zone,
-        AttentionStatus attention) {
+        AttentionStatus attention, String logoUrl, String coverUrl) {
 
-    public static PublicRestaurantResponse from(Restaurant restaurant, AttentionStatus attention) {
+    public static PublicRestaurantResponse from(Restaurant restaurant, AttentionStatus attention,
+            String fallbackCoverUrl) {
         return new PublicRestaurantResponse(restaurant.getId(), restaurant.getName(), restaurant.getCategory(),
-                restaurant.getDescription(), restaurant.getZone(), attention);
+                restaurant.getDescription(), restaurant.getZone(), attention, restaurant.getLogoUrl(),
+                restaurant.getCoverUrl() != null ? restaurant.getCoverUrl() : fallbackCoverUrl);
     }
 }

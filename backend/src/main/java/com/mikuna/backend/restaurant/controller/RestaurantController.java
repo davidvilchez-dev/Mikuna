@@ -5,7 +5,11 @@ import com.mikuna.backend.restaurant.dto.AvailabilityRequest;
 import com.mikuna.backend.restaurant.dto.RestaurantRequest;
 import com.mikuna.backend.restaurant.dto.RestaurantResponse;
 import com.mikuna.backend.restaurant.dto.ScheduleRequest;
+import com.mikuna.backend.restaurant.service.RestaurantImageService;
 import com.mikuna.backend.restaurant.service.RestaurantService;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,9 +27,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class RestaurantController {
 
     private final RestaurantService service;
+    private final RestaurantImageService imageService;
 
-    public RestaurantController(RestaurantService service) {
+    public RestaurantController(RestaurantService service, RestaurantImageService imageService) {
         this.service = service;
+        this.imageService = imageService;
     }
 
     @PostMapping
@@ -54,6 +60,13 @@ public class RestaurantController {
     public RestaurantResponse schedule(@AuthenticationPrincipal AccountPrincipal principal,
             @Valid @RequestBody ScheduleRequest request) {
         return service.updateSchedule(principal.id(), request);
+    }
+
+    @PutMapping(value = "/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public RestaurantResponse images(@AuthenticationPrincipal AccountPrincipal principal,
+            @RequestPart(value = "logo", required = false) MultipartFile logo,
+            @RequestPart(value = "cover", required = false) MultipartFile cover) {
+        return imageService.update(principal.id(), logo, cover);
     }
 
     @PutMapping("/availability")

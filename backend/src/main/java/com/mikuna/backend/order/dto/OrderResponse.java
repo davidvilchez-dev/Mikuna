@@ -10,7 +10,8 @@ import java.util.UUID;
 
 /** Pedido con sus datos fijados al confirmar y el estado de su pago. No expone referencias de la pasarela. */
 public record OrderResponse(UUID id, String status, RestaurantInfo restaurant, List<Line> lines, Delivery delivery,
-        Totals totals, PaymentInfo payment, Instant createdAt) {
+        Totals totals, PaymentInfo payment, Instant createdAt,
+        Options options) {
 
     public record RestaurantInfo(UUID id, String name) {
     }
@@ -24,6 +25,13 @@ public record OrderResponse(UUID id, String status, RestaurantInfo restaurant, L
     public record Totals(BigDecimal subtotal, BigDecimal deliveryFee, BigDecimal commission, BigDecimal total) {
     }
 
+    /** Nota para la tienda, horario elegido ({@code null} es inmediato) y receptor ({@code null} es el cliente). */
+    public record Options(String storeNote, Instant scheduledFor, Receiver receiver) {
+    }
+
+    public record Receiver(String name, String phone, String note) {
+    }
+
     public record PaymentInfo(String method, String status) {
     }
 
@@ -34,7 +42,14 @@ public record OrderResponse(UUID id, String status, RestaurantInfo restaurant, L
                 new Delivery(order.getDeliveryLabel(), order.getDeliveryStreet(), order.getDeliveryDistrict(),
                         order.getDeliveryReference(), order.getDeliveryPhone()),
                 new Totals(order.getSubtotal(), order.getDeliveryFee(), order.getCommission(), order.getTotal()),
-                new PaymentInfo(order.getPaymentMethod().name(), paymentStatus.name()), order.getCreatedAt());
+                new PaymentInfo(order.getPaymentMethod().name(), paymentStatus.name()), order.getCreatedAt(),
+                options(order));
+    }
+
+    private static Options options(Order order) {
+        Receiver receiver = order.getReceiverName() == null ? null
+                : new Receiver(order.getReceiverName(), order.getReceiverPhone(), order.getReceiverNote());
+        return new Options(order.getStoreNote(), order.getScheduledFor(), receiver);
     }
 
     private static Line line(OrderLine line) {

@@ -84,7 +84,7 @@ class PublicSearchIntegrationTest extends IntegrationTestSupport {
         String body = search("").andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 
         Set<String> keys = JsonPath.<java.util.Map<String, Object>>read(body, "$.items[0]").keySet();
-        assertThat(keys).containsExactlyInAnyOrder("id", "name", "category", "description", "zone", "attention");
+        assertThat(keys).containsExactlyInAnyOrder("id", "name", "category", "description", "zone", "attention", "logoUrl", "coverUrl");
         assertThat(body).doesNotContain("Jr. Lima 123").doesNotContain("966123456").doesNotContain("a@mail.com");
     }
 

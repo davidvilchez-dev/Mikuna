@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     /** Producto propio y no retirado; uno ajeno o retirado es indistinguible de uno inexistente. */
+    Optional<Product> findFirstByRestaurantIdAndActiveTrueAndAvailableTrueOrderByCategoryAscNameAsc(UUID restaurantId);
+
     Optional<Product> findByIdAndRestaurantIdAndActiveTrue(UUID id, UUID restaurantId);
 
     /** Gestión: productos no retirados del restaurante, disponibles o no. */

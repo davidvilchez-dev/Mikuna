@@ -100,7 +100,7 @@ class OrderConfirmationIntegrationTest extends OrderTestSupport {
 
     @Test
     void metodoDePagoNoOfrecidoOCamposDesconocidosSeRechazanConValidacion() throws Exception {
-        confirm(token, "clave-6", "{\"paymentMethod\":\"CASH\",\"paymentMethodId\":\"pm_x\",\"expectedTotal\":52.25}")
+        confirm(token, "clave-6", "{\"paymentMethod\":\"BIZUM\",\"paymentMethodId\":\"pm_x\",\"expectedTotal\":52.25}")
                 .andExpect(status().isBadRequest());
         confirm(token, "clave-6", "{\"paymentMethod\":\"CARD\",\"paymentMethodId\":\"4242424242424242\","
                 + "\"expectedTotal\":52.25}").andExpect(status().isBadRequest())
