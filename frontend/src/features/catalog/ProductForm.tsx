@@ -58,6 +58,7 @@ export function ProductForm({ initial, currentImageUrl, submitLabel, onSubmit, o
       <div className="restaurant-field-textarea">
         <label htmlFor="product-description">Descripción breve (opcional)</label>
         <textarea id="product-description" value={values.description} onChange={(e) => set('description')(e.target.value)} aria-invalid={errors.description ? true : undefined} />
+        <p className="auth-hint">Escribe una frase corta. Para listar lo que contiene, usa una línea por ingrediente que empiece con «- ».</p>
         {errors.description && <p className="auth-error">{errors.description}</p>}
       </div>
       <FormField id="product-price" label="Precio en soles (S/)" inputMode="decimal" value={values.price} onChange={(e) => set('price')(e.target.value)} error={errors.price} hint="Hasta 2 decimales, por ejemplo 18.50" />

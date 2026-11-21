@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
 import { AppIcon } from '../auth/AppIcon'
+import { notifyError, notifySuccess } from '../ui/notify'
 import { AuthLayout } from '../auth/AuthLayout'
 import { clearSession, getSession } from '../auth/session-storage'
 import { AddressForm } from './AddressForm'
@@ -39,7 +40,6 @@ export function AddressesPage() {
   const [state, setState] = useState<ViewState>({ kind: 'loading' })
   const [mode, setMode] = useState<Mode>({ kind: 'list' })
   const [attempt, setAttempt] = useState(0)
-  const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null)
   const [busy, setBusy] = useState(false)
 
   const token = session?.token ?? ''
@@ -69,7 +69,7 @@ export function AddressesPage() {
   if (!session) return <Navigate to="/iniciar-sesion" replace />
 
   const reload = (message: string | null) => {
-    setNotice(message ? { text: message, ok: true } : null)
+    if (message) notifySuccess(message)
     setMode({ kind: 'list' })
     setState({ kind: 'loading' })
     setAttempt((n) => n + 1)
@@ -82,7 +82,7 @@ export function AddressesPage() {
       await deleteAddress(token, address.id)
       reload('Dirección eliminada')
     } catch (error) {
-      setNotice({ text: handleFailure(error), ok: false })
+      notifyError(handleFailure(error))
     } finally {
       setBusy(false)
     }
@@ -125,9 +125,6 @@ export function AddressesPage() {
 
   return (
     <AuthLayout title="Mis direcciones" description="Guarda tus direcciones y elige a dónde llegan tus pedidos." wide>
-      {notice && (notice.ok
-        ? <p className="app-success" role="status"><AppIcon name="check" />{notice.text}</p>
-        : <p className="auth-alert" role="alert">{notice.text}</p>)}
       <ul className="addr-grid">
         {state.addresses.map((address) => (
           <li key={address.id}>

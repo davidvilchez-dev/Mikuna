@@ -210,6 +210,10 @@ export function OrdersPage() {
                 <div className="rs-meta-block">
                   <AppIcon name="pin" />
                   <span>{order.delivery.street}, {order.delivery.district}{order.delivery.reference ? ` · ${order.delivery.reference}` : ''}</span>
+                  {order.options.scheduledFor && <span><strong>Programado:</strong> {new Date(order.options.scheduledFor).toLocaleString('es-PE', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>}
+                  {order.options.storeNote && <span><strong>Nota del cliente:</strong> {order.options.storeNote}</span>}
+                  {order.options.receiver && <span><strong>Recibe:</strong> {order.options.receiver.name} ({order.options.receiver.phone})</span>}
+                  {order.payment.method === 'CASH' && <span><strong>Pago:</strong> en efectivo contra entrega</span>}
                 </div>
                 <div className="rs-total"><small>Total</small><strong>{formatPrice(order.totals.total)}</strong></div>
               </div>

@@ -115,13 +115,25 @@ export function RestaurantSearchPage() {
         <>
           <ul className="catalog-results">
             {state.data.items.map((restaurant) => (
-              <li className="catalog-result" key={restaurant.id}>
-                <Link to={'/restaurantes/' + restaurant.id}>
-                  <h2>{restaurant.name}</h2>
-                </Link>
-                <p>{restaurant.category} · {restaurant.zone}</p>
-                {restaurant.description && <p>{restaurant.description}</p>}
-                <p><span className={'catalog-attention catalog-attention-' + restaurant.attention.toLowerCase()}>{attentionLabels[restaurant.attention]}</span></p>
+              <li className={'catalog-result' + (restaurant.attention === 'OPEN' ? '' : ' catalog-result-closed')} key={restaurant.id}>
+                <div className="catalog-cover">
+                  {restaurant.coverUrl
+                    ? <img src={restaurant.coverUrl} alt="" loading="lazy" />
+                    : <span className="catalog-cover-empty" aria-hidden="true">{restaurant.name.charAt(0)}</span>}
+                  <span className={'catalog-attention catalog-attention-' + restaurant.attention.toLowerCase()}>{attentionLabels[restaurant.attention]}</span>
+                </div>
+                <div className="catalog-result-row">
+                  <span className="catalog-logo" aria-hidden="true">
+                    {restaurant.logoUrl ? <img src={restaurant.logoUrl} alt="" loading="lazy" /> : restaurant.name.charAt(0)}
+                  </span>
+                  <div className="catalog-result-text">
+                    <Link to={'/restaurantes/' + restaurant.id}>
+                      <h2>{restaurant.name}</h2>
+                    </Link>
+                    <p>{restaurant.category} · {restaurant.zone}</p>
+                  </div>
+                </div>
+                {restaurant.description && <p className="catalog-result-desc">{restaurant.description}</p>}
               </li>
             ))}
           </ul>

@@ -151,7 +151,7 @@ export function AppHeader() {
     navigate('/', { replace: true })
   }
 
-  const home = isCustomer ? '/restaurantes' : session ? '/mi-cuenta' : '/'
+  const home = isCustomer ? '/restaurantes' : role === 'RESTAURANT' ? '/mi-restaurante' : session ? '/mi-cuenta' : '/'
   return (
     <header className="app-header">
       <div className={isCustomer ? 'app-header-inner app-header-customer' : 'app-header-inner'}>

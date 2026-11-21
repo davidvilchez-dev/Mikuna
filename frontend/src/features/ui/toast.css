@@ -1,0 +1,13 @@
+.Toastify__toast-container { top: 72px; }
+.Toastify__toast {
+  min-height: 52px; padding: 12px 14px; border: 1px solid var(--app-border); border-radius: 14px;
+  background: var(--color-mikuna-white); color: var(--color-mikuna-indigo); font-family: inherit; font-size: 15px; font-weight: 600;
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--color-mikuna-indigo) 16%, transparent);
+}
+.Toastify__toast-icon { width: 22px; margin-inline-end: 12px; }
+.Toastify__toast--success .Toastify__toast-icon svg { fill: #067647; }
+.Toastify__toast--error .Toastify__toast-icon svg { fill: #B42318; }
+.Toastify__progress-bar--success { background: #067647; }
+.Toastify__progress-bar--error { background: #B42318; }
+.Toastify__close-button { color: var(--color-mikuna-gray); }
+@media (max-width: 480px) { .Toastify__toast-container { top: 64px; width: calc(100vw - 24px); left: 12px; right: 12px; } }

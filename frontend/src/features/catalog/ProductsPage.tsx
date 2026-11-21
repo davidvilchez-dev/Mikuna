@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
 import { AppIcon } from '../auth/AppIcon'
+import { notifyError, notifySuccess } from '../ui/notify'
 import { RestaurantLayout } from '../restaurant/RestaurantLayout'
 import { clearSession, getSession } from '../auth/session-storage'
 import {
@@ -41,7 +42,6 @@ export function ProductsPage() {
   const [mode, setMode] = useState<Mode>({ kind: 'list' })
   const [page, setPage] = useState(0)
   const [attempt, setAttempt] = useState(0)
-  const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   const token = session?.token ?? ''
@@ -74,8 +74,8 @@ export function ProductsPage() {
 
   if (!session) return <Navigate to="/iniciar-sesion" replace />
 
-  const reload = (message: string | null) => {
-    setNotice(message)
+  const reload = (message: string | null, isError = false) => {
+    if (message) (isError ? notifyError : notifySuccess)(message)
     setMode({ kind: 'list' })
     setState({ kind: 'loading' })
     setAttempt((n) => n + 1)
@@ -90,8 +90,8 @@ export function ProductsPage() {
     } catch (error) {
       const message = handleFailure(error)
       // 409: otra edición cambió el producto; se recarga para ver la versión vigente.
-      if (error instanceof ApiError && error.status === 409) reload(message)
-      else setNotice(message)
+      if (error instanceof ApiError && error.status === 409) reload(message, true)
+      else notifyError(message)
     } finally {
       setBusy(false)
     }
@@ -157,7 +157,7 @@ export function ProductsPage() {
               if (error instanceof ApiError && error.status === 401) handleFailure(error)
               // 409: el producto cambió; se muestra el aviso y se recarga la lista con la versión vigente.
               if (error instanceof ApiError && error.status === 409) {
-                reload(error.message)
+                reload(error.message, true)
                 return
               }
               throw error
@@ -171,10 +171,9 @@ export function ProductsPage() {
   const { data } = state
   return (
     <RestaurantLayout title="Mi carta" description="Los clientes solo ven los productos disponibles." wide>
-      {notice && <p className="app-success" role="status"><AppIcon name="check" />{notice}</p>}
       <div className="rs-toolbar">
         <span>{data.totalItems} {data.totalItems === 1 ? 'producto' : 'productos'}</span>
-        <button type="button" className="auth-submit" onClick={() => { setNotice(null); setMode({ kind: 'create' }) }}>+ Nuevo producto</button>
+        <button type="button" className="auth-submit" onClick={() => setMode({ kind: 'create' })}>+ Nuevo producto</button>
       </div>
 
       {data.items.length === 0 ? (
@@ -207,7 +206,7 @@ export function ProductsPage() {
                   {product.available ? 'Disponible' : 'Agotado'}
                 </label>
                 <button type="button" className="rs-link" disabled={busy}
-                  onClick={() => { setNotice(null); setMode({ kind: 'edit', product }) }}>Editar</button>
+                  onClick={() => setMode({ kind: 'edit', product })}>Editar</button>
                 <button type="button" className="rs-link rs-link-danger" disabled={busy}
                   onClick={() => { if (window.confirm(`¿Retirar «${product.name}»? Esta acción no se puede deshacer.`)) void run(() => withdrawProduct(token, product.id, product.version), 'Producto retirado') }}>
                   Retirar

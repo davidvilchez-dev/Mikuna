@@ -26,7 +26,9 @@ export function LoginPage() {
     try {
       const result = await login(email, password)
       saveSession({ token: result.accessToken, expiresAt: Date.parse(result.expiresAt), role: result.account.role, name: result.account.name })
-      navigate('/mi-cuenta', { replace: true })
+      // Cada rol entra directo a su pantalla de trabajo, sin pasar por el inicio genérico.
+      const landing: Record<string, string> = { CUSTOMER: '/restaurantes', RESTAURANT: '/mi-restaurante' }
+      navigate(landing[result.account.role] ?? '/mi-cuenta', { replace: true })
     } catch (error) {
       setFormError(error instanceof ApiError ? error.message : GENERIC_ERROR)
       setSubmitting(false)

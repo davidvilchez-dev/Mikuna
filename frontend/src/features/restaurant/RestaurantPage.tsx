@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
 import { AppIcon } from '../auth/AppIcon'
+import { notifyError, notifySuccess } from '../ui/notify'
 import { AuthLayout } from '../auth/AuthLayout'
 import { RestaurantLayout } from './RestaurantLayout'
 import { FormField } from '../auth/FormField'
@@ -12,6 +13,7 @@ import {
 
   submitRestaurant,
   updateMyRestaurant,
+  updateImages,
   updateSchedule,
   type Restaurant,
   type RestaurantInput,
@@ -118,7 +120,6 @@ interface ScheduleEditorProps {
 function ScheduleEditor({ restaurant, editable, token, onChange, onFailure }: ScheduleEditorProps) {
   const [days, setDays] = useState<DayForm[]>(() => toDayForms(restaurant.schedule))
   const [errors, setErrors] = useState<ScheduleErrors>({})
-  const [message, setMessage] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   const patch = (day: string, changes: Partial<DayForm>) =>
@@ -126,16 +127,15 @@ function ScheduleEditor({ restaurant, editable, token, onChange, onFailure }: Sc
 
   async function save() {
     if (saving) return
-    setMessage(null)
     const localErrors = validateSchedule(days)
     setErrors(localErrors)
     if (Object.keys(localErrors).length > 0) return
     setSaving(true)
     try {
       onChange(await updateSchedule(token, toOpeningHours(days)))
-      setMessage('Horario guardado')
+      notifySuccess('Horario guardado')
     } catch (error) {
-      setMessage(onFailure(error))
+      notifyError(onFailure(error))
     } finally {
       setSaving(false)
     }
@@ -158,18 +158,65 @@ function ScheduleEditor({ restaurant, editable, token, onChange, onFailure }: Sc
         )
       })}
       {editable && <button type="button" className="auth-submit" onClick={save} disabled={saving}>{saving ? 'Guardando…' : 'Guardar horario'}</button>}
-      {message && <p className="app-success" role="status"><AppIcon name="check" />{message}</p>}
     </div>
   )
 }
 
 /** Solicitud, estado, datos, horario y disponibilidad del restaurante propio (RF-05 y RF-07). */
+interface ImageUploaderProps {
+  restaurant: Restaurant
+  onSave: (logo: File | null, cover: File | null) => Promise<void>
+}
+
+function ImageUploader({ restaurant, onSave }: ImageUploaderProps) {
+  const [logo, setLogo] = useState<File | null>(null)
+  const [cover, setCover] = useState<File | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [inputKey, setInputKey] = useState(0)
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (busy || (!logo && !cover)) return
+    setBusy(true)
+    setError(null)
+    try {
+      await onSave(logo, cover)
+      setLogo(null)
+      setCover(null)
+      setInputKey((n) => n + 1)
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : GENERIC_ERROR)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form className="rs-images" onSubmit={submit} noValidate>
+      <div className="rs-image-field">
+        <label htmlFor="rs-logo">Logo</label>
+        {restaurant.logoUrl && <img className="rs-image-preview rs-image-logo" src={restaurant.logoUrl} alt="Logo actual" />}
+        <input key={'l' + inputKey} id="rs-logo" type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setLogo(e.target.files?.[0] ?? null)} />
+      </div>
+      <div className="rs-image-field">
+        <label htmlFor="rs-cover">Portada</label>
+        {restaurant.coverUrl && <img className="rs-image-preview" src={restaurant.coverUrl} alt="Portada actual" />}
+        <input key={'c' + inputKey} id="rs-cover" type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setCover(e.target.files?.[0] ?? null)} />
+      </div>
+      {error && <p className="auth-alert" role="alert">{error}</p>}
+      <button type="submit" className="auth-submit auth-submit-secondary rs-edit" disabled={busy || (!logo && !cover)}>
+        {busy ? 'Subiendo…' : 'Guardar imágenes'}
+      </button>
+    </form>
+  )
+}
+
 export function RestaurantPage() {
   const navigate = useNavigate()
   const [session] = useState(() => getSession())
   const [state, setState] = useState<ViewState>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
-  const [notice, setNotice] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
 
   const token = session?.token ?? ''
@@ -202,7 +249,7 @@ export function RestaurantPage() {
 
   const show = (restaurant: Restaurant, message: string | null = null) => {
     setState({ kind: 'ready', restaurant })
-    setNotice(message)
+    if (message) notifySuccess(message)
     setEditing(false)
   }
 
@@ -259,7 +306,6 @@ export function RestaurantPage() {
 
   return (
     <RestaurantLayout title="Mi negocio" description="Tus datos, tu horario y tu estado en Mikuna.">
-      {notice && <p className="app-success" role="status"><AppIcon name="check" />{notice}</p>}
 
       <section className={restaurant.available && isApproved ? 'rs-hero' : 'rs-hero'} aria-label="Estado del restaurante">
         <span className="rs-hero-icon"><AppIcon name="store" /></span>
@@ -278,6 +324,21 @@ export function RestaurantPage() {
       )}
 
       <div className="rs-grid">
+        <section className="rs-card" aria-labelledby="images-title">
+          <h2 id="images-title">Imagen del negocio</h2>
+          <p className="auth-description">El logo y la portada se muestran a tus clientes en la lista de restaurantes. JPG, PNG o WebP de hasta 2 MB.</p>
+          <ImageUploader
+            restaurant={restaurant}
+            onSave={async (logo, cover) => {
+              try {
+                show(await updateImages(token, logo, cover), 'Imágenes guardadas')
+              } catch (error) {
+                throw new Error(handleFailure(error), { cause: error })
+              }
+            }}
+          />
+        </section>
+
         <section className="rs-card" aria-labelledby="data-title">
           <h2 id="data-title">Datos del negocio</h2>
           {editing ? (

@@ -93,6 +93,8 @@ export interface PublicRestaurant {
   description: string | null
   zone: string
   attention: Attention
+  logoUrl: string | null
+  coverUrl: string | null
 }
 
 export interface PublicProduct {

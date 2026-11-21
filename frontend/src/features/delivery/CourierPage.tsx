@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
 import { AppIcon } from '../auth/AppIcon'
+import { notifyError, notifySuccess } from '../ui/notify'
 import { AuthLayout } from '../auth/AuthLayout'
 import { clearSession, getSession } from '../auth/session-storage'
 import {
@@ -44,7 +45,6 @@ export function CourierPage() {
   const [session] = useState(() => getSession())
   const [view, setView] = useState<ViewState>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
-  const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null)
   const [rejecting, setRejecting] = useState(false)
   const [reason, setReason] = useState('')
   const [reasonError, setReasonError] = useState<string | undefined>()
@@ -97,13 +97,12 @@ export function CourierPage() {
   async function toggle(available: boolean) {
     if (busy) return
     setBusy(true)
-    setNotice(null)
     try {
       await setAvailability(token, available)
-      setNotice({ text: available ? 'Estás en línea: te asignaremos la siguiente entrega' : 'Te desconectaste: no recibirás nuevas entregas', ok: true })
+      notifySuccess(available ? 'Estás en línea: te asignaremos la siguiente entrega' : 'Te desconectaste: no recibirás nuevas entregas')
       reload()
     } catch (error) {
-      setNotice({ text: fail(error), ok: false })
+      notifyError(fail(error))
     } finally {
       setBusy(false)
     }
@@ -112,16 +111,15 @@ export function CourierPage() {
   async function run(delivery: CourierDelivery, action: CourierAction, reasonText?: string) {
     if (busy) return
     setBusy(true)
-    setNotice(null)
     try {
       await actOnDelivery(token, delivery.orderId, action, reasonText)
-      setNotice({ text: courierDoneMessages[action], ok: true })
+      notifySuccess(courierDoneMessages[action])
       setRejecting(false)
       setReason('')
       reload()
     } catch (error) {
       // 404/409: la entrega cambió (reasignada o ya registrada); se muestra el motivo y se recarga.
-      setNotice({ text: fail(error), ok: false })
+      notifyError(fail(error))
       reload()
     } finally {
       setBusy(false)
@@ -146,9 +144,6 @@ export function CourierPage() {
 
   return (
     <AuthLayout wide title="Entregas" description="Conéctate para recibir pedidos y sigue tu ruta.">
-      {notice && (notice.ok
-        ? <p className="app-success" role="status"><AppIcon name="check" />{notice.text}</p>
-        : <p className="auth-alert" role="alert">{notice.text}</p>)}
       {view.kind === 'loading' && <p className="auth-description" role="status">Cargando…</p>}
       {view.kind === 'error' && (
         <>

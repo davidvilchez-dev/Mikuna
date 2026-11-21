@@ -21,3 +21,40 @@
 .tracking-stages li span:last-child { color: var(--color-mikuna-gray); font-size: 14px; }
 .tracking-location { display: grid; gap: 4px; padding: 14px 16px; border-radius: 12px; background: var(--color-mikuna-peach); }
 .tracking-location a { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+
+/* Datos de entrega y método de pago */
+.checkout-block { display: grid; gap: 14px; }
+.checkout-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 4px 0; }
+.checkout-row p { margin: 2px 0 0; color: var(--color-mikuna-gray); font-size: 14px; }
+.checkout-chip {
+  flex-shrink: 0; padding: 8px 16px; border: 0; border-radius: 999px; cursor: pointer; font: inherit; font-weight: 700; font-size: 14px;
+  background: var(--color-mikuna-peach); color: var(--color-mikuna-orange-deep);
+}
+.checkout-chip:disabled { opacity: .6; cursor: default; }
+.checkout-receiver { display: grid; gap: 12px; padding: 14px; border-radius: 12px; background: #FAFAFB; }
+.checkout-methods { display: grid; gap: 10px; }
+.checkout-method {
+  display: flex; align-items: center; gap: 12px; padding: 14px; border: 1.5px solid var(--app-border); border-radius: 12px; cursor: pointer; font-weight: 700;
+}
+.checkout-method.is-selected { border-color: var(--color-mikuna-orange); background: var(--color-mikuna-peach); }
+.checkout-method input { accent-color: var(--color-mikuna-orange-deep); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.checkout-card-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.checkout-card-field { display: grid; gap: 6px; font-weight: 700; font-size: 14px; }
+.checkout-card-wide { grid-column: 1 / -1; }
+
+/* Panel de tipos de entrega */
+.delivery-types { display: grid; gap: 4px; }
+.delivery-type { display: flex; align-items: center; gap: 14px; padding: 14px 4px; cursor: pointer; font-size: 18px; }
+.delivery-type span { font-size: 28px; }
+.delivery-type strong { flex: 1; }
+.delivery-type input { width: 22px; height: 22px; accent-color: var(--color-mikuna-orange-deep); }
+.delivery-days { display: grid; gap: 18px; max-height: 40vh; overflow-y: auto; padding-top: 14px; border-top: 1px solid var(--app-border); }
+.delivery-days h3 { display: flex; justify-content: space-between; margin: 0 0 10px; font-size: 17px; }
+.delivery-days h3 em { font-style: normal; color: var(--color-mikuna-orange-deep); }
+.delivery-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.delivery-slot {
+  padding: 14px 8px; border: 1.5px solid transparent; border-radius: 12px; background: #F3F4F8; font: inherit; font-weight: 700; font-size: 14px; cursor: pointer;
+}
+.delivery-slot.is-selected { border-color: var(--color-mikuna-orange); background: var(--color-mikuna-peach); }
+.delivery-actions { display: grid; gap: 10px; margin-top: 16px; }

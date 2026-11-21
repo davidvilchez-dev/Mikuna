@@ -26,6 +26,8 @@ export interface Restaurant extends RestaurantInput {
   available: boolean
   schedule: OpeningHour[]
   acceptingOrders: boolean
+  logoUrl: string | null
+  coverUrl: string | null
 }
 
 export interface AdminRestaurant extends Restaurant {
@@ -62,6 +64,13 @@ export function resubmitMyRestaurant(token: string): Promise<Restaurant> {
 
 export function updateSchedule(token: string, days: OpeningHour[]): Promise<Restaurant> {
   return call(ME + '/schedule', token, 'PUT', { days })
+}
+
+export function updateImages(token: string, logo: File | null, cover: File | null): Promise<Restaurant> {
+  const form = new FormData()
+  if (logo) form.append('logo', logo)
+  if (cover) form.append('cover', cover)
+  return apiRequest<Restaurant>(ME + '/images', { method: 'PUT', headers: { Authorization: 'Bearer ' + token }, body: form })
 }
 
 export function setAvailability(token: string, available: boolean): Promise<Restaurant> {

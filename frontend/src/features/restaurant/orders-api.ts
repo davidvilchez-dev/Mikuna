@@ -9,7 +9,8 @@ export interface RestaurantOrder {
   lines: { productId: string; name: string; unitPrice: number; quantity: number; lineTotal: number }[]
   delivery: { label: string | null; street: string; district: string; reference: string | null; contactPhone: string | null }
   totals: { subtotal: number; deliveryFee: number; commission: number; total: number }
-  payment: { status: 'AUTHORIZED' | 'CAPTURED' | 'RELEASED' }
+  payment: { method: 'CARD' | 'CASH'; status: 'AUTHORIZED' | 'CAPTURED' | 'RELEASED' }
+  options: { storeNote: string | null; scheduledFor: string | null; receiver: { name: string; phone: string; note: string | null } | null }
   createdAt: string
 }
 

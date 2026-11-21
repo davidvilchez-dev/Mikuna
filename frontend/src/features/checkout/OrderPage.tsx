@@ -5,7 +5,7 @@ import { AuthLayout } from '../auth/AuthLayout'
 import { clearSession, getSession } from '../auth/session-storage'
 import { formatPrice } from '../catalog/catalog-validation'
 import { canCustomerCancel, orderStatusLabels } from '../restaurant/orders-logic'
-import { cancelOrder, getOrder, paymentStatusLabels, type Order } from './checkout-api'
+import { cancelOrder, getOrder, paymentStatusLabel, type Order } from './checkout-api'
 import { getTracking, type Tracking } from './tracking-api'
 import {
   TRACKING_POLL_MS,
@@ -161,6 +161,9 @@ export function OrderPage() {
           ))}
         </ul>
         <p className="auth-hint">Entrega en: {order.delivery.street}, {order.delivery.district}{order.delivery.reference ? ` (${order.delivery.reference})` : ''}</p>
+        <p className="auth-hint">Horario: {order.options.scheduledFor ? new Date(order.options.scheduledFor).toLocaleString('es-PE', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Entrega inmediata'}</p>
+        {order.options.receiver && <p className="auth-hint">Recibe: {order.options.receiver.name} ({order.options.receiver.phone}){order.options.receiver.note ? ` · ${order.options.receiver.note}` : ''}</p>}
+        {order.options.storeNote && <p className="auth-hint">Nota para la tienda: {order.options.storeNote}</p>}
       </section>
       </div>
       <aside className="cart-side">
@@ -172,7 +175,7 @@ export function OrderPage() {
           <div><dt>Comisión</dt><dd>{formatPrice(order.totals.commission)}</dd></div>
           <div className="cart-total"><dt>Total</dt><dd>{formatPrice(order.totals.total)}</dd></div>
         </dl>
-        <p className="auth-hint">Tu pago: {paymentStatusLabels[order.payment.status]}.</p>
+        <p className="auth-hint">Tu pago: {paymentStatusLabel(order.payment.method, order.payment.status)}.</p>
       </section>
       {canCustomerCancel(status) && (
         <button type="button" className="auth-submit auth-submit-secondary cart-cancel" disabled={busy} onClick={() => void cancel()}>

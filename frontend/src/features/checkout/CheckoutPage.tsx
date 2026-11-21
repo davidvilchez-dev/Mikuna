@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { loadStripe } from '@stripe/stripe-js'
-import { CardElement, Elements, useElements, useStripe } from '@stripe/react-stripe-js'
+import { CardCvcElement, CardExpiryElement, CardNumberElement, Elements, useElements, useStripe } from '@stripe/react-stripe-js'
 import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
 import { AuthLayout } from '../auth/AuthLayout'
 import { clearSession, getSession } from '../auth/session-storage'
 import { formatPrice } from '../catalog/catalog-validation'
-import { confirmOrder, getCheckout, type Checkout } from './checkout-api'
+import { confirmOrder, getCheckout, type Checkout, type PaymentChoice } from './checkout-api'
+import { AddressDialog } from '../auth/AddressDialog'
+import { describeSlot, validateReceiver } from './checkout-options'
+import { DeliveryTimeDialog } from './DeliveryTimeDialog'
 import { blockerLabels, confirmationErrorMessage, newConfirmationKey } from './checkout-validation'
 import '../restaurant/restaurant.css'
 import '../cart/cart.css'
@@ -104,7 +107,7 @@ function CheckoutView({ checkout, token, onRefresh, onFailure }: ViewProps) {
           <div><dt>Comisión</dt><dd>{totals.commission === null ? '-' : formatPrice(totals.commission)}</dd></div>
           <div className="cart-total"><dt>Total</dt><dd>{totals.total === null ? '-' : formatPrice(totals.total)}</dd></div>
         </dl>
-        <p className="auth-hint">Al confirmar se reserva el monto en tu tarjeta; solo se cobra cuando el restaurante acepte el pedido.</p>
+        <p className="auth-hint">Con tarjeta se reserva el monto y solo se cobra cuando el restaurante acepte el pedido. En efectivo pagas al recibir.</p>
       </section>
       </aside>
       </div>
@@ -121,23 +124,58 @@ function PaymentForm({ checkout, token, onRefresh, onFailure }: ViewProps) {
   // Misma clave en los reintentos del mismo intento; nueva solo tras cambiar los importes o la tarjeta.
   const [confirmationKey, setConfirmationKey] = useState(() => newConfirmationKey())
 
+  const [method, setMethod] = useState<PaymentChoice>('CARD')
+  const [storeNote, setStoreNote] = useState('')
+  const [showNote, setShowNote] = useState(false)
+  const [scheduledFor, setScheduledFor] = useState('')
+  const [forOther, setForOther] = useState(false)
+  const [receiver, setReceiver] = useState({ name: '', phone: '', note: '' })
+  const [receiverError, setReceiverError] = useState<string | null>(null)
+  const [changingAddress, setChangingAddress] = useState(false)
+  const [timeOpen, setTimeOpen] = useState(false)
+
   const total = checkout.cart.totals.total
+  const cart = checkout.cart
+
+  /** Al cerrar el panel de direcciones se vuelve a leer el resumen: la dirección elegida cambia el envío. */
+  async function addressDialogClosed() {
+    setChangingAddress(false)
+    try {
+      onRefresh(await getCheckout(token))
+      setConfirmationKey(newConfirmationKey())
+    } catch (failure) {
+      setError(onFailure(failure))
+    }
+  }
 
   async function submit(event: React.SyntheticEvent) {
     event.preventDefault()
-    if (busy || !stripe || !elements || total === null) return
-    const card = elements.getElement(CardElement)
-    if (!card) return
+    if (busy || total === null) return
+    if (forOther) {
+      const problem = validateReceiver(receiver)
+      setReceiverError(problem)
+      if (problem) return
+    }
+    let paymentMethodId: string | null = null
     setBusy(true)
     setError(null)
     try {
-      const created = await stripe.createPaymentMethod({ type: 'card', card })
-      if (created.error || !created.paymentMethod) {
-        setError(created.error?.message ?? 'No se pudo leer la tarjeta. Revisa los datos.')
-        setConfirmationKey(newConfirmationKey())
-        return
+      if (method === 'CARD') {
+        const card = elements?.getElement(CardNumberElement)
+        if (!stripe || !elements || !card) return
+        const created = await stripe.createPaymentMethod({ type: 'card', card })
+        if (created.error || !created.paymentMethod) {
+          setError(created.error?.message ?? 'No se pudo leer la tarjeta. Revisa los datos.')
+          setConfirmationKey(newConfirmationKey())
+          return
+        }
+        paymentMethodId = created.paymentMethod.id
       }
-      const order = await confirmOrder(token, confirmationKey, created.paymentMethod.id, total)
+      const order = await confirmOrder(token, confirmationKey, method, paymentMethodId, total, {
+        storeNote: storeNote.trim() || null,
+        scheduledFor: scheduledFor || null,
+        receiver: forOther ? { name: receiver.name.trim(), phone: receiver.phone.trim(), note: receiver.note.trim() || null } : null,
+      })
       navigate('/pedido/' + order.id, { replace: true })
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 409 && failure.code === 'AMOUNTS_CHANGED') {
@@ -155,13 +193,99 @@ function PaymentForm({ checkout, token, onRefresh, onFailure }: ViewProps) {
   }
 
   return (
-    <form className="cart-section checkout-form" onSubmit={submit} noValidate>
-      <h2>Método de pago</h2>
-      <p className="auth-hint">{checkout.paymentMethods.map((m) => m.label).join(', ')}. Los datos de tu tarjeta los procesa Stripe (modo de pruebas); Mikuna nunca los guarda.</p>
-      <div className="checkout-card"><CardElement options={{ hidePostalCode: true }} /></div>
-      {error && <p className="auth-alert" role="alert">{error}</p>}
-      <button type="submit" className="auth-submit" disabled={busy || !stripe || total === null}>{busy ? 'Procesando...' : 'Confirmar pedido'}</button>
-      <Link to="/carrito" className="auth-switch">Volver al carrito</Link>
+    <form className="checkout-form" onSubmit={submit} noValidate>
+      <section className="cart-section checkout-block">
+        <h2>Datos de entrega</h2>
+
+        <div className="checkout-row">
+          <div>
+            <strong>Dirección de entrega</strong>
+            <p>{cart.address ? `${cart.address.street}, ${cart.address.district}` : 'Sin dirección'}</p>
+          </div>
+          <button type="button" className="checkout-chip" disabled={busy} onClick={() => setChangingAddress(true)}>Cambiar</button>
+        </div>
+        {changingAddress && (
+          <AddressDialog token={token} selectedId={cart.address?.id ?? null} onClose={() => void addressDialogClosed()} />
+        )}
+
+        <div className="checkout-row">
+          <div>
+            <strong>Horario de entrega</strong>
+            <p>{scheduledFor ? describeSlot(scheduledFor) : 'Entrega inmediata'}</p>
+          </div>
+          <button type="button" className="checkout-chip" onClick={() => setTimeOpen(true)}>Cambiar</button>
+        </div>
+        {timeOpen && <DeliveryTimeDialog value={scheduledFor} onConfirm={setScheduledFor} onClose={() => setTimeOpen(false)} />}
+
+        <div className="checkout-row">
+          <div>
+            <strong>Nota para la tienda</strong>
+            {storeNote && !showNote && <p>{storeNote}</p>}
+          </div>
+          <button type="button" className="checkout-chip" onClick={() => setShowNote((v) => !v)}>{showNote ? 'Listo' : storeNote ? 'Editar' : 'Agregar'}</button>
+        </div>
+        {showNote && (
+          <div className="auth-field">
+            <label htmlFor="checkout-note" className="visually-hidden">Nota para la tienda</label>
+            <textarea id="checkout-note" rows={3} maxLength={300} value={storeNote} placeholder="Ej. Sin cebolla, por favor" onChange={(e) => setStoreNote(e.target.value)} />
+          </div>
+        )}
+
+        <div className="checkout-row">
+          <div>
+            <strong>¿Quién recibirá el pedido?</strong>
+            <p>{forOther ? (receiver.name.trim() || 'Otra persona') : 'Yo mismo'}</p>
+          </div>
+          <button type="button" className="checkout-chip" onClick={() => { setForOther((v) => !v); setReceiverError(null) }}>{forOther ? 'Yo mismo' : 'Cambiar'}</button>
+        </div>
+        {forOther && (
+          <div className="checkout-receiver">
+            <div className="auth-field"><label htmlFor="rc-name">Nombre de quien recibe</label>
+              <input id="rc-name" maxLength={80} value={receiver.name} onChange={(e) => setReceiver({ ...receiver, name: e.target.value })} /></div>
+            <div className="auth-field"><label htmlFor="rc-phone">Teléfono</label>
+              <input id="rc-phone" type="tel" maxLength={20} value={receiver.phone} onChange={(e) => setReceiver({ ...receiver, phone: e.target.value })} /></div>
+            <div className="auth-field"><label htmlFor="rc-note">Nota para la entrega (opcional)</label>
+              <textarea id="rc-note" rows={2} maxLength={300} value={receiver.note} placeholder="Ej. Tocar el timbre del 2.º piso" onChange={(e) => setReceiver({ ...receiver, note: e.target.value })} /></div>
+            {receiverError && <p className="auth-alert" role="alert">{receiverError}</p>}
+          </div>
+        )}
+      </section>
+
+      <section className="cart-section checkout-block">
+        <h2>Método de pago</h2>
+        <div className="checkout-methods" role="radiogroup" aria-label="Método de pago">
+          {checkout.paymentMethods.map((m) => (
+            <label key={m.code} className={'checkout-method' + (method === m.code ? ' is-selected' : '')}>
+              <input type="radio" name="payment-method" value={m.code} checked={method === m.code} onChange={() => setMethod(m.code as PaymentChoice)} />
+              <span>{m.label}</span>
+            </label>
+          ))}
+        </div>
+        {method === 'CARD' ? (
+          <>
+            <p className="auth-hint">Los datos de tu tarjeta los procesa Stripe (modo de pruebas); Mikuna nunca los guarda.</p>
+            <div className="checkout-card-fields">
+              <label className="checkout-card-field checkout-card-wide">
+                <span>Número de tarjeta</span>
+                <div className="checkout-card"><CardNumberElement options={{ showIcon: true, placeholder: '1234 1234 1234 1234' }} /></div>
+              </label>
+              <label className="checkout-card-field">
+                <span>Fecha de vencimiento</span>
+                <div className="checkout-card"><CardExpiryElement options={{ placeholder: 'MM / AA' }} /></div>
+              </label>
+              <label className="checkout-card-field">
+                <span>Código de seguridad</span>
+                <div className="checkout-card"><CardCvcElement options={{ placeholder: 'CVC' }} /></div>
+              </label>
+            </div>
+          </>
+        ) : (
+          <p className="auth-hint">Pagarás en efectivo al repartidor cuando recibas el pedido.</p>
+        )}
+        {error && <p className="auth-alert" role="alert">{error}</p>}
+        <button type="submit" className="auth-submit" disabled={busy || total === null || (method === 'CARD' && !stripe)}>{busy ? 'Procesando...' : 'Ordenar ahora'}</button>
+        <Link to="/carrito" className="auth-switch">Volver al carrito</Link>
+      </section>
     </form>
   )
 }

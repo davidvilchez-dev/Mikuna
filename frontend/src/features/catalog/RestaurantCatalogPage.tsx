@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
 import { AuthLayout } from '../auth/AuthLayout'
+import { notifyAddedToCart, notifyError } from '../ui/notify'
 import { clearSession, getSession } from '../auth/session-storage'
 import { addToCart, clearCart } from '../cart/cart-api'
 import { attentionLabels, getCatalog, type Catalog, type PublicProduct } from './catalog-api'
 import { formatPrice } from './catalog-validation'
+import { ProductDialog } from './ProductDialog'
+import { parseDescription } from './product-description'
 import '../cart/cart.css'
 import './catalog.css'
 
@@ -30,7 +33,7 @@ function groupByCategory(products: PublicProduct[]): { category: string; items: 
 export function RestaurantCatalogPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
-  const [cartMessage, setCartMessage] = useState<string | null>(null)
+  const [selected, setSelected] = useState<PublicProduct | null>(null)
   const [adding, setAdding] = useState(false)
   const [page, setPage] = useState(0)
   const [attempt, setAttempt] = useState(0)
@@ -48,8 +51,8 @@ export function RestaurantCatalogPage() {
     return () => { active = false }
   }, [id, page, attempt])
 
-  /** Agrega una unidad al carrito (RF-11). Sin sesión lleva a iniciar sesión; el backend valida rol y elegibilidad. */
-  async function add(product: PublicProduct) {
+  /** Agrega unidades al carrito (RF-11). Sin sesión lleva a iniciar sesión; el backend valida rol y elegibilidad. */
+  async function add(product: PublicProduct, quantity = 1) {
     const session = getSession()
     if (!session) {
       navigate('/iniciar-sesion')
@@ -57,25 +60,24 @@ export function RestaurantCatalogPage() {
     }
     if (adding) return
     setAdding(true)
-    setCartMessage(null)
     try {
       try {
-        await addToCart(session.token, product.id, 1)
+        await addToCart(session.token, product.id, quantity)
       } catch (error) {
         if (!(error instanceof ApiError && error.code === 'CART_OTHER_RESTAURANT')) throw error
         if (!window.confirm('Tu carrito es de otro restaurante. ¿Vaciarlo y agregar este producto?')) return
         await clearCart(session.token)
-        await addToCart(session.token, product.id, 1)
+        await addToCart(session.token, product.id, quantity)
       }
-      setCartMessage(`«${product.name}» se agregó a tu carrito.`)
+      notifyAddedToCart(product.name, quantity)
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         clearSession()
         navigate('/iniciar-sesion')
       } else if (error instanceof ApiError && error.status === 403) {
-        setCartMessage('Solo las cuentas de cliente pueden agregar productos al carrito.')
+        notifyError('Solo las cuentas de cliente pueden agregar productos al carrito.')
       } else {
-        setCartMessage(error instanceof ApiError ? error.message : GENERIC_ERROR)
+        notifyError(error instanceof ApiError ? error.message : GENERIC_ERROR)
       }
     } finally {
       setAdding(false)
@@ -109,9 +111,24 @@ export function RestaurantCatalogPage() {
   const notAttending = restaurant.attention !== 'OPEN'
 
   return (
-    <AuthLayout title={restaurant.name} description={`${restaurant.category} · ${restaurant.zone}`} wide>
-      <p><span className={'catalog-attention catalog-attention-' + restaurant.attention.toLowerCase()}>{attentionLabels[restaurant.attention]}</span></p>
-      {restaurant.description && <p className="auth-description">{restaurant.description}</p>}
+    <AuthLayout
+      title={restaurant.name}
+      description={`${restaurant.category} · ${restaurant.zone}`}
+      wide
+      hero={(
+        <div className="catalog-hero">
+          {restaurant.coverUrl
+            ? <img className="catalog-hero-cover" src={restaurant.coverUrl} alt="" />
+            : <div className="catalog-hero-cover catalog-hero-empty" aria-hidden="true" />}
+          <div className="catalog-hero-row">
+            <span className="catalog-logo catalog-logo-lg" aria-hidden="true">
+              {restaurant.logoUrl ? <img src={restaurant.logoUrl} alt="" /> : restaurant.name.charAt(0)}
+            </span>
+            <span className={'catalog-attention catalog-attention-' + restaurant.attention.toLowerCase()}>{attentionLabels[restaurant.attention]}</span>
+          </div>
+        </div>
+      )}
+    >
       {notAttending && (
         <p className="catalog-banner" role="status">
           {restaurant.attention === 'PAUSED'
@@ -129,13 +146,15 @@ export function RestaurantCatalogPage() {
             <ul className="catalog-products">
               {group.items.map((product) => (
                 <li className="catalog-product" key={product.id}>
-                  <img src={product.imageUrl} alt={product.name} loading="lazy" />
-                  <div className="catalog-product-body">
-                    <h3>{product.name}</h3>
-                    {product.description && <p>{product.description}</p>}
-                    <p className="catalog-price">{formatPrice(product.price)}</p>
-                    <button type="button" className="auth-submit cart-add" disabled={adding || notAttending} onClick={() => add(product)}>Agregar al carrito</button>
-                  </div>
+                  <button type="button" className="catalog-product-open" onClick={() => setSelected(product)} aria-label={`Ver detalle de ${product.name}`}>
+                    <img src={product.imageUrl} alt="" loading="lazy" />
+                    <span className="catalog-product-text">
+                      <h3>{product.name}</h3>
+                      {parseDescription(product.description).summary && <span className="catalog-product-summary">{parseDescription(product.description).summary}</span>}
+                      <span className="catalog-price">{formatPrice(product.price)}</span>
+                    </span>
+                  </button>
+                  <button type="button" className="auth-submit cart-add" disabled={adding || notAttending} onClick={() => add(product)}>Agregar al carrito</button>
                 </li>
               ))}
             </ul>
@@ -143,7 +162,6 @@ export function RestaurantCatalogPage() {
         ))
       )}
 
-      {cartMessage && <p className="auth-notice" role="status">{cartMessage} <Link to="/carrito">Ver carrito</Link></p>}
 
       {products.totalPages > 1 && (
         <nav className="catalog-pager" aria-label="Paginación">
@@ -151,6 +169,10 @@ export function RestaurantCatalogPage() {
           <span>Página {page + 1} de {products.totalPages}</span>
           <button type="button" className="auth-submit auth-submit-secondary" disabled={page + 1 >= products.totalPages} onClick={() => setPage(page + 1)}>Siguiente</button>
         </nav>
+      )}
+
+      {selected && (
+        <ProductDialog product={selected} canAdd={!adding && !notAttending} onAdd={(quantity) => add(selected, quantity)} onClose={() => setSelected(null)} />
       )}
 
       <Link to="/restaurantes" className="auth-switch">Volver a la búsqueda</Link>

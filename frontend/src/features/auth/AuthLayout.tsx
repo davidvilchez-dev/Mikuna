@@ -9,16 +9,19 @@ interface AuthLayoutProps {
   children: ReactNode
   /** Contenido ancho para listas, tablas y cuadrículas; sin él, una tarjeta centrada. */
   wide?: boolean
+  /** Imagen de cabecera que va encima del título (portada de un restaurante). */
+  hero?: ReactNode
 }
 
 /** Marco común de las pantallas con sesión: encabezado de la aplicación y contenido con su título. */
-export function AuthLayout({ title, description, children, wide }: AuthLayoutProps) {
+export function AuthLayout({ title, description, children, wide, hero }: AuthLayoutProps) {
   return (
     <div className="app-shell">
       <AppHeader />
       <main className="app-main">
         <div className={wide ? 'app-container app-container-wide' : 'app-container'}>
           <section aria-labelledby="auth-title" className={wide ? 'app-section' : 'app-section app-card'}>
+            {hero}
             <div className="app-title">
               <h1 id="auth-title">{title}</h1>
               {description && <p className="auth-description">{description}</p>}
