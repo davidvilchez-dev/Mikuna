@@ -5,11 +5,12 @@ import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     react(),
     tailwindcss(),
-    babel({ presets: [reactCompilerPreset()] })
+    // El React Compiler es lento: solo se aplica en build, no en el servidor de desarrollo.
+    ...(command === 'build' ? [babel({ presets: [reactCompilerPreset()] })] : []),
   ],
   server: {
     // La API se sirve desde Spring Boot; el proxy evita configurar CORS en local.
@@ -37,4 +38,4 @@ export default defineConfig({
       thresholds: { lines: 90 },
     },
   },
-})
+}))

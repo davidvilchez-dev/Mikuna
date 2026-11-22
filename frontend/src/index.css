@@ -8,7 +8,7 @@
   --color-mikuna-peach: #FDE8D8;
   --color-mikuna-gray: #464B53;
   --color-mikuna-white: #FFFFFF;
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-sans: "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
   --font-display: var(--font-sans);
 }
 
