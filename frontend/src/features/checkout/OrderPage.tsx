@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router'
 import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
 import { AuthLayout } from '../auth/AuthLayout'
@@ -10,15 +10,15 @@ import { getTracking, type Tracking } from './tracking-api'
 import {
   TRACKING_POLL_MS,
   formatAge,
-  formatCoordinates,
   formatStageTime,
   isFinalStatus,
   locationReasonMessages,
-  mapUrl,
 } from './tracking-logic'
 import '../restaurant/restaurant.css'
 import '../cart/cart.css'
 import './checkout.css'
+
+const RouteMap = lazy(() => import('../delivery/RouteMap'))
 
 type ViewState =
   | { kind: 'loading' }
@@ -143,10 +143,17 @@ export function OrderPage() {
             ))}
           </ol>
           {tracking.courierLocation ? (
-            <div className="tracking-location" role="status">
-              <p>Tu repartidor está en: {formatCoordinates(tracking.courierLocation.latitude, tracking.courierLocation.longitude)}</p>
-              <p className="auth-hint">Actualizada {formatAge(tracking.courierLocation.updatedAt, now)}</p>
-              <a href={mapUrl(tracking.courierLocation.latitude, tracking.courierLocation.longitude)} target="_blank" rel="noopener noreferrer">Abrir en mapa</a>
+            <div className="tracking-location tracking-map" role="status">
+              <Suspense fallback={<p className="auth-hint">Cargando el mapa…</p>}>
+                <RouteMap
+                  ariaLabel="Mapa con la ubicación de tu repartidor"
+                  points={[
+                    { kind: 'courier', latitude: tracking.courierLocation.latitude, longitude: tracking.courierLocation.longitude, label: 'Tu repartidor' },
+                    ...(tracking.destination ? [{ kind: 'dropoff' as const, latitude: tracking.destination.latitude, longitude: tracking.destination.longitude, label: 'Tu entrega' }] : []),
+                  ]}
+                />
+              </Suspense>
+              <p className="auth-hint">Ubicación actualizada {formatAge(tracking.courierLocation.updatedAt, now)}</p>
             </div>
           ) : tracking.locationUnavailableReason && (
             <p className="auth-hint" role="status">{locationReasonMessages[tracking.locationUnavailableReason]}</p>

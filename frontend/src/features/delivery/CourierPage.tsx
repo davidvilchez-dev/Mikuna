@@ -27,11 +27,12 @@ import {
   validateDeliveryReason,
   type CourierAction,
 } from './courier-logic'
+import type { RoutePoint } from './RouteMap'
 import { sharingMessages, startLocationSharing, type SharingState } from './location-sender'
 import './courier.css'
 
 /** Leaflet solo se descarga cuando hay una entrega con punto marcado. */
-const DeliveryMap = lazy(() => import('./DeliveryMap'))
+const RouteMap = lazy(() => import('./RouteMap'))
 
 type ViewState =
   | { kind: 'loading' }
@@ -50,6 +51,10 @@ export function CourierPage() {
   const [reasonError, setReasonError] = useState<string | undefined>()
   const [busy, setBusy] = useState(false)
   const [sharing, setSharing] = useState<SharingState>('idle')
+  // Cambia cuando el repartidor pulsa «Compartir mi ubicación»: reinicia la escucha del GPS (y con ello el permiso).
+  const [shareAttempt, setShareAttempt] = useState(0)
+  // Última posición del propio repartidor (la que se envía al cliente); alimenta el mapa de la entrega.
+  const [myPosition, setMyPosition] = useState<{ latitude: number; longitude: number } | null>(null)
 
   const token = session?.token ?? ''
 
@@ -87,8 +92,11 @@ export function CourierPage() {
   const hasActiveDelivery = view.kind === 'ready' && view.deliveries.length > 0
   useEffect(() => {
     if (!token || !hasActiveDelivery) return
-    return startLocationSharing((position) => sendLocation(token, position), setSharing)
-  }, [token, hasActiveDelivery])
+    return startLocationSharing((position) => {
+      setMyPosition({ latitude: position.latitude, longitude: position.longitude })
+      return sendLocation(token, position)
+    }, setSharing)
+  }, [token, hasActiveDelivery, shareAttempt])
 
   if (!session) return <Navigate to="/iniciar-sesion" replace />
 
@@ -169,6 +177,29 @@ export function CourierPage() {
             </button>
           </section>
 
+          {hasActiveDelivery && (
+            <section className={'cr-share cr-share-' + sharing} role={sharing === 'denied' ? 'alert' : 'status'} aria-label="Ubicación">
+              <span className="cr-share-icon"><AppIcon name="navigate" /></span>
+              <div className="cr-share-text">
+                <strong>
+                  {sharing === 'sharing' ? 'Compartiendo tu ubicación' : sharing === 'denied' ? 'Ubicación bloqueada' : sharing === 'unsupported' ? 'Ubicación no disponible' : sharing === 'error' ? 'No se pudo enviar tu ubicación' : 'Comparte tu ubicación'}
+                </strong>
+                <small>
+                  {sharing === 'sharing' ? 'El cliente ve en el mapa por dónde vienes.'
+                    : sharing === 'denied' ? 'Toca el candado junto a la dirección del navegador, abre «Permisos» y elige «Ubicación: Permitir». Luego pulsa el botón.'
+                    : sharing === 'unsupported' ? sharingMessages.unsupported
+                    : sharing === 'error' ? 'Se reintentará sola; si sigue fallando, pulsa el botón.'
+                    : 'El navegador te pedirá permiso. Así el cliente puede seguir su pedido en vivo.'}
+                </small>
+              </div>
+              {sharing !== 'sharing' && sharing !== 'unsupported' && (
+                <button type="button" className="auth-submit" onClick={() => setShareAttempt((n) => n + 1)}>
+                  {sharing === 'denied' ? 'Ya la permití, reintentar' : 'Compartir mi ubicación'}
+                </button>
+              )}
+            </section>
+          )}
+
           {view.deliveries.length === 0 && (
             <div className="cr-empty" role="status">
               <span className={view.availability.available ? 'cr-empty-icon cr-pulse' : 'cr-empty-icon'}><AppIcon name="scooter" /></span>
@@ -188,7 +219,12 @@ export function CourierPage() {
             const step = currentStep(delivery.status)
             const phone = phoneHref(delivery.delivery.phone)
             const { latitude, longitude } = delivery.delivery
-            const hasPoint = latitude !== null && longitude !== null
+            const pickup = delivery.restaurant
+            const mapPoints: RoutePoint[] = []
+            if (myPosition) mapPoints.push({ kind: 'courier', ...myPosition, label: 'Tú' })
+            if (pickup.latitude !== null && pickup.longitude !== null) mapPoints.push({ kind: 'pickup', latitude: pickup.latitude, longitude: pickup.longitude, label: 'Recoger aquí' })
+            if (latitude !== null && longitude !== null) mapPoints.push({ kind: 'dropoff', latitude, longitude, label: 'Entregar aquí' })
+            const hasPoint = mapPoints.length > 0
             const options = courierActions(delivery.status)
             const main = options.find((option) => option.action !== 'reject')
             const canReject = options.some((option) => option.action === 'reject')
@@ -243,14 +279,21 @@ export function CourierPage() {
 
                   <div className="cr-map-wrap">
                     {hasPoint ? (
+                      <>
                       <Suspense fallback={<p className="auth-description" role="status">Cargando el mapa…</p>}>
-                        <DeliveryMap latitude={latitude} longitude={longitude} />
+                        <RouteMap points={mapPoints} ariaLabel="Mapa de la entrega: tu ubicación, el local y el destino" />
                       </Suspense>
+                      <div className="rm-legend" aria-hidden="true">
+                        {myPosition && <span><i className="rm-l-courier" />Tú</span>}
+                        {mapPoints.some((p) => p.kind === 'pickup') && <span><i className="rm-l-pickup" />Recoger</span>}
+                        {mapPoints.some((p) => p.kind === 'dropoff') && <span><i className="rm-l-dropoff" />Entregar</span>}
+                      </div>
+                      </>
                     ) : (
                       <div className="cr-nomap">
                         <AppIcon name="pin" />
-                        <strong>El cliente no marcó el punto en el mapa</strong>
-                        <p>Usa la dirección y la referencia, o toca «Cómo llegar» para buscarla.</p>
+                        <strong>Todavía no hay puntos para mostrar</strong>
+                        <p>Usa la dirección y la referencia, o toca «Cómo llegar» para buscarla. Tu ubicación aparecerá aquí al compartirla.</p>
                       </div>
                     )}
                   </div>

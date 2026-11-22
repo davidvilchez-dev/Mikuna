@@ -46,7 +46,7 @@ const MENU_BY_ROLE: Record<string, NavItem[]> = {
 
 const FALLBACK_MENU: NavItem[] = [{ to: '/mi-cuenta', label: 'Mi perfil', icon: 'user' }]
 
-interface CustomerBar { count: number; address: { id: string; street: string; district: string } | null }
+interface CustomerBar { count: number; address: { id: string; street: string; district: string } | null }  // el carrito trae también latitude/longitude
 
 /** Cantidad de unidades en el carrito y dirección de entrega elegida; se renueva cuando cambian el carrito o las direcciones. */
 function useCustomerBar(token: string | null): CustomerBar {

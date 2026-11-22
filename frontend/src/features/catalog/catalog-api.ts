@@ -1,3 +1,4 @@
+import { panelHeaders } from '../restaurant/branch-storage'
 import { apiRequest } from '../auth/auth-api'
 
 export interface PageResponse<T> {
@@ -42,7 +43,7 @@ export interface ProductData {
 const PRODUCTS = '/api/restaurant/me/products'
 
 function auth(token: string): HeadersInit {
-  return { Authorization: 'Bearer ' + token }
+  return panelHeaders(token)
 }
 
 /** Parte JSON «product» + parte binaria «image» (la versión solo se envía al editar). */
@@ -95,6 +96,10 @@ export interface PublicRestaurant {
   attention: Attention
   logoUrl: string | null
   coverUrl: string | null
+  /** Distancia al punto de entrega, si se conoce. */
+  distanceKm: number | null
+  /** Sucursales de la marca; el listado muestra la más cercana. */
+  branchCount: number
 }
 
 export interface PublicProduct {
@@ -121,6 +126,8 @@ export interface SearchCriteria {
   category: string
   zone: string
   page: number
+  /** Punto de entrega del cliente: sirve para elegir la sucursal más cercana de cada marca. */
+  point?: { latitude: number; longitude: number } | null
 }
 
 const PUBLIC = '/api/public/restaurants'
@@ -130,7 +137,21 @@ export function searchRestaurants(criteria: SearchCriteria): Promise<PageRespons
   if (criteria.name.trim()) params.set('name', criteria.name.trim())
   if (criteria.category) params.set('category', criteria.category)
   if (criteria.zone) params.set('zone', criteria.zone)
+  if (criteria.point) {
+    params.set('lat', String(criteria.point.latitude))
+    params.set('lng', String(criteria.point.longitude))
+  }
   return apiRequest(`${PUBLIC}?${params.toString()}`)
+}
+
+export interface CopyMenuResult {
+  copied: number
+  skipped: number
+}
+
+/** Copia a la sucursal actual la carta de otra sucursal de la misma cuenta. */
+export function copyMenuFrom(token: string, sourceId: string): Promise<CopyMenuResult> {
+  return apiRequest(`${PRODUCTS}/copy-from/${sourceId}`, { method: 'POST', headers: auth(token) })
 }
 
 export function getFilters(): Promise<Filters> {

@@ -4,8 +4,12 @@ import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
 import { AppIcon } from '../auth/AppIcon'
 import { notifyError, notifySuccess } from '../ui/notify'
 import { RestaurantLayout } from '../restaurant/RestaurantLayout'
+import { Modal } from '../ui/Modal'
 import { clearSession, getSession } from '../auth/session-storage'
+import { getBranchId } from '../restaurant/branch-storage'
+import { listBranches, type Restaurant } from '../restaurant/restaurant-api'
 import {
+  copyMenuFrom,
   createProduct,
   listMyProducts,
   setProductAvailability,
@@ -32,6 +36,55 @@ const emptyData: ProductData = { name: '', category: '', description: '', price:
 
 function toData(product: Product): ProductData {
   return { name: product.name, category: product.category, description: product.description ?? '', price: product.price.toFixed(2) }
+}
+
+/** Ofrece copiar la carta de otra sucursal aprobada de la misma cuenta a la sucursal actual. */
+function CopyMenu({ token, onCopied, onFailure }: { token: string; onCopied: (message: string) => void; onFailure: (error: unknown) => string }) {
+  const [others, setOthers] = useState<Restaurant[]>([])
+  const [source, setSource] = useState('')
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    listBranches(token).then((all) => {
+      if (!active) return
+      const currentId = getBranchId() ?? all[0]?.id
+      const list = all.filter((branch) => branch.id !== currentId && branch.status === 'APPROVED')
+      setOthers(list)
+      setSource(list[0]?.id ?? '')
+    }).catch(() => { /* sin sucursales la opción no aparece */ })
+    return () => { active = false }
+  }, [token])
+
+  if (others.length === 0) return null
+
+  async function copy() {
+    if (busy || !source) return
+    setBusy(true)
+    try {
+      const result = await copyMenuFrom(token, source)
+      onCopied(result.copied === 0
+        ? 'No había productos nuevos para copiar'
+        : `Se copiaron ${result.copied} ${result.copied === 1 ? 'producto' : 'productos'}` + (result.skipped > 0 ? ` (${result.skipped} ya existían)` : ''))
+    } catch (error) {
+      notifyError(onFailure(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!open) return <button type="button" className="auth-submit auth-submit-secondary" onClick={() => setOpen(true)}>Copiar carta de otra sucursal</button>
+  return (
+    <div className="rs-copy">
+      <label htmlFor="copy-source">Copiar desde</label>
+      <select id="copy-source" value={source} onChange={(e) => setSource(e.target.value)} disabled={busy}>
+        {others.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+      </select>
+      <button type="button" className="auth-submit" onClick={() => void copy()} disabled={busy}>{busy ? 'Copiando…' : 'Copiar'}</button>
+      <button type="button" className="auth-submit auth-submit-secondary" onClick={() => setOpen(false)} disabled={busy}>Cancelar</button>
+    </div>
+  )
 }
 
 /** Gestión del catálogo propio del restaurante aprobado (RF-08). */
@@ -119,61 +172,15 @@ export function ProductsPage() {
     )
   }
 
-  if (mode.kind === 'create') {
-    return (
-      <RestaurantLayout title="Nuevo producto" description="Se publica como disponible apenas lo guardes.">
-        <ProductForm
-          initial={emptyData}
-          submitLabel="Guardar producto"
-          onCancel={() => setMode({ kind: 'list' })}
-          onSubmit={async (data, image) => {
-            try {
-              await createProduct(token, data, image as File)
-              reload('Producto creado')
-            } catch (error) {
-              if (error instanceof ApiError && error.status === 401) handleFailure(error)
-              throw error
-            }
-          }}
-        />
-      </RestaurantLayout>
-    )
-  }
-
-  if (mode.kind === 'edit') {
-    const { product } = mode
-    return (
-      <RestaurantLayout title={'Editar: ' + product.name}>
-        <ProductForm
-          initial={toData(product)}
-          currentImageUrl={product.imageUrl}
-          submitLabel="Guardar cambios"
-          onCancel={() => setMode({ kind: 'list' })}
-          onSubmit={async (data, image) => {
-            try {
-              await updateProduct(token, product.id, product.version, data, image)
-              reload('Cambios guardados')
-            } catch (error) {
-              if (error instanceof ApiError && error.status === 401) handleFailure(error)
-              // 409: el producto cambió; se muestra el aviso y se recarga la lista con la versión vigente.
-              if (error instanceof ApiError && error.status === 409) {
-                reload(error.message, true)
-                return
-              }
-              throw error
-            }
-          }}
-        />
-      </RestaurantLayout>
-    )
-  }
-
   const { data } = state
   return (
     <RestaurantLayout title="Mi carta" description="Los clientes solo ven los productos disponibles." wide>
       <div className="rs-toolbar">
         <span>{data.totalItems} {data.totalItems === 1 ? 'producto' : 'productos'}</span>
-        <button type="button" className="auth-submit" onClick={() => setMode({ kind: 'create' })}>+ Nuevo producto</button>
+        <div className="rs-toolbar-actions">
+          <CopyMenu token={token} onCopied={(message) => reload(message)} onFailure={handleFailure} />
+          <button type="button" className="auth-submit" onClick={() => setMode({ kind: 'create' })}>+ Nuevo producto</button>
+        </div>
       </div>
 
       {data.items.length === 0 ? (
@@ -223,6 +230,49 @@ export function ProductsPage() {
           <span>Página {page + 1} de {data.totalPages}</span>
           <button type="button" className="auth-submit auth-submit-secondary" disabled={page + 1 >= data.totalPages} onClick={() => setPage(page + 1)}>Siguiente</button>
         </nav>
+      )}
+      {mode.kind === 'create' && (
+        <Modal title="Nuevo producto" onClose={() => setMode({ kind: 'list' })}>
+          <ProductForm
+            initial={emptyData}
+            submitLabel="Guardar producto"
+            onCancel={() => setMode({ kind: 'list' })}
+            onSubmit={async (data, image) => {
+              try {
+                await createProduct(token, data, image as File)
+                reload('Producto creado')
+              } catch (error) {
+                if (error instanceof ApiError && error.status === 401) handleFailure(error)
+                throw error
+              }
+            }}
+          />
+        </Modal>
+      )}
+      {mode.kind === 'edit' && (
+        <Modal title={'Editar: ' + mode.product.name} onClose={() => setMode({ kind: 'list' })}>
+          <ProductForm
+            initial={toData(mode.product)}
+            currentImageUrl={mode.product.imageUrl}
+            submitLabel="Guardar cambios"
+            onCancel={() => setMode({ kind: 'list' })}
+            onSubmit={async (data, image) => {
+              const product = mode.product
+              try {
+                await updateProduct(token, product.id, product.version, data, image)
+                reload('Cambios guardados')
+              } catch (error) {
+                if (error instanceof ApiError && error.status === 401) handleFailure(error)
+                // 409: el producto cambió; se muestra el aviso y se recarga la lista con la versión vigente.
+                if (error instanceof ApiError && error.status === 409) {
+                  reload(error.message, true)
+                  return
+                }
+                throw error
+              }
+            }}
+          />
+        </Modal>
       )}
     </RestaurantLayout>
   )

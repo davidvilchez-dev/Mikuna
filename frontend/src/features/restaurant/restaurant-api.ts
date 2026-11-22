@@ -1,4 +1,5 @@
 import { apiRequest } from '../auth/auth-api'
+import { panelHeaders } from './branch-storage'
 
 export type RestaurantStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 
@@ -15,6 +16,9 @@ export interface RestaurantInput {
   address: string
   zone: string
   phone: string
+  /** Ubicación del local en el mapa; opcional. */
+  latitude?: number | null
+  longitude?: number | null
 }
 
 export interface Restaurant extends RestaurantInput {
@@ -41,13 +45,22 @@ const ADMIN = '/api/admin/restaurants'
 function call<T>(url: string, token: string, method: string, body?: unknown): Promise<T> {
   return apiRequest<T>(url, {
     method,
-    headers: { Authorization: 'Bearer ' + token },
+    headers: url.startsWith(ME) ? panelHeaders(token) : { Authorization: 'Bearer ' + token },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
 }
 
 export function getMyRestaurant(token: string): Promise<Restaurant> {
   return call(ME, token, 'GET')
+}
+
+/** Sucursales de la cuenta, de la más antigua (principal) a la más reciente. */
+export function listBranches(token: string): Promise<Restaurant[]> {
+  return call(ME + '/branches', token, 'GET')
+}
+
+export function addBranch(token: string, input: RestaurantInput): Promise<Restaurant> {
+  return call(ME + '/branches', token, 'POST', input)
 }
 
 export function submitRestaurant(token: string, input: RestaurantInput): Promise<Restaurant> {
@@ -70,7 +83,7 @@ export function updateImages(token: string, logo: File | null, cover: File | nul
   const form = new FormData()
   if (logo) form.append('logo', logo)
   if (cover) form.append('cover', cover)
-  return apiRequest<Restaurant>(ME + '/images', { method: 'PUT', headers: { Authorization: 'Bearer ' + token }, body: form })
+  return apiRequest<Restaurant>(ME + '/images', { method: 'PUT', headers: panelHeaders(token), body: form })
 }
 
 export function setAvailability(token: string, available: boolean): Promise<Restaurant> {

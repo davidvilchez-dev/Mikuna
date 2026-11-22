@@ -101,7 +101,7 @@ export interface Totals {
 export interface Cart {
   restaurant: { id: string; name: string; attention: Attention | null } | null
   lines: CartLine[]
-  address: { id: string; street: string; district: string } | null
+  address: { id: string; street: string; district: string; latitude: number | null; longitude: number | null } | null
   totals: Totals
   notices: string[]
 }

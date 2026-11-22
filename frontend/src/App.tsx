@@ -13,7 +13,7 @@ import { CheckoutPage } from './features/checkout/CheckoutPage'
 import { OrderPage } from './features/checkout/OrderPage'
 import { AdminRequestsPage } from './features/restaurant/AdminRequestsPage'
 import { RestaurantDashboard } from './features/restaurant/RestaurantDashboard'
-import { RestaurantPage } from './features/restaurant/RestaurantPage'
+import { NewBranchPage, RestaurantPage } from './features/restaurant/RestaurantPage'
 import { SalesHistoryPage } from './features/restaurant/SalesHistoryPage'
 import { AdminDeliveriesPage } from './features/delivery/AdminDeliveriesPage'
 import { CourierPage } from './features/delivery/CourierPage'
@@ -37,6 +37,7 @@ export default function App() {
       <Route path="/mi-cuenta" element={<AccountPage />} />
       <Route path="/mi-restaurante" element={<RestaurantDashboard />} />
       <Route path="/mi-restaurante/negocio" element={<RestaurantPage />} />
+      <Route path="/mi-restaurante/sucursales/nueva" element={<NewBranchPage />} />
       <Route path="/mi-restaurante/historial" element={<SalesHistoryPage />} />
       <Route path="/restaurantes" element={<RestaurantSearchPage />} />
       <Route path="/restaurantes/:id" element={<RestaurantCatalogPage />} />

@@ -29,6 +29,7 @@ export function saveSession(session: StoredSession): void {
 export function clearSession(): void {
   try {
     storage()?.removeItem(SESSION_KEY)
+    storage()?.removeItem('mikuna.branch')
   } catch {
     // Nada que limpiar.
   }

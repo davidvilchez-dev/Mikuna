@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
 import { AppIcon } from '../auth/AppIcon'
 import { notifyError, notifySuccess } from '../ui/notify'
+import { Modal } from '../ui/Modal'
 import { AuthLayout } from '../auth/AuthLayout'
 import { RestaurantLayout } from './RestaurantLayout'
 import { FormField } from '../auth/FormField'
@@ -29,7 +30,12 @@ import {
   type RestaurantErrors,
   type ScheduleErrors,
 } from './restaurant-validation'
+import { addBranch } from './restaurant-api'
+import { setBranchId } from './branch-storage'
+import '../cart/location-picker.css'
 import './restaurant.css'
+
+const LocationPicker = lazy(() => import('../cart/LocationPicker'))
 
 const statusLabels: Record<RestaurantStatus, string> = {
   PENDING: 'Pendiente de aprobación',
@@ -54,6 +60,8 @@ function toInput(restaurant: Restaurant): RestaurantInput {
     address: restaurant.address,
     zone: restaurant.zone,
     phone: restaurant.phone,
+    latitude: restaurant.latitude ?? null,
+    longitude: restaurant.longitude ?? null,
   }
 }
 
@@ -70,7 +78,11 @@ function RestaurantForm({ initial, submitLabel, onSubmit }: RestaurantFormProps)
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  const set = (field: keyof RestaurantInput) => (value: string) => setValues((current) => ({ ...current, [field]: value }))
+  const [mapOpen, setMapOpen] = useState(false)
+
+  const set = (field: 'name' | 'category' | 'description' | 'address' | 'zone' | 'phone') => (value: string) =>
+    setValues((current) => ({ ...current, [field]: value }))
+  const located = values.latitude != null && values.longitude != null
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -91,6 +103,26 @@ function RestaurantForm({ initial, submitLabel, onSubmit }: RestaurantFormProps)
     }
   }
 
+  if (mapOpen) {
+    return (
+      <Suspense fallback={<p className="auth-description" role="status">Cargando el mapa…</p>}>
+        <LocationPicker
+          initial={located ? { latitude: values.latitude as number, longitude: values.longitude as number } : null}
+          confirmLabel="Confirmar ubicación del local"
+          onConfirm={(point, suggestion) => {
+            setValues((current) => ({
+              ...current,
+              ...point,
+              address: current.address.trim() === '' && suggestion ? suggestion.street : current.address,
+            }))
+            setMapOpen(false)
+          }}
+          onCancel={() => setMapOpen(false)}
+        />
+      </Suspense>
+    )
+  }
+
   return (
     <form className="auth-form" onSubmit={handleSubmit} noValidate>
       <FormField id="name" label="Nombre comercial" value={values.name} onChange={(e) => set('name')(e.target.value)} error={errors.name} />
@@ -101,6 +133,14 @@ function RestaurantForm({ initial, submitLabel, onSubmit }: RestaurantFormProps)
         {errors.description && <p className="auth-error">{errors.description}</p>}
       </div>
       <FormField id="address" label="Dirección" value={values.address} onChange={(e) => set('address')(e.target.value)} error={errors.address} />
+      <div className={located ? 'locsum locsum-ok' : 'locsum'}>
+        <span className="locsum-icon"><AppIcon name={located ? 'check' : 'pin'} /></span>
+        <div className="locsum-text">
+          <strong>{located ? 'Ubicación marcada en el mapa' : 'Ubicación en el mapa'}</strong>
+          <small>{located ? 'Los repartidores llegarán a este punto.' : 'Marca dónde está el local para que el repartidor llegue sin perderse.'}</small>
+        </div>
+        <button type="button" className="auth-submit auth-submit-secondary" onClick={() => setMapOpen(true)}>{located ? 'Cambiar' : 'Marcar en el mapa'}</button>
+      </div>
       <FormField id="zone" label="Distrito o zona" value={values.zone} onChange={(e) => set('zone')(e.target.value)} error={errors.zone} />
       <FormField id="phone" label="Teléfono de contacto" type="tel" value={values.phone} onChange={(e) => set('phone')(e.target.value)} error={errors.phone} />
       {formError && <p className="auth-alert" role="alert">{formError}</p>}
@@ -192,22 +232,36 @@ function ImageUploader({ restaurant, onSave }: ImageUploaderProps) {
     }
   }
 
+  const logoSrc = useMemo(() => (logo ? URL.createObjectURL(logo) : restaurant.logoUrl), [logo, restaurant.logoUrl])
+  const coverSrc = useMemo(() => (cover ? URL.createObjectURL(cover) : restaurant.coverUrl), [cover, restaurant.coverUrl])
+  useEffect(() => () => { if (logoSrc && logo) URL.revokeObjectURL(logoSrc) }, [logoSrc, logo])
+  useEffect(() => () => { if (coverSrc && cover) URL.revokeObjectURL(coverSrc) }, [coverSrc, cover])
+
+  const discard = () => { setLogo(null); setCover(null); setError(null); setInputKey((n) => n + 1) }
+  const dirty = Boolean(logo || cover)
+
   return (
     <form className="rs-images" onSubmit={submit} noValidate>
-      <div className="rs-image-field">
-        <label htmlFor="rs-logo">Logo</label>
-        {restaurant.logoUrl && <img className="rs-image-preview rs-image-logo" src={restaurant.logoUrl} alt="Logo actual" />}
-        <input key={'l' + inputKey} id="rs-logo" type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setLogo(e.target.files?.[0] ?? null)} />
+      <div className="rs-banner">
+        <label className="rs-cover-pick" htmlFor="rs-cover">
+          {coverSrc ? <img src={coverSrc} alt="Portada" /> : <span className="rs-cover-empty">Sin portada</span>}
+          <span className="rs-pick-badge"><AppIcon name="camera" />{coverSrc ? 'Cambiar portada' : 'Subir portada'}</span>
+        </label>
+        <input key={'c' + inputKey} id="rs-cover" className="rs-file" type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setCover(e.target.files?.[0] ?? null)} />
+        <label className="rs-logo-pick" htmlFor="rs-logo" aria-label={logoSrc ? 'Cambiar logo' : 'Subir logo'}>
+          {logoSrc ? <img src={logoSrc} alt="Logo" /> : <span>{restaurant.name.charAt(0).toUpperCase()}</span>}
+          <span className="rs-pick-badge rs-pick-badge-round"><AppIcon name="camera" /></span>
+        </label>
+        <input key={'l' + inputKey} id="rs-logo" className="rs-file" type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setLogo(e.target.files?.[0] ?? null)} />
       </div>
-      <div className="rs-image-field">
-        <label htmlFor="rs-cover">Portada</label>
-        {restaurant.coverUrl && <img className="rs-image-preview" src={restaurant.coverUrl} alt="Portada actual" />}
-        <input key={'c' + inputKey} id="rs-cover" type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setCover(e.target.files?.[0] ?? null)} />
-      </div>
+      <p className="rs-images-hint">Toca el logo o la portada para cambiarlos. JPG, PNG o WebP de hasta 2 MB.</p>
       {error && <p className="auth-alert" role="alert">{error}</p>}
-      <button type="submit" className="auth-submit auth-submit-secondary rs-edit" disabled={busy || (!logo && !cover)}>
-        {busy ? 'Subiendo…' : 'Guardar imágenes'}
-      </button>
+      {dirty && (
+        <div className="rs-images-actions">
+          <button type="submit" className="auth-submit" disabled={busy}>{busy ? 'Subiendo…' : 'Guardar imágenes'}</button>
+          <button type="button" className="auth-submit auth-submit-secondary" disabled={busy} onClick={discard}>Descartar</button>
+        </div>
+      )}
     </form>
   )
 }
@@ -308,7 +362,9 @@ export function RestaurantPage() {
     <RestaurantLayout title="Mi negocio" description="Tus datos, tu horario y tu estado en Mikuna.">
 
       <section className={restaurant.available && isApproved ? 'rs-hero' : 'rs-hero'} aria-label="Estado del restaurante">
-        <span className="rs-hero-icon"><AppIcon name="store" /></span>
+        <span className="rs-hero-icon">
+          {restaurant.logoUrl ? <img src={restaurant.logoUrl} alt="" /> : <AppIcon name="store" />}
+        </span>
         <div className="rs-hero-text">
           <h2>{restaurant.name}</h2>
           <p>{restaurant.category} · {restaurant.zone}</p>
@@ -326,7 +382,7 @@ export function RestaurantPage() {
       <div className="rs-grid">
         <section className="rs-card" aria-labelledby="images-title">
           <h2 id="images-title">Imagen del negocio</h2>
-          <p className="auth-description">El logo y la portada se muestran a tus clientes en la lista de restaurantes. JPG, PNG o WebP de hasta 2 MB.</p>
+          <p className="auth-description">Así ven tus clientes tu restaurante en la lista.</p>
           <ImageUploader
             restaurant={restaurant}
             onSave={async (logo, cover) => {
@@ -341,33 +397,33 @@ export function RestaurantPage() {
 
         <section className="rs-card" aria-labelledby="data-title">
           <h2 id="data-title">Datos del negocio</h2>
-          {editing ? (
-            <RestaurantForm
-              initial={toInput(restaurant)}
-              submitLabel={restaurant.status === 'REJECTED' ? 'Guardar y reenviar solicitud' : 'Guardar cambios'}
-              onSubmit={async (input) => {
-                try {
-                  const saved = await updateMyRestaurant(token, input)
-                  show(restaurant.status === 'REJECTED' ? await resubmitMyRestaurant(token) : saved,
-                    restaurant.status === 'REJECTED' ? 'Solicitud reenviada: queda pendiente de aprobación.' : 'Cambios guardados')
-                } catch (error) {
-                  if (error instanceof ApiError && error.status === 401) handleFailure(error)
-                  throw error
-                }
-              }}
-            />
-          ) : (
-            <>
-              <dl className="rs-data">
-                <div><dt>Dirección</dt><dd>{restaurant.address}</dd></div>
-                <div><dt>Distrito o zona</dt><dd>{restaurant.zone}</dd></div>
-                <div><dt>Teléfono</dt><dd>{restaurant.phone}</dd></div>
-                {restaurant.description && <div><dt>Descripción</dt><dd>{restaurant.description}</dd></div>}
-              </dl>
-              <button type="button" className="auth-submit auth-submit-secondary rs-edit" onClick={() => setEditing(true)}>
-                {restaurant.status === 'REJECTED' ? 'Corregir y reenviar' : 'Editar datos'}
-              </button>
-            </>
+          <dl className="rs-data">
+            <div><dt>Dirección</dt><dd>{restaurant.address}</dd></div>
+            <div><dt>Distrito o zona</dt><dd>{restaurant.zone}</dd></div>
+            <div><dt>Teléfono</dt><dd>{restaurant.phone}</dd></div>
+            <div><dt>Ubicación en el mapa</dt><dd>{restaurant.latitude != null ? 'Marcada' : 'Sin marcar'}</dd></div>
+            {restaurant.description && <div><dt>Descripción</dt><dd>{restaurant.description}</dd></div>}
+          </dl>
+          <button type="button" className="auth-submit auth-submit-secondary rs-edit" onClick={() => setEditing(true)}>
+            {restaurant.status === 'REJECTED' ? 'Corregir y reenviar' : 'Editar datos'}
+          </button>
+          {editing && (
+            <Modal title="Datos del negocio" onClose={() => setEditing(false)}>
+              <RestaurantForm
+                initial={toInput(restaurant)}
+                submitLabel={restaurant.status === 'REJECTED' ? 'Guardar y reenviar solicitud' : 'Guardar cambios'}
+                onSubmit={async (input) => {
+                  try {
+                    const saved = await updateMyRestaurant(token, input)
+                    show(restaurant.status === 'REJECTED' ? await resubmitMyRestaurant(token) : saved,
+                      restaurant.status === 'REJECTED' ? 'Solicitud reenviada: queda pendiente de aprobación.' : 'Cambios guardados')
+                  } catch (error) {
+                    if (error instanceof ApiError && error.status === 401) handleFailure(error)
+                    throw error
+                  }
+                }}
+              />
+            </Modal>
           )}
         </section>
 
@@ -384,6 +440,41 @@ export function RestaurantPage() {
           />
         </section>
       </div>
+    </RestaurantLayout>
+  )
+}
+
+/** Alta de una sucursal más: nace pendiente y la revisa un administrador como cualquier solicitud. */
+export function NewBranchPage() {
+  const navigate = useNavigate()
+  const [session] = useState(() => getSession())
+  const [base, setBase] = useState<Restaurant | null>(null)
+  const token = session?.token ?? ''
+
+  useEffect(() => {
+    if (!token) return
+    let active = true
+    getMyRestaurant(token).then((value) => { if (active) setBase(value) }).catch(() => { /* el formulario funciona sin datos base */ })
+    return () => { active = false }
+  }, [token])
+
+  if (!session) return <Navigate to="/iniciar-sesion" replace />
+
+  return (
+    <RestaurantLayout title="Agregar sucursal" description="Cada sucursal tiene su dirección, su horario y sus pedidos. Un administrador la aprueba antes de publicarla.">
+      <section className="rs-card">
+        <RestaurantForm
+          key={base?.id ?? 'nueva'}
+          initial={{ ...emptyInput, category: base?.category ?? '', phone: base?.phone ?? '', description: base?.description ?? '' }}
+          submitLabel="Enviar sucursal"
+          onSubmit={async (input) => {
+            const created = await addBranch(token, input)
+            setBranchId(created.id)
+            notifySuccess('Sucursal enviada: queda pendiente de aprobación.')
+            navigate('/mi-restaurante/negocio', { replace: true })
+          }}
+        />
+      </section>
     </RestaurantLayout>
   )
 }

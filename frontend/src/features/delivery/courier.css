@@ -119,3 +119,18 @@
   .cr-link { flex: 1; }
 }
 .cr-inline { color: var(--color-mikuna-indigo); font-size: 14px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+
+.cr-share {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 14px 18px; border: 1px solid var(--app-border); border-radius: 16px;
+  background: var(--color-mikuna-white);
+}
+.cr-share-icon { display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; flex-shrink: 0; border-radius: 12px; background: var(--color-mikuna-peach); color: var(--color-mikuna-orange-deep); }
+.cr-share-icon .app-icon { width: 22px; height: 22px; }
+.cr-share-text { display: grid; flex: 1; min-width: 220px; gap: 2px; line-height: 1.35; }
+.cr-share-text strong { font-size: 16px; }
+.cr-share-text small { color: var(--color-mikuna-gray); font-size: 14px; }
+.cr-share-sharing { border-color: color-mix(in srgb, #067647 35%, transparent); background: #F3FBF6; }
+.cr-share-sharing .cr-share-icon { background: #DCFAE6; color: #067647; }
+.cr-share-denied, .cr-share-error { border-color: color-mix(in srgb, #B42318 35%, transparent); background: #FEF3F2; }
+.cr-share-denied .cr-share-icon, .cr-share-error .cr-share-icon { background: #FEE4E2; color: #B42318; }
+.app-shell .cr-share .auth-submit { width: auto; min-height: 44px; padding: 0 20px; }

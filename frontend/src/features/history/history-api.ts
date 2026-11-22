@@ -1,4 +1,5 @@
 import { apiRequest, type Role } from '../auth/auth-api'
+import { panelHeaders } from '../restaurant/branch-storage'
 import type { OrderStatus } from '../restaurant/orders-logic'
 import { buildQuery, historyPath, type HistoryFilter } from './history-logic'
 
@@ -39,7 +40,7 @@ function headers(token: string): HeadersInit {
 }
 
 export function fetchHistory(role: Role, token: string, filter: HistoryFilter, page: number): Promise<HistoryPage> {
-  return apiRequest(historyPath(role) + buildQuery(filter, page), { headers: headers(token) })
+  return apiRequest(historyPath(role) + buildQuery(filter, page), { headers: role === 'RESTAURANT' ? panelHeaders(token) : headers(token) })
 }
 
 export interface RatingResult {

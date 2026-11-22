@@ -19,6 +19,7 @@ const PATHS = {
   check: 'M5 12.5l4.5 4.5L19 7.5',
   clock: 'M12 7v5l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z',
   chart: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
+  camera: 'M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1zM12 17a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z',
 } as const
 
 export type AppIconName = keyof typeof PATHS

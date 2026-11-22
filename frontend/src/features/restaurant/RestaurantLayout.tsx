@@ -4,7 +4,8 @@ import logo from '../../assets/branding/logo-mikuna.svg'
 import { ApiError } from '../auth/auth-api'
 import { AppIcon, type AppIconName } from '../auth/AppIcon'
 import { clearSession, getSession } from '../auth/session-storage'
-import { getMyRestaurant, setAvailability, type Restaurant } from './restaurant-api'
+import { getMyRestaurant, listBranches, setAvailability, type Restaurant } from './restaurant-api'
+import { getBranchId, setBranchId } from './branch-storage'
 import { listOrders } from './orders-api'
 import '../auth/auth.css'
 import '../auth/app-shell.css'
@@ -47,6 +48,8 @@ export function RestaurantLayout({ title, description, actions, children }: Rest
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null)
   const [pending, setPending] = useState(0)
   const [busy, setBusy] = useState(false)
+  const [branches, setBranches] = useState<Restaurant[]>([])
+  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     if (!token) return
@@ -54,6 +57,24 @@ export function RestaurantLayout({ title, description, actions, children }: Rest
     getMyRestaurant(token).then((value) => { if (active) setRestaurant(value) }).catch(() => { /* la pantalla ya explica el error */ })
     return () => { active = false }
   }, [token])
+
+  useEffect(() => {
+    if (!token) return
+    let active = true
+    listBranches(token).then((value) => {
+      if (!active) return
+      setBranches(value)
+      // Una sucursal guardada que ya no existe vuelve a la principal.
+      const saved = getBranchId()
+      if (saved && !value.some((branch) => branch.id === saved)) { setBranchId(null); window.location.reload() }
+    }).catch(() => { /* el selector es opcional */ })
+    return () => { active = false }
+  }, [token])
+
+  const switchBranch = (id: string) => {
+    setBranchId(id === branches[0]?.id ? null : id)
+    window.location.assign('/mi-restaurante')
+  }
 
   const approved = restaurant?.status === 'APPROVED'
   useEffect(() => {
@@ -89,12 +110,30 @@ export function RestaurantLayout({ title, description, actions, children }: Rest
         <Link to="/mi-restaurante" className="rl-brand" aria-label="Mikuna, panel del restaurante">
           <img src={logo} alt="Mikuna" width={3922} height={815} />
         </Link>
-        <div className="rl-business">
-          <span className="rl-avatar" aria-hidden="true">{initials(businessName)}</span>
-          <div>
-            <strong>{businessName}</strong>
-            <small>Panel del restaurante</small>
-          </div>
+        <div className="rl-branch">
+          <button type="button" className="rl-business" aria-expanded={menuOpen} aria-haspopup="listbox" onClick={() => setMenuOpen((value) => !value)}>
+            <span className="rl-avatar" aria-hidden="true">
+              {restaurant?.logoUrl ? <img src={restaurant.logoUrl} alt="" /> : initials(businessName)}
+            </span>
+            <span className="rl-business-text">
+              <strong>{businessName}</strong>
+              <small>{branches.length > 1 ? `${branches.length} sucursales` : 'Panel del restaurante'}</small>
+            </span>
+            <AppIcon name="chevron" className="app-icon rl-business-chevron" />
+          </button>
+          {menuOpen && (
+            <div className="rl-branch-menu" role="listbox" aria-label="Sucursales">
+              {branches.map((branch) => (
+                <button type="button" role="option" key={branch.id} aria-selected={branch.id === restaurant?.id}
+                  className={branch.id === restaurant?.id ? 'rl-branch-item rl-branch-current' : 'rl-branch-item'}
+                  onClick={() => (branch.id === restaurant?.id ? setMenuOpen(false) : switchBranch(branch.id))}>
+                  <strong>{branch.name}</strong>
+                  <small>{branch.status === 'APPROVED' ? branch.address : branch.status === 'PENDING' ? 'Pendiente de aprobación' : 'Rechazada'}</small>
+                </button>
+              ))}
+              <Link to="/mi-restaurante/sucursales/nueva" className="rl-branch-add" onClick={() => setMenuOpen(false)}>+ Agregar sucursal</Link>
+            </div>
+          )}
         </div>
         <nav className="rl-nav" aria-label="Secciones">
           {NAV.map((item) => (

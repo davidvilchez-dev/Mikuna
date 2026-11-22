@@ -1,5 +1,7 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
+import { CART_CHANGED, getCart } from '../cart/cart-api'
+import { getSession } from '../auth/session-storage'
 import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
 import { AuthLayout } from '../auth/AuthLayout'
 import {
@@ -25,10 +27,29 @@ export function RestaurantSearchPage() {
   const zone = params.get('zona') ?? ''
   const page = Math.max(0, (Number(params.get('pagina')) || 1) - 1)
 
-  const [nameInput, setNameInput] = useState(name)
   const [filters, setFilters] = useState<Filters>({ categories: [], zones: [] })
   const [state, setState] = useState<ViewState>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
+  // Punto de entrega del cliente: undefined mientras se consulta; null si no hay sesión o dirección con mapa.
+  const [point, setPoint] = useState<{ latitude: number; longitude: number } | null | undefined>(undefined)
+
+  useEffect(() => {
+    const session = getSession()
+    if (!session || session.role !== 'CUSTOMER') { setPoint(null); return }
+    let active = true
+    const load = () => {
+      getCart(session.token)
+        .then((cart) => {
+          if (!active) return
+          const a = cart.address
+          setPoint(a && a.latitude != null && a.longitude != null ? { latitude: a.latitude, longitude: a.longitude } : null)
+        })
+        .catch(() => { if (active) setPoint(null) })
+    }
+    load()
+    window.addEventListener(CART_CHANGED, load)
+    return () => { active = false; window.removeEventListener(CART_CHANGED, load) }
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -36,15 +57,19 @@ export function RestaurantSearchPage() {
     return () => { active = false }
   }, [])
 
+  const pointKey = point ? `${point.latitude},${point.longitude}` : ''
   useEffect(() => {
+    if (point === undefined) return
     let active = true
-    searchRestaurants({ name, category, zone, page })
+    searchRestaurants({ name, category, zone, page, point })
       .then((data) => { if (active) setState({ kind: 'ready', data }) })
       .catch((error: unknown) => {
         if (active) setState({ kind: 'error', message: error instanceof ApiError ? error.message : GENERIC_ERROR })
       })
     return () => { active = false }
-  }, [name, category, zone, page, attempt])
+    // point se resume en pointKey para no repetir la consulta si el objeto cambia pero el punto no.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, category, zone, page, attempt, pointKey, point === undefined])
 
   const update = (changes: Record<string, string>) => {
     const next = new URLSearchParams(params)
@@ -56,13 +81,7 @@ export function RestaurantSearchPage() {
     setParams(next)
   }
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    update({ q: nameInput.trim() })
-  }
-
   const clear = () => {
-    setNameInput('')
     setState({ kind: 'loading' })
     setParams(new URLSearchParams())
   }
@@ -70,28 +89,21 @@ export function RestaurantSearchPage() {
   const hasCriteria = Boolean(name || category || zone)
 
   return (
-    <AuthLayout title="Restaurantes" description="Busca por nombre, categoría o zona. No necesitas iniciar sesión." wide>
-      <form className="catalog-search" onSubmit={submit} role="search">
-        <div className="auth-field">
-          <label htmlFor="search-name">Nombre</label>
-          <input id="search-name" type="search" value={nameInput} maxLength={100} onChange={(e) => setNameInput(e.target.value)} placeholder="Por ejemplo, pollería" />
+    <AuthLayout title="Restaurantes" description="Elige una categoría o usa el buscador de arriba." wide>
+      {name && (
+        <p className="catalog-query" role="status">
+          Resultados para <strong>“{name}”</strong>
+          <button type="button" className="catalog-query-clear" onClick={() => update({ q: '' })}>Quitar</button>
+        </p>
+      )}
+      {filters.categories.length > 0 && (
+        <div className="catalog-chips" role="group" aria-label="Categorías">
+          <button type="button" className="catalog-chip" aria-pressed={!category} onClick={() => update({ categoria: '' })}>Todas</button>
+          {filters.categories.map((option) => (
+            <button type="button" key={option} className="catalog-chip" aria-pressed={category === option} onClick={() => update({ categoria: option })}>{option}</button>
+          ))}
         </div>
-        <div className="auth-field">
-          <label htmlFor="search-category">Categoría</label>
-          <select id="search-category" value={category} onChange={(e) => update({ categoria: e.target.value })}>
-            <option value="">Todas</option>
-            {filters.categories.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-        </div>
-        <div className="auth-field">
-          <label htmlFor="search-zone">Zona</label>
-          <select id="search-zone" value={zone} onChange={(e) => update({ zona: e.target.value })}>
-            <option value="">Todas</option>
-            {filters.zones.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-        </div>
-        <button type="submit" className="auth-submit">Buscar</button>
-      </form>
+      )}
 
       {state.kind === 'loading' && <p className="auth-description" role="status">Buscando restaurantes…</p>}
 
@@ -130,10 +142,10 @@ export function RestaurantSearchPage() {
                     <Link to={'/restaurantes/' + restaurant.id}>
                       <h2>{restaurant.name}</h2>
                     </Link>
-                    <p>{restaurant.category} · {restaurant.zone}</p>
+                    <p>{[restaurant.category, restaurant.distanceKm != null ? `a ${restaurant.distanceKm.toLocaleString('es-PE')} km` : restaurant.zone].join(' · ')}</p>
+                    {restaurant.branchCount > 1 && <small className="catalog-branches">{restaurant.branchCount} sucursales</small>}
                   </div>
                 </div>
-                {restaurant.description && <p className="catalog-result-desc">{restaurant.description}</p>}
               </li>
             ))}
           </ul>

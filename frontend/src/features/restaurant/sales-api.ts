@@ -1,3 +1,4 @@
+import { panelHeaders } from './branch-storage'
 import { apiRequest } from '../auth/auth-api'
 import type { HistoryItem, HistoryPage } from '../history/history-api'
 
@@ -8,7 +9,7 @@ export async function fetchSalesHistory(token: string, from: string, to: string)
   const items: HistoryItem[] = []
   for (let page = 0; page < MAX_PAGES; page += 1) {
     const query = `?size=100&page=${page}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
-    const result = await apiRequest<HistoryPage>('/api/restaurant/orders/history' + query, { headers: { Authorization: 'Bearer ' + token } })
+    const result = await apiRequest<HistoryPage>('/api/restaurant/orders/history' + query, { headers: panelHeaders(token) })
     items.push(...result.items)
     if (page + 1 >= result.totalPages) break
   }

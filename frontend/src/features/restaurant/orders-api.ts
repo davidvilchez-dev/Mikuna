@@ -1,3 +1,4 @@
+import { panelHeaders } from './branch-storage'
 import { apiRequest } from '../auth/auth-api'
 import type { OrderStatus, RestaurantAction } from './orders-logic'
 
@@ -15,7 +16,7 @@ export interface RestaurantOrder {
 }
 
 function headers(token: string): HeadersInit {
-  return { Authorization: 'Bearer ' + token }
+  return panelHeaders(token)
 }
 
 export function listOrders(token: string, status: OrderStatus): Promise<RestaurantOrder[]> {

@@ -23,6 +23,8 @@ export interface Tracking {
   stages: TrackingStage[]
   courierLocation: CourierLocation | null
   locationUnavailableReason: LocationUnavailableReason | null
+  /** Punto de entrega que marcó el cliente; las direcciones antiguas no lo tienen. */
+  destination: { latitude: number; longitude: number } | null
 }
 
 export function getTracking(token: string, orderId: string): Promise<Tracking> {

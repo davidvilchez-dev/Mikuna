@@ -14,14 +14,18 @@
 .catalog-pager .auth-submit { width: auto; min-height: 44px; font-size: 16px; }
 
 /* Consulta pública */
-.catalog-search {
-  display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 12px; align-items: end; margin: 0 0 24px; padding: 16px;
-  border: 1px solid var(--app-border); border-radius: 16px; background: var(--color-mikuna-white); box-shadow: var(--app-shadow);
+.catalog-chips { display: flex; gap: 8px; margin: 0 0 24px; padding: 2px 0 6px; overflow-x: auto; scrollbar-width: thin; }
+.catalog-chip {
+  flex: none; min-height: 40px; padding: 0 18px; border: 1px solid var(--app-border); border-radius: 999px;
+  background: var(--color-mikuna-white); color: var(--color-mikuna-indigo); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+  transition: border-color 160ms, background-color 160ms, color 160ms;
 }
-.catalog-search .auth-field { margin: 0; }
-.catalog-search .auth-field label { color: var(--color-mikuna-gray); font-size: 14px; font-weight: 600; }
-.app-shell .catalog-search .auth-submit { min-height: 48px; padding: 0 28px; }
-@media (max-width: 760px) { .catalog-search { grid-template-columns: 1fr; } }
+.catalog-chip:hover { border-color: var(--color-mikuna-orange); }
+.catalog-chip:focus-visible { outline: 3px solid var(--color-mikuna-indigo); outline-offset: 2px; }
+.catalog-chip[aria-pressed="true"] { border-color: var(--color-mikuna-orange); background: var(--color-mikuna-orange); color: var(--color-mikuna-white); }
+.catalog-query { margin: 0 0 16px; color: var(--color-mikuna-gray); }
+.catalog-query strong { color: var(--color-mikuna-indigo); }
+.catalog-query-clear { margin-left: 12px; padding: 0; border: 0; background: none; color: var(--color-mikuna-orange-deep); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
 
 .catalog-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
 .catalog-result {
@@ -146,3 +150,5 @@
   .product-dialog-close { background: var(--color-mikuna-white); box-shadow: 0 2px 10px color-mix(in srgb, var(--color-mikuna-indigo) 25%, transparent); }
 }
 @media (prefers-reduced-motion: reduce) { .catalog-product-open img { transition: none; } .catalog-product:hover .catalog-product-open img { transform: none; } }
+
+.catalog-branches { color: var(--color-mikuna-gray); font-size: 13px; }
