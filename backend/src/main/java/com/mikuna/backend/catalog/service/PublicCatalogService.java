@@ -43,24 +43,69 @@ public class PublicCatalogService {
         this.eligibility = eligibility;
     }
 
-    /** Nombre por coincidencia parcial; categoría y zona por igualdad; todo sin distinguir mayúsculas ni tildes. */
     public PageResponse<PublicRestaurantResponse> search(String name, String category, String zone, int page, int size) {
+        return search(name, category, zone, null, null, page, size);
+    }
+
+    /**
+     * Nombre por coincidencia parcial; categoría y zona por igualdad; todo sin distinguir mayúsculas ni tildes.
+     * Las sucursales de una misma cuenta se muestran como una sola tarjeta: la abierta y más cercana al punto de
+     * entrega (latitude/longitude); sin punto, la sucursal principal (la más antigua).
+     */
+    public PageResponse<PublicRestaurantResponse> search(String name, String category, String zone, Double latitude,
+            Double longitude, int page, int size) {
         Paging.validate(page, size);
+        boolean located = latitude != null && longitude != null
+                && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180;
         String nameQuery = fold(limit(name));
         String categoryQuery = fold(category);
         String zoneQuery = fold(zone);
 
-        List<PublicRestaurantResponse> matches = restaurants.findVisible().stream()
+        List<Restaurant> candidates = restaurants.findVisible().stream()
                 .filter(r -> nameQuery.isEmpty() || fold(r.getName()).contains(nameQuery))
                 .filter(r -> categoryQuery.isEmpty() || fold(r.getCategory()).equals(categoryQuery))
                 .filter(r -> zoneQuery.isEmpty() || fold(r.getZone()).equals(zoneQuery))
-                .map(r -> PublicRestaurantResponse.from(r, eligibility.attentionStatus(r), fallbackCover(r)))
+                .toList();
+
+        // Una tarjeta por marca (cuenta): se elige la mejor sucursal de cada una.
+        java.util.Map<UUID, List<Restaurant>> brands = candidates.stream()
+                .collect(java.util.stream.Collectors.groupingBy(Restaurant::getOwnerId));
+        List<PublicRestaurantResponse> matches = brands.values().stream()
+                .map(branches -> {
+                    Restaurant best = branches.stream()
+                            .min(Comparator
+                                    .comparing((Restaurant r) -> eligibility.attentionStatus(r) == AttentionStatus.OPEN ? 0 : 1)
+                                    .thenComparing(r -> located ? distanceKm(r, latitude, longitude) : 0.0)
+                                    .thenComparing(Restaurant::getSubmittedAt))
+                            .orElseThrow();
+                    Double distance = located ? roundedDistance(best, latitude, longitude) : null;
+                    return PublicRestaurantResponse.from(best, eligibility.attentionStatus(best), fallbackCover(best),
+                            distance, branches.size());
+                })
                 .sorted(Comparator
                         .comparing((PublicRestaurantResponse r) -> r.attention() == AttentionStatus.OPEN ? 0 : 1)
                         .thenComparing(r -> fold(r.name()))
                         .thenComparing(PublicRestaurantResponse::name))
                 .toList();
         return Paging.slice(matches, page, size);
+    }
+
+    /** Sucursales sin ubicación quedan al final: se comparan como si estuvieran lejísimos. */
+    private static double distanceKm(Restaurant restaurant, double latitude, double longitude) {
+        if (restaurant.getLatitude() == null || restaurant.getLongitude() == null) {
+            return Double.MAX_VALUE;
+        }
+        double earthRadiusKm = 6371.0;
+        double dLat = Math.toRadians(restaurant.getLatitude() - latitude);
+        double dLon = Math.toRadians(restaurant.getLongitude() - longitude);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(Math.toRadians(latitude))
+                * Math.cos(Math.toRadians(restaurant.getLatitude())) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    private static Double roundedDistance(Restaurant restaurant, double latitude, double longitude) {
+        double km = distanceKm(restaurant, latitude, longitude);
+        return km == Double.MAX_VALUE ? null : Math.round(km * 10) / 10.0;
     }
 
     /** Categorías y zonas distintas (sin distinguir mayúsculas ni tildes) de los restaurantes visibles. */

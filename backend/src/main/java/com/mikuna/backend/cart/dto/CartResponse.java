@@ -12,7 +12,7 @@ public record CartResponse(RestaurantInfo restaurant, List<Line> lines, AddressI
     public record RestaurantInfo(UUID id, String name, AttentionStatus attention) {
     }
 
-    public record AddressInfo(UUID id, String street, String district) {
+    public record AddressInfo(UUID id, String street, String district, Double latitude, Double longitude) {
     }
 
     /** {@code lineTotal} es {@code null} si la línea no es elegible; {@code reason} explica por qué. */

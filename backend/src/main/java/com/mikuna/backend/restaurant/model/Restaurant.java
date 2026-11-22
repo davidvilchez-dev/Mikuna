@@ -8,6 +8,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
@@ -22,8 +23,7 @@ import java.util.UUID;
  * Hibernate); las transiciones de estado se hacen con actualizaciones condicionales del repositorio.
  */
 @Entity
-@Table(name = "restaurantes",
-        uniqueConstraints = @UniqueConstraint(name = "uk_restaurantes_owner", columnNames = "owner_id"))
+@Table(name = "restaurantes", indexes = @Index(name = "idx_restaurantes_owner", columnList = "owner_id"))
 public class Restaurant {
 
     @Id
@@ -50,6 +50,11 @@ public class Restaurant {
 
     @Column(nullable = false, length = 20)
     private String phone;
+
+    /** Ubicación del local en el mapa; opcional hasta que el titular la marque. */
+    private Double latitude;
+
+    private Double longitude;
 
     @Column(nullable = false, length = 20)
     private String status;
@@ -120,6 +125,11 @@ public class Restaurant {
         this.phone = phone;
     }
 
+    public void changeLocation(Double latitude, Double longitude) {
+        this.latitude = latitude;
+        this.longitude = longitude;
+    }
+
     public void replaceSchedule(List<OpeningHour> days) {
         this.schedule.clear();
         this.schedule.addAll(days);
@@ -147,6 +157,8 @@ public class Restaurant {
     public String getAddress() { return address; }
     public String getZone() { return zone; }
     public String getPhone() { return phone; }
+    public Double getLatitude() { return latitude; }
+    public Double getLongitude() { return longitude; }
     public RestaurantStatus getStatus() { return RestaurantStatus.valueOf(status); }
     public Instant getSubmittedAt() { return submittedAt; }
     public String getRejectionReason() { return rejectionReason; }

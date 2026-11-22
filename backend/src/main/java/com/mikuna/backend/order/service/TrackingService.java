@@ -45,12 +45,21 @@ public class TrackingService {
             if (position.isPresent()) {
                 CourierLocationLookup.Position p = position.get();
                 return new TrackingResponse(orderId, status.name(), stages,
-                        new TrackingResponse.CourierLocation(p.latitude(), p.longitude(), p.recordedAt()), null);
+                        new TrackingResponse.CourierLocation(p.latitude(), p.longitude(), p.recordedAt()), null,
+                        destination(order));
             }
-            return new TrackingResponse(orderId, status.name(), stages, null, TrackingResponse.NO_LOCATION_YET);
+            return new TrackingResponse(orderId, status.name(), stages, null, TrackingResponse.NO_LOCATION_YET,
+                    destination(order));
         }
         String reason = isFinished(status) ? TrackingResponse.FINISHED : TrackingResponse.NOT_PICKED_UP;
-        return new TrackingResponse(orderId, status.name(), stages, null, reason);
+        return new TrackingResponse(orderId, status.name(), stages, null, reason, destination(order));
+    }
+
+    private static TrackingResponse.Point destination(Order order) {
+        if (order.getDeliveryLatitude() == null || order.getDeliveryLongitude() == null) {
+            return null;
+        }
+        return new TrackingResponse.Point(order.getDeliveryLatitude(), order.getDeliveryLongitude());
     }
 
     private static boolean isFinished(OrderStatus status) {

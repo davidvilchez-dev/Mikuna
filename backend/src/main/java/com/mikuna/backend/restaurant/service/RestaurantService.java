@@ -58,16 +58,39 @@ public class RestaurantService {
     @Transactional
     public RestaurantResponse create(UUID ownerId, RestaurantRequest request) {
         ValidatedData data = validate(request);
+        // Sin restricción de unicidad (una cuenta puede tener varias sucursales), la primera solicitud se serializa con un bloqueo.
+        accounts.lockById(ownerId);
         if (restaurants.findByOwnerId(ownerId).isPresent()) {
             throw alreadyRequested();
         }
         try {
-            Restaurant saved = restaurants.saveAndFlush(Restaurant.request(ownerId, data.name(), data.category(),
-                    data.description(), data.address(), data.zone(), data.phone(), Instant.now(clock)));
-            return respond(saved);
+            return respond(restaurants.saveAndFlush(newRestaurant(ownerId, data)));
         } catch (DataIntegrityViolationException concurrentDuplicate) {
             throw alreadyRequested();
         }
+    }
+
+    /** Una sucursal más de la misma cuenta: nace pendiente y la revisa un administrador como cualquier solicitud. */
+    @Transactional
+    public RestaurantResponse addBranch(UUID ownerId, RestaurantRequest request) {
+        ValidatedData data = validate(request);
+        if (restaurants.findByOwnerIdOrderBySubmittedAtAsc(ownerId).isEmpty()) {
+            throw new RestaurantNotFoundException("Primero envía la solicitud de tu restaurante");
+        }
+        return respond(restaurants.saveAndFlush(newRestaurant(ownerId, data)));
+    }
+
+    /** Todas las sucursales de la cuenta, para el selector del panel. */
+    @Transactional(readOnly = true)
+    public List<RestaurantResponse> listMine(UUID ownerId) {
+        return restaurants.findByOwnerIdOrderBySubmittedAtAsc(ownerId).stream().map(this::respond).toList();
+    }
+
+    private Restaurant newRestaurant(UUID ownerId, ValidatedData data) {
+        Restaurant restaurant = Restaurant.request(ownerId, data.name(), data.category(), data.description(),
+                data.address(), data.zone(), data.phone(), Instant.now(clock));
+        restaurant.changeLocation(data.latitude(), data.longitude());
+        return restaurant;
     }
 
     @Transactional(readOnly = true)
@@ -82,6 +105,7 @@ public class RestaurantService {
         Restaurant restaurant = find(ownerId);
         restaurant.updateGeneralData(data.name(), data.category(), data.description(), data.address(),
                 data.zone(), data.phone());
+        restaurant.changeLocation(data.latitude(), data.longitude());
         return respond(save(restaurant));
     }
 
@@ -147,7 +171,7 @@ public class RestaurantService {
     }
 
     private record ValidatedData(String name, String category, String description, String address, String zone,
-            String phone) {
+            String phone, Double latitude, Double longitude) {
     }
 
     private static ValidatedData validate(RestaurantRequest request) {
@@ -166,7 +190,15 @@ public class RestaurantService {
         if (description.length() > 300) {
             throw new RegistrationValidationException("description", "La descripción admite hasta 300 caracteres");
         }
-        return new ValidatedData(name, category, description.isEmpty() ? null : description, address, zone, phone);
+        boolean hasLatitude = request.latitude() != null;
+        if (hasLatitude != (request.longitude() != null)) {
+            throw new RegistrationValidationException("latitude", "Marca la ubicación completa en el mapa");
+        }
+        if (hasLatitude && (Math.abs(request.latitude()) > 90 || Math.abs(request.longitude()) > 180)) {
+            throw new RegistrationValidationException("latitude", "La ubicación no es válida");
+        }
+        return new ValidatedData(name, category, description.isEmpty() ? null : description, address, zone, phone,
+                request.latitude(), request.longitude());
     }
 
     private static String required(String field, String value, int min, int max, String message) {

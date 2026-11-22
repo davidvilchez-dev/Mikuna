@@ -7,6 +7,7 @@ import com.mikuna.backend.restaurant.dto.RestaurantResponse;
 import com.mikuna.backend.restaurant.dto.ScheduleRequest;
 import com.mikuna.backend.restaurant.service.RestaurantImageService;
 import com.mikuna.backend.restaurant.service.RestaurantService;
+import java.util.List;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
@@ -38,6 +39,18 @@ public class RestaurantController {
     public ResponseEntity<RestaurantResponse> create(@AuthenticationPrincipal AccountPrincipal principal,
             @Valid @RequestBody RestaurantRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(principal.id(), request));
+    }
+
+    /** Sucursales de la cuenta (el panel elige una con la cabecera X-Restaurant-Id). */
+    @GetMapping("/branches")
+    public List<RestaurantResponse> branches(@AuthenticationPrincipal AccountPrincipal principal) {
+        return service.listMine(principal.id());
+    }
+
+    @PostMapping("/branches")
+    public ResponseEntity<RestaurantResponse> addBranch(@AuthenticationPrincipal AccountPrincipal principal,
+            @Valid @RequestBody RestaurantRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.addBranch(principal.id(), request));
     }
 
     @GetMapping

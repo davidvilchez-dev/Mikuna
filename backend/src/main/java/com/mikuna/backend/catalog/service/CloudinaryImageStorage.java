@@ -49,6 +49,20 @@ public class CloudinaryImageStorage {
     }
 
     public StoredImage upload(byte[] content, String filename) {
+        return send(new ByteArrayResource(content) {
+            @Override
+            public String getFilename() {
+                return filename;
+            }
+        });
+    }
+
+    /** Sube una copia independiente de una imagen ya publicada: Cloudinary la descarga y le da su propio id. */
+    public StoredImage copyFrom(String sourceUrl) {
+        return send(sourceUrl);
+    }
+
+    private StoredImage send(Object file) {
         if (!properties.isConfigured()) {
             throw new ImageUnavailableException();
         }
@@ -60,12 +74,7 @@ public class CloudinaryImageStorage {
         }
 
         MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
-        form.add("file", new ByteArrayResource(content) {
-            @Override
-            public String getFilename() {
-                return filename;
-            }
-        });
+        form.add("file", file);
         form.add("api_key", properties.apiKey());
         signed.forEach(form::add);
         form.add("signature", sign(signed));

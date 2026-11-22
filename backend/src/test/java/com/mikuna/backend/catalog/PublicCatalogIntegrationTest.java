@@ -66,7 +66,7 @@ class PublicCatalogIntegrationTest extends IntegrationTestSupport {
         assertThat(JsonPath.<Map<String, Object>>read(body, "$.products.items[0]").keySet())
                 .containsExactlyInAnyOrder("id", "name", "description", "category", "price", "imageUrl");
         assertThat(JsonPath.<Map<String, Object>>read(body, "$.restaurant").keySet())
-                .containsExactlyInAnyOrder("id", "name", "category", "description", "zone", "attention", "logoUrl", "coverUrl");
+                .containsExactlyInAnyOrder("id", "name", "category", "description", "zone", "attention", "logoUrl", "coverUrl", "distanceKm", "branchCount");
         assertThat(body).doesNotContain("mikuna/products/p").doesNotContain("Jr. Lima 123").doesNotContain("local@mail.com");
     }
 

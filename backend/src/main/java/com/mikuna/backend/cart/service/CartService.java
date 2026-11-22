@@ -251,7 +251,7 @@ public class CartService {
         Optional<Address> address = addresses.findByIdAndCustomerId(selected, cart.getCustomerId());
         if (address.isPresent() && zone.covers(address.get().getDistrict())) {
             return new CartResponse.AddressInfo(address.get().getId(), address.get().getStreet(),
-                    address.get().getDistrict());
+                    address.get().getDistrict(), address.get().getLatitude(), address.get().getLongitude());
         }
         if (dropInvalid) {
             cart.clearAddress();

@@ -12,7 +12,8 @@ import java.util.UUID;
 /** Datos del restaurante para su titular; nunca incluye ownerId ni resolvedBy. */
 public record RestaurantResponse(UUID id, String name, String category, String description, String address,
         String zone, String phone, RestaurantStatus status, Instant submittedAt, String rejectionReason,
-        Instant resolvedAt, boolean available, List<OpeningHourDto> schedule, boolean acceptingOrders, String logoUrl, String coverUrl) {
+        Instant resolvedAt, boolean available, List<OpeningHourDto> schedule, boolean acceptingOrders, String logoUrl, String coverUrl,
+        Double latitude, Double longitude) {
 
     private static final DateTimeFormatter HOUR = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -21,7 +22,8 @@ public record RestaurantResponse(UUID id, String name, String category, String d
                 restaurant.getDescription(), restaurant.getAddress(), restaurant.getZone(),
                 restaurant.getPhone(), restaurant.getStatus(), restaurant.getSubmittedAt(),
                 restaurant.getRejectionReason(), restaurant.getResolvedAt(), restaurant.isAvailable(),
-                scheduleOf(restaurant), acceptingOrders, restaurant.getLogoUrl(), restaurant.getCoverUrl());
+                scheduleOf(restaurant), acceptingOrders, restaurant.getLogoUrl(), restaurant.getCoverUrl(),
+                restaurant.getLatitude(), restaurant.getLongitude());
     }
 
     static List<OpeningHourDto> scheduleOf(Restaurant restaurant) {

@@ -9,13 +9,17 @@ import java.util.UUID;
  * Recogido, la ubicación vigente del repartidor. Las etapas no exponen quién las originó.
  */
 public record TrackingResponse(UUID orderId, String status, List<Stage> stages, CourierLocation courierLocation,
-        String locationUnavailableReason) {
+        String locationUnavailableReason, Point destination) {
 
     public static final String NOT_PICKED_UP = "NOT_PICKED_UP";
     public static final String FINISHED = "FINISHED";
     public static final String NO_LOCATION_YET = "NO_LOCATION_YET";
 
     public record Stage(String status, Instant at) {
+    }
+
+    /** Punto de entrega que marcó el cliente (puede faltar en direcciones antiguas). */
+    public record Point(double latitude, double longitude) {
     }
 
     public record CourierLocation(double latitude, double longitude, Instant updatedAt) {

@@ -11,7 +11,7 @@ import java.util.UUID;
 public record CourierDeliveryResponse(UUID orderId, String status, Pickup restaurant, Destination delivery,
         List<Line> lines, Instant assignedAt) {
 
-    public record Pickup(String name, String address, String zone, String phone) {
+    public record Pickup(String name, String address, String zone, String phone, Double latitude, Double longitude) {
     }
 
     public record Destination(String label, String street, String district, String reference, String phone,
@@ -24,7 +24,8 @@ public record CourierDeliveryResponse(UUID orderId, String status, Pickup restau
     public static CourierDeliveryResponse of(Order order, Delivery delivery, Restaurant place) {
         return new CourierDeliveryResponse(order.getId(), order.getStatus().name(),
                 new Pickup(order.getRestaurantName(), place == null ? null : place.getAddress(),
-                        place == null ? null : place.getZone(), place == null ? null : place.getPhone()),
+                        place == null ? null : place.getZone(), place == null ? null : place.getPhone(),
+                        place == null ? null : place.getLatitude(), place == null ? null : place.getLongitude()),
                 new Destination(order.getDeliveryLabel(), order.getDeliveryStreet(), order.getDeliveryDistrict(),
                         order.getDeliveryReference(), order.getDeliveryPhone(), order.getDeliveryLatitude(),
                         order.getDeliveryLongitude()),

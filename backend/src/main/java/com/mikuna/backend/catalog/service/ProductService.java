@@ -38,6 +38,7 @@ public class ProductService {
 
     private static final BigDecimal MIN_PRICE = new BigDecimal("0.01");
     private static final BigDecimal MAX_PRICE = new BigDecimal("9999.99");
+    private static final int MAX_COPY = 500;
 
     private final ProductRepository products;
     private final RestaurantRepository restaurants;
@@ -75,6 +76,54 @@ public class ProductService {
             storage.delete(stored.publicId());
             throw failure;
         }
+    }
+
+    /**
+     * Copia a la sucursal actual los productos activos de otra sucursal de la misma cuenta. Cada imagen se vuelve a
+     * subir (no se comparte), así cambiarla o reemplazarla en una sucursal no afecta a las demás. Los productos que
+     * ya existan con el mismo nombre y categoría se omiten.
+     */
+    @Transactional
+    public CopyMenuResult copyMenu(UUID ownerId, UUID sourceRestaurantId) {
+        Restaurant target = approvedRestaurant(ownerId);
+        if (target.getId().equals(sourceRestaurantId)) {
+            throw new RegistrationValidationException("source", "Elige otra sucursal para copiar su carta");
+        }
+        Restaurant source = restaurants.findByIdAndOwnerId(sourceRestaurantId, ownerId)
+                .orElseThrow(() -> new RestaurantNotFoundException("Sucursal no encontrada"));
+
+        java.util.Set<String> existing = new java.util.HashSet<>();
+        products.findByRestaurantIdAndActiveTrue(target.getId(), PageRequest.of(0, MAX_COPY)).forEach(
+                product -> existing.add(Product.key(product.getName()) + "|" + Product.key(product.getCategory())));
+
+        java.util.List<String> uploaded = new java.util.ArrayList<>();
+        int copied = 0;
+        int skipped = 0;
+        try {
+            for (Product original : products.findByRestaurantIdAndActiveTrue(source.getId(),
+                    PageRequest.of(0, MAX_COPY, Sort.by("category", "name"))).getContent()) {
+                if (!existing.add(Product.key(original.getName()) + "|" + Product.key(original.getCategory()))) {
+                    skipped++;
+                    continue;
+                }
+                StoredImage image = storage.copyFrom(original.getImageUrl());
+                uploaded.add(image.publicId());
+                Product copy = Product.create(target.getId(), original.getName(), original.getDescription(),
+                        original.getCategory(), original.getPrice(), image.secureUrl(), image.publicId(),
+                        Instant.now(clock));
+                copy.setAvailable(original.isAvailable());
+                products.save(copy);
+                copied++;
+            }
+            products.flush();
+        } catch (RuntimeException failure) {
+            uploaded.forEach(storage::delete);
+            throw failure;
+        }
+        return new CopyMenuResult(copied, skipped);
+    }
+
+    public record CopyMenuResult(int copied, int skipped) {
     }
 
     @Transactional(readOnly = true)

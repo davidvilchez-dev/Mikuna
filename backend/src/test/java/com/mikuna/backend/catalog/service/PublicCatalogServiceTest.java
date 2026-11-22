@@ -56,7 +56,7 @@ class PublicCatalogServiceTest {
 
     /** Abierto el lunes de 09:00 a 21:00, por tanto OPEN en el reloj de la prueba si está disponible. */
     private static Restaurant restaurant(String name, String category, String zone, boolean available) {
-        Restaurant restaurant = TestRestaurants.approvedOpenOnMonday(OWNER, available);
+        Restaurant restaurant = TestRestaurants.approvedOpenOnMonday(UUID.randomUUID(), available);
         ReflectionTestUtils.setField(restaurant, "name", name);
         ReflectionTestUtils.setField(restaurant, "category", category);
         ReflectionTestUtils.setField(restaurant, "zone", zone);
@@ -71,9 +71,55 @@ class PublicCatalogServiceTest {
         return page.items().stream().map(PublicRestaurantResponse::name).toList();
     }
 
+    private static Restaurant branch(UUID owner, String name, Double latitude, Double longitude, boolean available) {
+        Restaurant restaurant = TestRestaurants.approvedOpenOnMonday(owner, available);
+        ReflectionTestUtils.setField(restaurant, "name", name);
+        restaurant.changeLocation(latitude, longitude);
+        return restaurant;
+    }
+
+    @Test
+    void lasSucursalesDeUnaMarcaSeMuestranComoUnaSolaTarjetaLaMasCercana() {
+        UUID brand = UUID.randomUUID();
+        visible(branch(brand, "Kimsa Lejos", -13.1700, -74.2100, true), branch(brand, "Kimsa Cerca", -13.1580, -74.2230, true),
+                branch(UUID.randomUUID(), "Otra marca", -13.1000, -74.2000, true));
+
+        PageResponse<PublicRestaurantResponse> page = service.search(null, null, null, -13.1579, -74.2232, 0, 20);
+
+        assertThat(names(page)).containsExactly("Kimsa Cerca", "Otra marca");
+        PublicRestaurantResponse kimsa = page.items().get(0);
+        assertThat(kimsa.branchCount()).isEqualTo(2);
+        assertThat(kimsa.distanceKm()).isNotNull().isLessThan(0.5);
+    }
+
+    @Test
+    void laSucursalCerradaCedeAnteUnaAbiertaMasLejana() {
+        UUID brand = UUID.randomUUID();
+        visible(branch(brand, "Kimsa Cerca Pausada", -13.1580, -74.2230, false), branch(brand, "Kimsa Lejos Abierta", -13.1700, -74.2100, true));
+
+        PageResponse<PublicRestaurantResponse> page = service.search(null, null, null, -13.1579, -74.2232, 0, 20);
+
+        assertThat(names(page)).containsExactly("Kimsa Lejos Abierta");
+    }
+
+    @Test
+    void sinPuntoDeEntregaSeUsaLaSucursalPrincipalYNoHayDistancia() {
+        UUID brand = UUID.randomUUID();
+        Restaurant principal = branch(brand, "Kimsa Principal", -13.1700, -74.2100, true);
+        Restaurant reciente = branch(brand, "Kimsa Reciente", -13.1580, -74.2230, true);
+        ReflectionTestUtils.setField(principal, "submittedAt", Instant.parse("2026-01-01T00:00:00Z"));
+        ReflectionTestUtils.setField(reciente, "submittedAt", Instant.parse("2026-06-01T00:00:00Z"));
+        visible(reciente, principal);
+
+        PublicRestaurantResponse card = service.search(null, null, null, 0, 20).items().get(0);
+
+        assertThat(card.name()).isEqualTo("Kimsa Principal");
+        assertThat(card.distanceKm()).isNull();
+    }
+
     @Test
     void sinCriteriosDevuelveTodosLosVisiblesConSuAtencion() {
-        Restaurant outside = TestRestaurants.restaurant(OWNER, RestaurantStatus.APPROVED); // sin horario
+        Restaurant outside = TestRestaurants.restaurant(UUID.randomUUID(), RestaurantStatus.APPROVED); // sin horario
         outside.setAvailable(true);
         ReflectionTestUtils.setField(outside, "name", "Cerrado ahora");
         visible(restaurant("Abierto", "Criolla", "Ayacucho", true), restaurant("Pausado", "Criolla", "Ayacucho", false), outside);

@@ -41,6 +41,13 @@ public class ProductController {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(principal.id(), product, image));
     }
 
+    /** Copia la carta de otra sucursal de la misma cuenta a la sucursal con la que se trabaja. */
+    @PostMapping("/copy-from/{sourceRestaurantId}")
+    public ProductService.CopyMenuResult copyFrom(@AuthenticationPrincipal AccountPrincipal principal,
+            @PathVariable UUID sourceRestaurantId) {
+        return service.copyMenu(principal.id(), sourceRestaurantId);
+    }
+
     @GetMapping
     public PageResponse<ProductResponse> list(@AuthenticationPrincipal AccountPrincipal principal,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {

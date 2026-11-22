@@ -12,7 +12,22 @@ import org.springframework.data.repository.query.Param;
 
 public interface RestaurantRepository extends JpaRepository<Restaurant, UUID> {
 
-    Optional<Restaurant> findByOwnerId(UUID ownerId);
+    /** Sucursales del titular, de la más antigua a la más reciente. */
+    List<Restaurant> findByOwnerIdOrderBySubmittedAtAsc(UUID ownerId);
+
+    Optional<Restaurant> findByIdAndOwnerId(UUID id, UUID ownerId);
+
+    /**
+     * Sucursal con la que trabaja el titular en esta petición: la indicada en la cabecera
+     * {@code X-Restaurant-Id} (solo si le pertenece) o, sin cabecera, la más antigua.
+     */
+    default Optional<Restaurant> findByOwnerId(UUID ownerId) {
+        UUID requested = BranchSelection.requested();
+        if (requested != null) {
+            return findByIdAndOwnerId(requested, ownerId);
+        }
+        return findByOwnerIdOrderBySubmittedAtAsc(ownerId).stream().findFirst();
+    }
 
     /**
      * Restaurantes visibles al público (spec 004): aprobados y con la cuenta habilitada, con su horario

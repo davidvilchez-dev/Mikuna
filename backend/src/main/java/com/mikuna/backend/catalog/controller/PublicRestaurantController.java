@@ -29,8 +29,9 @@ public class PublicRestaurantController {
     @GetMapping
     public PageResponse<PublicRestaurantResponse> search(@RequestParam(required = false) String name,
             @RequestParam(required = false) String category, @RequestParam(required = false) String zone,
+            @RequestParam(required = false) Double lat, @RequestParam(required = false) Double lng,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-        return service.search(name, category, zone, page, size);
+        return service.search(name, category, zone, lat, lng, page, size);
     }
 
     @GetMapping("/filters")
