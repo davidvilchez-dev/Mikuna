@@ -206,7 +206,7 @@ img { display: block; max-width: 100%; }
 .hero-highlights .icon-accent { stroke: currentColor; }
 
 /* ---------- Categorías ---------- */
-.category-section { padding-block: 72px 80px; background: var(--color-mikuna-white); }
+.category-section { padding-block: 72px 80px; background: var(--color-mikuna-white); overflow-x: clip; }
 .category-section h2 { margin: 0; font-family: var(--font-display); font-size: clamp(32px, 3.6vw, 48px); font-weight: 800; line-height: 1.1; letter-spacing: -0.035em; }
 .category-grid { gap: 16px; margin-top: 32px; }
 .category-card {
