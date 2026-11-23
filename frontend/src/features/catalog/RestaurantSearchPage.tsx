@@ -31,11 +31,13 @@ export function RestaurantSearchPage() {
   const [state, setState] = useState<ViewState>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
   // Punto de entrega del cliente: undefined mientras se consulta; null si no hay sesión o dirección con mapa.
-  const [point, setPoint] = useState<{ latitude: number; longitude: number } | null | undefined>(undefined)
+  const [point, setPoint] = useState<{ latitude: number; longitude: number } | null | undefined>(
+    () => (getSession()?.role === 'CUSTOMER' ? undefined : null),
+  )
 
   useEffect(() => {
     const session = getSession()
-    if (!session || session.role !== 'CUSTOMER') { setPoint(null); return }
+    if (!session || session.role !== 'CUSTOMER') return
     let active = true
     const load = () => {
       getCart(session.token)
