@@ -101,16 +101,68 @@ export function friendlyHttpError(status: number, detail: string): string {
 export interface TextPiece {
   text: string
   bold: boolean
+  italic: boolean
 }
 
-/** Convierte **negrita** en piezas de texto para pintar sin HTML; el resto se muestra tal cual. */
+/** Convierte **negrita** y *cursiva* en piezas de texto para pintar sin HTML; los asteriscos sueltos se quitan. */
 export function formatInline(text: string): TextPiece[] {
   const pieces: TextPiece[] = []
-  const parts = text.split(/\*\*(.+?)\*\*/g)
-  parts.forEach((part, index) => {
-    if (part !== '') pieces.push({ text: part, bold: index % 2 === 1 })
-  })
-  return pieces
+  for (const part of text.split(/(\*\*.+?\*\*|\*[^*\s][^*]*?\*)/g)) {
+    if (part === '') continue
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+      pieces.push({ text: part.slice(2, -2), bold: true, italic: false })
+    } else if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
+      pieces.push({ text: part.slice(1, -1), bold: false, italic: true })
+    } else {
+      pieces.push({ text: part.replace(/\*/g, ''), bold: false, italic: false })
+    }
+  }
+  return pieces.filter((piece) => piece.text !== '')
+}
+
+export type Block =
+  | { type: 'p'; pieces: TextPiece[] }
+  | { type: 'ul' | 'ol'; items: TextPiece[][] }
+
+const BULLET = /^\s*[*•-]\s+(.*)$/
+const NUMBERED = /^\s*\d+[.)]\s+(.*)$/
+
+/**
+ * Convierte la respuesta del asistente en bloques: párrafos, listas con viñeta y listas numeradas. Las líneas con
+ * sangría que siguen a un elemento se unen a él (detalle del plato). Todo se pinta sin HTML.
+ */
+export function formatBlocks(text: string): Block[] {
+  const blocks: Block[] = []
+  let paragraph: string[] = []
+  const flush = () => {
+    if (paragraph.length > 0) blocks.push({ type: 'p', pieces: formatInline(paragraph.join(' ')) })
+    paragraph = []
+  }
+  for (const line of text.replace(/\r\n/g, '\n').split('\n')) {
+    const bullet = BULLET.exec(line)
+    const numbered = bullet ? null : NUMBERED.exec(line)
+    const match = bullet ?? numbered
+    if (match) {
+      flush()
+      const type = bullet ? 'ul' : 'ol'
+      const last = blocks[blocks.length - 1]
+      const item = formatInline(match[1])
+      if (last && last.type === type) last.items.push(item)
+      else blocks.push({ type, items: [item] })
+    } else if (line.trim() === '') {
+      flush()
+    } else {
+      const last = blocks[blocks.length - 1]
+      if (paragraph.length === 0 && last && last.type !== 'p' && /^\s+/.test(line)) {
+        // Línea con sangría tras un elemento de lista: continúa ese elemento.
+        last.items[last.items.length - 1].push(...formatInline(' ' + line.trim()))
+      } else {
+        paragraph.push(line.trim())
+      }
+    }
+  }
+  flush()
+  return blocks
 }
 
 function storage(): Storage | null {

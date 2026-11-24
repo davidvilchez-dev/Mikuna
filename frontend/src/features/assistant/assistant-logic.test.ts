@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   appendDelta,
   clearAssistantHistory,
+  formatBlocks,
   formatInline,
   friendlyHttpError,
   loadHistory,
@@ -105,16 +106,52 @@ describe('textos de error', () => {
 })
 
 describe('formato', () => {
-  it('convierte **negrita** en piezas y deja el resto igual', () => {
+  const plain = (text: string) => ({ text, bold: false, italic: false })
+
+  it('convierte **negrita** y *cursiva* en piezas y deja el resto igual', () => {
     expect(formatInline('Prueba **Ensalada** hoy')).toEqual([
-      { text: 'Prueba ', bold: false },
-      { text: 'Ensalada', bold: true },
-      { text: ' hoy', bold: false },
+      plain('Prueba '),
+      { text: 'Ensalada', bold: true, italic: false },
+      plain(' hoy'),
     ])
-    expect(formatInline('sin formato')).toEqual([{ text: 'sin formato', bold: false }])
+    expect(formatInline('S/ 22.00 · *mozzarella y jamón*')).toEqual([
+      plain('S/ 22.00 · '),
+      { text: 'mozzarella y jamón', bold: false, italic: true },
+    ])
+    expect(formatInline('sin formato')).toEqual([plain('sin formato')])
     expect(formatInline('')).toEqual([])
   })
+
+  it('quita los asteriscos sueltos', () => {
+    expect(formatInline('a * b')).toEqual([plain('a  b')])
+    expect(formatInline('**')).toEqual([])
+  })
+
+  it('arma párrafos y listas con viñeta, sea con * o con -', () => {
+    const blocks = formatBlocks('Opciones:\n\n* **Pizza americana** — S/ 22.00\n- **Pizza argentina** — S/ 24.00\n\nCierre')
+    expect(blocks.map((b) => b.type)).toEqual(['p', 'ul', 'p'])
+    const list = blocks[1]
+    expect(list.type === 'ul' && list.items).toHaveLength(2)
+    expect(list.type === 'ul' && list.items[0][0]).toEqual({ text: 'Pizza americana', bold: true, italic: false })
+  })
+
+  it('una línea con sangría continúa el elemento anterior', () => {
+    const blocks = formatBlocks('* **Pizza** — S/ 22.00\n  *(Mozzarella y jamón)*')
+    expect(blocks).toHaveLength(1)
+    const list = blocks[0]
+    expect(list.type === 'ul' && list.items).toHaveLength(1)
+    expect(list.type === 'ul' && list.items[0].some((piece) => piece.italic)).toBe(true)
+  })
+
+  it('reconoce listas numeradas y no pierde texto en construcción', () => {
+    const blocks = formatBlocks('1. **Elige** un restaurante\n2) Agrega al carrito')
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0].type).toBe('ol')
+    expect(formatBlocks('**Piz')).toEqual([{ type: 'p', pieces: [plain('Piz')] }])
+    expect(formatBlocks('')).toEqual([])
+  })
 })
+
 
 describe('almacenamiento', () => {
   it('guarda, recupera y borra la conversación', () => {

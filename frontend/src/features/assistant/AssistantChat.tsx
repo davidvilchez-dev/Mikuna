@@ -3,7 +3,7 @@ import { ApiError } from '../auth/auth-api'
 import { streamChat } from './assistant-api'
 import {
   appendDelta,
-  formatInline,
+  formatBlocks,
   friendlyHttpError,
   GREETING,
   loadHistory,
@@ -12,6 +12,7 @@ import {
   SUGGESTIONS,
   UNAVAILABLE,
   type ChatMessage,
+  type TextPiece,
 } from './assistant-logic'
 import './assistant.css'
 
@@ -117,22 +118,24 @@ export function AssistantChat({ token }: AssistantChatProps) {
 
           <div className="assistant-messages" role="log" aria-live="polite" aria-label="Conversación">
             <p className="assistant-bubble assistant-bubble-bot">{GREETING}</p>
-            {messages.map((message, index) => (
-              <p
-                key={index}
-                className={
-                  message.role === 'user'
-                    ? 'assistant-bubble assistant-bubble-user'
-                    : message.notice
-                      ? 'assistant-bubble assistant-bubble-notice'
-                      : 'assistant-bubble assistant-bubble-bot'
-                }
-              >
-                {formatInline(message.text).map((piece, i) =>
-                  piece.bold ? <strong key={i}>{piece.text}</strong> : <span key={i}>{piece.text}</span>,
-                )}
-              </p>
-            ))}
+            {messages.map((message, index) =>
+              message.role === 'assistant' && !message.notice ? (
+                <div key={index} className="assistant-bubble assistant-bubble-bot assistant-rich">
+                  <RichText text={message.text} />
+                </div>
+              ) : (
+                <p
+                  key={index}
+                  className={
+                    message.role === 'user'
+                      ? 'assistant-bubble assistant-bubble-user assistant-plain'
+                      : 'assistant-bubble assistant-bubble-notice assistant-plain'
+                  }
+                >
+                  {message.text}
+                </p>
+              ),
+            )}
             {sending && messages[messages.length - 1]?.role === 'user' && (
               <p className="assistant-bubble assistant-bubble-bot assistant-typing" aria-label="El asistente está escribiendo">
                 <span />
@@ -197,6 +200,35 @@ export function AssistantChat({ token }: AssistantChatProps) {
       </button>
     </div>
   )
+}
+
+function Inline({ pieces }: { pieces: TextPiece[] }) {
+  return pieces.map((piece, i) =>
+    piece.bold ? <strong key={i}>{piece.text}</strong> : piece.italic ? <em key={i}>{piece.text}</em> : piece.text,
+  )
+}
+
+/** Respuesta del asistente con párrafos, viñetas y listas numeradas reales (sin HTML crudo). */
+function RichText({ text }: { text: string }) {
+  return formatBlocks(text).map((block, index) => {
+    if (block.type === 'p') {
+      return (
+        <p key={index}>
+          <Inline pieces={block.pieces} />
+        </p>
+      )
+    }
+    const List = block.type === 'ul' ? 'ul' : 'ol'
+    return (
+      <List key={index}>
+        {block.items.map((item, i) => (
+          <li key={i}>
+            <Inline pieces={item} />
+          </li>
+        ))}
+      </List>
+    )
+  })
 }
 
 function Sparkle({ size = 20 }: { size?: number }) {
