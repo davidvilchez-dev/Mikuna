@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.mikuna.backend.common.exception.InvalidOrderTransitionException;
+import com.mikuna.backend.common.exception.OrderConflictException;
 import com.mikuna.backend.common.exception.OrderNotFoundException;
 import com.mikuna.backend.common.exception.PaymentUnavailableException;
 import com.mikuna.backend.common.exception.RestaurantNotEnabledException;
@@ -265,5 +266,79 @@ class OrderStatusServiceTest {
                 .isInstanceOf(InvalidOrderTransitionException.class);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PREPARING);
         verify(changes, times(2)).save(any());
+    }
+    // --- Spec 012: vencimiento al decidir ---
+
+    @Test
+    void aceptarUnPendienteVencidoLoCancelaPorElSistemaSinCobrar() {
+        order.setExpiresAt(Instant.now(CLOCK).minusSeconds(1));
+
+        OrderStatusService.Result result = service.accept(ownerId, order.getId());
+
+        assertThat(result.expired()).isTrue();
+        verify(paymentService, never()).capture(any());
+        verify(paymentService).release(order.getId());
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        OrderStatusChange change = savedChange();
+        assertThat(change.getActorRole()).isEqualTo(ActorRole.SYSTEM);
+        assertThat(change.getActorId()).isNull();
+        assertThat(change.getReason()).isEqualTo(OrderExpiryPolicy.REASON);
+    }
+
+    @Test
+    void rechazarUnPendienteVencidoLoCancelaPorElSistema() {
+        order.setExpiresAt(Instant.now(CLOCK));
+
+        OrderStatusService.Result result = service.reject(ownerId, order.getId(), "sin stock");
+
+        assertThat(result.expired()).isTrue();
+        verify(paymentService, times(1)).release(order.getId());
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(savedChange().getReason()).isEqualTo(OrderExpiryPolicy.REASON);
+    }
+
+    @Test
+    void aceptarAntesDelVencimientoCobraNormalmente() {
+        order.setExpiresAt(Instant.now(CLOCK).plusSeconds(1));
+
+        OrderStatusService.Result result = service.accept(ownerId, order.getId());
+
+        assertThat(result.expired()).isFalse();
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.ACCEPTED);
+    }
+
+    @Test
+    void decidirSobreUnPedidoYaVencidoEsOrderExpiredSinTocarElPago() {
+        order.setExpiresAt(Instant.now(CLOCK).minusSeconds(60));
+        service.expireIfDue(order);
+        OrderStatusChange expiredChange = savedChange();
+        when(changes.findFirstByOrderIdOrderByChangedAtDesc(order.getId())).thenReturn(Optional.of(expiredChange));
+
+        assertThatThrownBy(() -> service.accept(ownerId, order.getId()))
+                .isInstanceOfSatisfying(OrderConflictException.class,
+                        e -> assertThat(e.getCode()).isEqualTo(OrderConflictException.ORDER_EXPIRED));
+        assertThatThrownBy(() -> service.reject(ownerId, order.getId(), null))
+                .isInstanceOf(OrderConflictException.class);
+        verify(paymentService, times(1)).release(order.getId());
+        verify(paymentService, never()).capture(any());
+    }
+
+    @Test
+    void expireIfDueNoHaceNadaSiNoVencioOSiNoEstaPendiente() {
+        assertThat(service.expireIfDue(order)).isFalse(); // sin vencimiento fijado
+        order.setExpiresAt(Instant.now(CLOCK).plusSeconds(30));
+        assertThat(service.expireIfDue(order)).isFalse();
+        verify(paymentService, never()).release(any());
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING);
+    }
+
+    @Test
+    void siLaPasarelaFallaAlVencerNoCambiaElEstado() {
+        order.setExpiresAt(Instant.now(CLOCK).minusSeconds(1));
+        doThrow(new PaymentUnavailableException()).when(paymentService).release(order.getId());
+
+        assertThatThrownBy(() -> service.expireIfDue(order)).isInstanceOf(PaymentUnavailableException.class);
+        assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING);
+        verify(changes, never()).save(any());
     }
 }

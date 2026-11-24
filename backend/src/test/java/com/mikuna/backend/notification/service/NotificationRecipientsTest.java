@@ -66,6 +66,18 @@ class NotificationRecipientsTest {
     }
 
     @Test
+    void elVencimientoAvisaAClienteYRestauranteConElMotivo() {
+        List<Draft> drafts = NotificationRecipients.plan(new OrderStatusChangedEvent(UUID.randomUUID(), orderId,
+                OrderStatus.PENDING, OrderStatus.CANCELLED, null, ActorRole.SYSTEM,
+                com.mikuna.backend.order.service.OrderExpiryPolicy.REASON), withoutCourier);
+
+        assertThat(recipients(drafts)).containsExactly(customer, owner);
+        assertThat(drafts).allSatisfy(d -> assertThat(d.type()).isEqualTo(NotificationType.CANCELLED));
+        assertThat(drafts.get(0).message()).contains("el restaurante no respondió a tiempo");
+        assertThat(drafts.get(1).message()).contains("porque no se respondió a tiempo");
+    }
+
+    @Test
     void asignarAvisaALosTresParticipantes() {
         List<Draft> drafts = plan(OrderStatus.READY, OrderStatus.ASSIGNED, null, ActorRole.SYSTEM, withCourier);
 

@@ -11,6 +11,9 @@ public class OrderConflictException extends RuntimeException {
     public static final String NOT_ORDERABLE = "NOT_ORDERABLE";
     public static final String AMOUNTS_CHANGED = "AMOUNTS_CHANGED";
     public static final String RESERVATION_EXPIRED = "RESERVATION_EXPIRED";
+    /** El pedido venció sin respuesta del restaurante (spec 012). */
+    public static final String ORDER_EXPIRED = "ORDER_EXPIRED";
+    public static final String EXPIRED_MESSAGE = "El pedido venció porque no se respondió a tiempo";
 
     private final String code;
     private final transient Object checkout;

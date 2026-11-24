@@ -9,6 +9,7 @@ import com.mikuna.backend.order.model.OrderPlacedEvent;
 import com.mikuna.backend.order.model.OrderStatus;
 import com.mikuna.backend.order.model.OrderStatusChangedEvent;
 import com.mikuna.backend.order.repository.OrderRepository;
+import com.mikuna.backend.order.service.OrderExpiryPolicy;
 import com.mikuna.backend.restaurant.model.Restaurant;
 import com.mikuna.backend.restaurant.repository.RestaurantRepository;
 import java.util.ArrayList;
@@ -25,6 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Component
 public class NotificationRecipients {
+
+    private static final String EXPIRED_REASON = OrderExpiryPolicy.REASON;
 
     /** Aviso por registrar: destinatario, tipo y mensaje ya redactado. */
     public record Draft(UUID recipientId, NotificationType type, String message) {
@@ -81,6 +84,14 @@ public class NotificationRecipients {
                 }
             }
             case CANCELLED -> {
+                if (EXPIRED_REASON.equals(event.reason())) {
+                    // Vencimiento sin respuesta del restaurante (spec 012): el responsable es el sistema.
+                    add(drafts, p.customerId(), NotificationType.CANCELLED,
+                            "Se canceló tu " + ref + ": el restaurante no respondió a tiempo");
+                    add(drafts, p.restaurantOwnerId(), NotificationType.CANCELLED,
+                            "Se canceló el " + ref + " porque no se respondió a tiempo");
+                    break;
+                }
                 add(drafts, p.customerId(), NotificationType.CANCELLED, "Se canceló tu " + ref);
                 add(drafts, p.restaurantOwnerId(), NotificationType.CANCELLED, "Se canceló el " + ref);
                 add(drafts, p.courierId(), NotificationType.CANCELLED, "Se canceló el " + ref + " asignado");

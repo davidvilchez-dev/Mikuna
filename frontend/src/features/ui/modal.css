@@ -17,3 +17,19 @@
 .mk-modal-close:hover { background: #F1F2F4; }
 .mk-modal-close:focus-visible { outline: 3px solid var(--color-mikuna-indigo); outline-offset: 0; }
 .mk-modal-close svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+
+/* Diálogo de confirmación (useConfirm). */
+.mk-confirm-text { margin: 0; font-size: 16px; line-height: 1.5; color: color-mix(in srgb, var(--color-mikuna-indigo) 80%, transparent); }
+.mk-confirm-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+.mk-confirm-btn {
+  min-height: 44px; padding: 0 20px; border-radius: 999px; font: inherit; font-weight: 700; cursor: pointer;
+  border: 1px solid transparent; transition: background-color 160ms, border-color 160ms;
+}
+.mk-confirm-btn:focus-visible { outline: 3px solid var(--color-mikuna-indigo); outline-offset: 2px; }
+.mk-confirm-cancel { background: transparent; border-color: #D9DCE3; color: var(--color-mikuna-indigo); }
+.mk-confirm-cancel:hover { background: #F1F2F4; }
+.mk-confirm-ok { background: var(--color-mikuna-orange); color: #fff; }
+.mk-confirm-ok:hover { background: var(--color-mikuna-orange-deep); }
+.mk-confirm-danger { background: #C62828; color: #fff; }
+.mk-confirm-danger:hover { background: #A61F1F; }
+@media (max-width: 480px) { .mk-confirm-actions { flex-direction: column-reverse; } .mk-confirm-btn { width: 100%; } }

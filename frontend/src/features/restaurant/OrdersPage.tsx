@@ -5,9 +5,14 @@ import { AppIcon } from '../auth/AppIcon'
 import { RestaurantLayout } from './RestaurantLayout'
 import { clearSession, getSession } from '../auth/session-storage'
 import { formatPrice } from '../catalog/catalog-validation'
-import { actOnOrder, listOrders, type RestaurantOrder } from './orders-api'
+import { actOnOrder, listAssignedOrders, listOrders, type RestaurantOrder } from './orders-api'
 import {
   ORDER_REASON_MAX,
+  expiryDeadline,
+  formatRemaining,
+  isNearExpiry,
+  orderCode as shortCode,
+  remainingMs,
   orderStatusLabels,
   restaurantActions,
   validateOrderReason,
@@ -24,6 +29,8 @@ const tabs: { status: OrderStatus; label: string }[] = [
 ]
 
 const POLL_MS = 15_000
+/** Con un pedido ya vencido en pantalla, se vuelve a pedir la lista como mucho cada tantos ms hasta que el servidor lo cancele. */
+const EXPIRED_RELOAD_MS = 5_000
 
 const doneMessages: Record<RestaurantAction, string> = {
   accept: 'Pedido aceptado y cobrado',
@@ -36,12 +43,7 @@ const emptyTexts: Partial<Record<OrderStatus, string>> = {
   PENDING: 'Cuando llegue un pedido nuevo aparecerá aquí. Mantén esta pantalla abierta.',
   ACCEPTED: 'Los pedidos que aceptes esperan aquí hasta que empieces a prepararlos.',
   PREPARING: 'Aquí verás lo que tienes en cocina.',
-  READY: 'Los pedidos listos esperan aquí a que llegue el repartidor.',
-}
-
-/** Código corto para nombrar el pedido en voz alta con el repartidor o el cliente. */
-function shortCode(id: string): string {
-  return '#' + id.replace(/-/g, '').slice(-4).toUpperCase()
+  READY: 'Los pedidos listos esperan aquí hasta que el repartidor los recoge.',
 }
 
 function ago(iso: string, now: number): string {
@@ -56,7 +58,7 @@ type Buckets = Partial<Record<OrderStatus, RestaurantOrder[]>>
 
 type ViewState =
   | { kind: 'loading' }
-  | { kind: 'ready'; buckets: Buckets }
+  | { kind: 'ready'; buckets: Buckets; loadedAt: number }
   | { kind: 'forbidden' }
   | { kind: 'error'; message: string }
 
@@ -89,11 +91,15 @@ export function OrdersPage() {
     if (!token) return
     let active = true
     const load = () => {
-      Promise.all(tabs.map((tab) => listOrders(token, tab.status)))
+      Promise.all([...tabs.map((tab) => listOrders(token, tab.status)), listAssignedOrders(token)])
         .then((lists) => {
           if (!active) return
-          setNow(Date.now())
-          setState({ kind: 'ready', buckets: Object.fromEntries(tabs.map((tab, i) => [tab.status, lists[i]])) })
+          const loadedAt = Date.now()
+          setNow(loadedAt)
+          const buckets: Buckets = Object.fromEntries(tabs.map((tab, i) => [tab.status, lists[i]]))
+          // Con repartidor asignado el pedido sigue en el local hasta que lo recogen: se muestra en «Listos».
+          buckets.READY = [...(buckets.READY ?? []), ...lists[tabs.length]]
+          setState({ kind: 'ready', buckets, loadedAt })
         })
         .catch((error: unknown) => {
           if (!active) return
@@ -109,6 +115,29 @@ export function OrdersPage() {
     const timer = setInterval(load, POLL_MS)
     return () => { active = false; clearInterval(timer) }
   }, [token, attempt, fail])
+
+  // Reloj de 1 s para la cuenta regresiva de los pedidos nuevos (spec 012).
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  const loadedAt = state.kind === 'ready' ? state.loadedAt : 0
+  const deadlineOf = (order: RestaurantOrder) =>
+    order.status === 'PENDING' ? expiryDeadline(order.secondsToExpire, loadedAt) : null
+  const pending = state.kind === 'ready' ? state.buckets.PENDING ?? [] : []
+  const someExpired = pending.some((order) => {
+    const deadline = deadlineOf(order)
+    return deadline !== null && deadline <= now
+  })
+  const shouldRefreshExpired = someExpired && now - loadedAt >= EXPIRED_RELOAD_MS
+
+  // Un pedido que llegó a 0 se vuelve a pedir para mostrarlo Cancelado en cuanto el servidor lo registra.
+  useEffect(() => {
+    if (!shouldRefreshExpired) return
+    const timer = setTimeout(() => setAttempt((n) => n + 1), 0)
+    return () => clearTimeout(timer)
+  }, [shouldRefreshExpired])
 
   if (!session) return <Navigate to="/iniciar-sesion" replace />
 
@@ -190,14 +219,28 @@ export function OrdersPage() {
       )}
       {state.kind === 'ready' && items.length > 0 && (
         <ul className="rs-orders">
-          {items.map((order) => (
+          {items.map((order) => {
+            const deadline = deadlineOf(order)
+            const remaining = deadline === null ? null : remainingMs(deadline, now)
+            const expired = remaining === 0
+            const near = remaining !== null && isNearExpiry(remaining, order.createdAt, order.expiresAt)
+            return (
             <li key={order.id} className={order.status === 'PENDING' ? 'rs-order rs-order-new' : 'rs-order'}>
               <header className="rs-order-head">
                 <div>
                   <strong className="rs-order-code">{shortCode(order.id)}</strong>
                   <small>{ago(order.createdAt, now)}</small>
                 </div>
-                <span className="rs-chip">{orderStatusLabels[order.status]}</span>
+                <span className="rs-order-tags">
+                  {remaining !== null && (
+                    <span className={near ? 'rs-expiry rs-expiry-near' : 'rs-expiry'} role="timer"
+                      aria-label={expired ? 'Plazo vencido' : `Quedan ${formatRemaining(remaining)} para responder`}>
+                      <AppIcon name="clock" />
+                      {expired ? 'Vencido' : `Responde en ${formatRemaining(remaining)}`}
+                    </span>
+                  )}
+                  <span className="rs-chip">{orderStatusLabels[order.status]}</span>
+                </span>
               </header>
 
               <ul className="rs-lines">
@@ -213,12 +256,18 @@ export function OrdersPage() {
                   {order.options.scheduledFor && <span><strong>Programado:</strong> {new Date(order.options.scheduledFor).toLocaleString('es-PE', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>}
                   {order.options.storeNote && <span><strong>Nota del cliente:</strong> {order.options.storeNote}</span>}
                   {order.options.receiver && <span><strong>Recibe:</strong> {order.options.receiver.name} ({order.options.receiver.phone})</span>}
-                  {order.payment.method === 'CASH' && <span><strong>Pago:</strong> en efectivo contra entrega</span>}
+                  {order.payment.method === 'CASH'
+                    ? <span><strong>Pago:</strong> en efectivo; el repartidor cobra {formatPrice(order.totals.total)} al cliente</span>
+                    : <span><strong>Pago:</strong> con tarjeta</span>}
+                  {order.status === 'ASSIGNED' && <span><strong>Repartidor:</strong> asignado, en camino a recogerlo</span>}
                 </div>
-                <div className="rs-total"><small>Total</small><strong>{formatPrice(order.totals.total)}</strong></div>
+                <div className="rs-total"><small>Tus productos</small><strong>{formatPrice(order.totals.subtotal)}</strong></div>
               </div>
 
-              {rejectingId !== order.id && restaurantActions(order.status).length > 0 && (
+              {expired && (
+                <p className="rs-expired-note">No se respondió a tiempo: el pedido se cancelará y la reserva se liberará sin cobro.</p>
+              )}
+              {!expired && rejectingId !== order.id && restaurantActions(order.status).length > 0 && (
                 <div className="rs-actions">
                   {restaurantActions(order.status).map((option) => (
                     <button key={option.action} type="button"
@@ -233,7 +282,7 @@ export function OrdersPage() {
                   ))}
                 </div>
               )}
-              {rejectingId === order.id && (
+              {!expired && rejectingId === order.id && (
                 <div className="rs-reject-panel">
                   <label htmlFor={'reason-' + order.id}>Motivo del rechazo <span className="addr-optional">(opcional)</span></label>
                   <textarea id={'reason-' + order.id} rows={3} value={reason} maxLength={ORDER_REASON_MAX + 50}
@@ -246,7 +295,8 @@ export function OrdersPage() {
                 </div>
               )}
             </li>
-          ))}
+            )
+          })}
         </ul>
       )}
     </RestaurantLayout>

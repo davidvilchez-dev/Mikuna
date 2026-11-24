@@ -11,6 +11,8 @@ import com.mikuna.backend.order.service.CheckoutTransaction;
 import com.mikuna.backend.order.service.OrderStatusService;
 import com.mikuna.backend.order.service.TrackingService;
 import jakarta.validation.Valid;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.springframework.http.HttpStatus;
@@ -34,8 +36,11 @@ public class OrderController {
     private final CheckoutService service;
     private final OrderStatusService statusService;
     private final TrackingService tracking;
+    private final Clock clock;
 
-    public OrderController(CheckoutService service, OrderStatusService statusService, TrackingService tracking) {
+    public OrderController(CheckoutService service, OrderStatusService statusService, TrackingService tracking,
+            Clock clock) {
+        this.clock = clock;
         this.service = service;
         this.statusService = statusService;
         this.tracking = tracking;
@@ -60,7 +65,7 @@ public class OrderController {
             @Valid @RequestBody(required = false) DecisionRequest request) {
         OrderStatusService.Result result = statusService.cancel(principal.id(), id,
                 request == null ? null : request.reason());
-        return OrderResponse.of(result.order(), result.payment());
+        return OrderResponse.of(result.order(), result.payment(), Instant.now(clock));
     }
 
     /** Estado, etapas y, solo con el pedido Recogido, la ubicación del repartidor (RF-27, RF-28). */

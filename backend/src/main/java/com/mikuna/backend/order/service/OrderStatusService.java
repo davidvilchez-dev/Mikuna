@@ -1,6 +1,7 @@
 package com.mikuna.backend.order.service;
 
 import com.mikuna.backend.common.exception.InvalidOrderTransitionException;
+import com.mikuna.backend.common.exception.OrderConflictException;
 import com.mikuna.backend.common.exception.OrderNotFoundException;
 import com.mikuna.backend.common.exception.RestaurantNotEnabledException;
 import com.mikuna.backend.order.model.ActorRole;
@@ -38,8 +39,15 @@ public class OrderStatusService {
 
     static final String EXPIRED_REASON = "reserva vencida";
 
-    /** Pedido resultante con el estado de su pago; {@code reservationExpired} solo al aceptar sin reserva. */
-    public record Result(Order order, PaymentStatus payment, boolean reservationExpired) {
+    /**
+     * Pedido resultante con el estado de su pago; {@code reservationExpired} solo al aceptar sin reserva y
+     * {@code expired} cuando la decisión llegó con el plazo de respuesta ya vencido (spec 012).
+     */
+    public record Result(Order order, PaymentStatus payment, boolean reservationExpired, boolean expired) {
+
+        public Result(Order order, PaymentStatus payment, boolean reservationExpired) {
+            this(order, payment, reservationExpired, false);
+        }
     }
 
     private final OrderRepository orders;
@@ -82,6 +90,9 @@ public class OrderStatusService {
     @Transactional
     public Result accept(UUID accountId, UUID orderId) {
         Order order = lockOwnedByRestaurant(accountId, orderId);
+        if (expireIfDue(order)) {
+            return expiredResult(order);
+        }
         requirePending(order);
         if (paymentService.capture(order.getId()) == CaptureResult.RESERVATION_EXPIRED) {
             changeStatus(order, OrderStatus.CANCELLED, null, ActorRole.SYSTEM, EXPIRED_REASON);
@@ -95,6 +106,9 @@ public class OrderStatusService {
     @Transactional
     public Result reject(UUID accountId, UUID orderId, String reason) {
         Order order = lockOwnedByRestaurant(accountId, orderId);
+        if (expireIfDue(order)) {
+            return expiredResult(order);
+        }
         requirePending(order);
         paymentService.release(order.getId());
         changeStatus(order, OrderStatus.REJECTED, accountId, ActorRole.RESTAURANT, reason);
@@ -136,7 +150,31 @@ public class OrderStatusService {
         return result(order, false);
     }
 
-    private static void requirePending(Order order) {
+    /**
+     * Vencimiento de un pedido cuya fila ya bloqueó quien llama (spec 012): si sigue Pendiente y su plazo terminó,
+     * libera la reserva (pedido y luego pago, el mismo orden de bloqueo que el resto) y lo pasa a Cancelado por el
+     * sistema. Devuelve si venció. Si la pasarela falla, la excepción revierte todo y el pedido sigue Pendiente.
+     */
+    public boolean expireIfDue(Order order) {
+        if (!order.isExpiredAt(Instant.now(clock))) {
+            return false;
+        }
+        paymentService.release(order.getId());
+        changeStatus(order, OrderStatus.CANCELLED, null, ActorRole.SYSTEM, OrderExpiryPolicy.REASON);
+        return true;
+    }
+
+    /** Decidir sobre un pedido que acaba de vencer o que ya había vencido responde lo mismo (FR-014). */
+    private Result expiredResult(Order order) {
+        return new Result(order, paymentStatus(order), false, true);
+    }
+
+    private void requirePending(Order order) {
+        if (order.getStatus() == OrderStatus.CANCELLED && changes.findFirstByOrderIdOrderByChangedAtDesc(order.getId())
+                .map(change -> OrderExpiryPolicy.REASON.equals(change.getReason())).orElse(false)) {
+            throw new OrderConflictException(OrderConflictException.ORDER_EXPIRED,
+                    OrderConflictException.EXPIRED_MESSAGE);
+        }
         if (order.getStatus() != OrderStatus.PENDING) {
             throw new InvalidOrderTransitionException();
         }
@@ -150,7 +188,8 @@ public class OrderStatusService {
         OrderStatusChange change = new OrderStatusChange(order.getId(), from, target, Instant.now(clock), actorId,
                 role, normalize(reason));
         changes.save(change);
-        events.publishEvent(new OrderStatusChangedEvent(change.getId(), order.getId(), from, target, actorId, role));
+        events.publishEvent(new OrderStatusChangedEvent(change.getId(), order.getId(), from, target, actorId, role,
+                change.getReason()));
     }
 
     private static String normalize(String reason) {
@@ -176,9 +215,11 @@ public class OrderStatusService {
     }
 
     private Result result(Order order, boolean reservationExpired) {
+        return new Result(order, paymentStatus(order), reservationExpired);
+    }
+
+    private PaymentStatus paymentStatus(Order order) {
         order.getLines().size();
-        PaymentStatus status = payments.findByOrderId(order.getId()).map(Payment::getStatus)
-                .orElse(PaymentStatus.AUTHORIZED);
-        return new Result(order, status, reservationExpired);
+        return payments.findByOrderId(order.getId()).map(Payment::getStatus).orElse(PaymentStatus.AUTHORIZED);
     }
 }

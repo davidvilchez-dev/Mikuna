@@ -8,6 +8,8 @@ import com.mikuna.backend.order.dto.RestaurantOrderResponse;
 import com.mikuna.backend.order.model.OrderStatus;
 import com.mikuna.backend.order.service.OrderStatusService;
 import jakarta.validation.Valid;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -26,19 +28,22 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/restaurant/orders")
 public class RestaurantOrderController {
 
-    private static final Set<OrderStatus> LISTABLE =
-            EnumSet.of(OrderStatus.PENDING, OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY);
+    /** ASSIGNED sigue en el local hasta que el repartidor lo recoge: el restaurante debe seguir viéndolo. */
+    private static final Set<OrderStatus> LISTABLE = EnumSet.of(OrderStatus.PENDING, OrderStatus.ACCEPTED,
+            OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.ASSIGNED);
 
     private final OrderStatusService service;
+    private final Clock clock;
 
-    public RestaurantOrderController(OrderStatusService service) {
+    public RestaurantOrderController(OrderStatusService service, Clock clock) {
         this.service = service;
+        this.clock = clock;
     }
 
     @GetMapping
     public List<RestaurantOrderResponse> list(@AuthenticationPrincipal AccountPrincipal principal,
             @RequestParam(name = "status", defaultValue = "PENDING") String status) {
-        return service.list(principal.id(), parse(status)).stream().map(RestaurantOrderController::response)
+        return service.list(principal.id(), parse(status)).stream().map(this::response)
                 .toList();
     }
 
@@ -56,13 +61,13 @@ public class RestaurantOrderController {
             throw new OrderConflictException(OrderConflictException.RESERVATION_EXPIRED,
                     "La reserva del pago venció: el pedido se canceló sin cobro");
         }
-        return response(result);
+        return decided(result);
     }
 
     @PostMapping("/{id}/reject")
     public RestaurantOrderResponse reject(@AuthenticationPrincipal AccountPrincipal principal,
             @PathVariable UUID id, @Valid @RequestBody(required = false) DecisionRequest request) {
-        return response(service.reject(principal.id(), id, reason(request)));
+        return decided(service.reject(principal.id(), id, reason(request)));
     }
 
     @PostMapping("/{id}/start-preparation")
@@ -94,7 +99,19 @@ public class RestaurantOrderController {
         return request == null ? null : request.reason();
     }
 
-    private static RestaurantOrderResponse response(OrderStatusService.Result result) {
-        return RestaurantOrderResponse.of(result.order(), result.payment());
+    /**
+     * Si la decisión llegó con el plazo vencido, el pedido ya quedó Cancelado y liberado (transacción confirmada)
+     * y se responde 409 {@code ORDER_EXPIRED} (spec 012, FR-014).
+     */
+    private RestaurantOrderResponse decided(OrderStatusService.Result result) {
+        if (result.expired()) {
+            throw new OrderConflictException(OrderConflictException.ORDER_EXPIRED,
+                    OrderConflictException.EXPIRED_MESSAGE);
+        }
+        return response(result);
+    }
+
+    private RestaurantOrderResponse response(OrderStatusService.Result result) {
+        return RestaurantOrderResponse.of(result.order(), result.payment(), Instant.now(clock));
     }
 }

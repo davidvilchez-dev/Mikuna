@@ -39,7 +39,8 @@ import org.springframework.data.domain.Persistable;
                 columnNames = {"customer_id", "confirmation_key"}),
         indexes = {@Index(name = "ix_pedidos_cliente_fecha", columnList = "customer_id, created_at"),
                 @Index(name = "ix_pedidos_restaurante_fecha", columnList = "restaurant_id, created_at"),
-                @Index(name = "ix_pedidos_estado_fecha", columnList = "status, created_at")})
+                @Index(name = "ix_pedidos_estado_fecha", columnList = "status, created_at"),
+                @Index(name = "ix_pedidos_estado_vence", columnList = "status, expires_at")})
 public class Order implements Persistable<UUID> {
 
     public static final String UK_CONFIRMATION = "uk_pedidos_cliente_clave";
@@ -126,6 +127,13 @@ public class Order implements Persistable<UUID> {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    /**
+     * Momento en que vence si sigue Pendiente (spec 012): se fija al crear como creación + plazo vigente y no
+     * cambia. Nullable en BD solo por los pedidos anteriores, que se rellenan al arrancar.
+     */
+    @Column(name = "expires_at", updatable = false)
+    private Instant expiresAt;
+
     /** El identificador se asigna en el servidor: se indica a Spring Data que la entidad es nueva. */
     @Transient
     private boolean isNew = true;
@@ -183,6 +191,18 @@ public class Order implements Persistable<UUID> {
     public void addLine(UUID productId, String productName, BigDecimal unitPrice, int quantity,
             BigDecimal lineTotal) {
         lines.add(new OrderLine(this, productId, productName, unitPrice, quantity, lineTotal));
+    }
+
+    /** Fija el vencimiento una sola vez, al crear el pedido. */
+    public void setExpiresAt(Instant expiresAt) {
+        if (this.expiresAt == null) {
+            this.expiresAt = expiresAt;
+        }
+    }
+
+    /** Sigue Pendiente y su plazo ya terminó. */
+    public boolean isExpiredAt(Instant now) {
+        return status == OrderStatus.PENDING && expiresAt != null && !now.isBefore(expiresAt);
     }
 
     private static final Map<OrderStatus, Set<OrderStatus>> TRANSITIONS = new EnumMap<>(OrderStatus.class);
@@ -247,4 +267,5 @@ public class Order implements Persistable<UUID> {
     public String getReceiverNote() { return receiverNote; }
     public List<OrderLine> getLines() { return List.copyOf(lines); }
     public Instant getCreatedAt() { return createdAt; }
+    public Instant getExpiresAt() { return expiresAt; }
 }

@@ -57,10 +57,12 @@ public class CheckoutTransaction {
     private final StripeProperties stripe;
     private final Clock clock;
     private final ApplicationEventPublisher events;
+    private final OrderExpiryPolicy expiry;
 
     public CheckoutTransaction(CartService carts, OrderRepository orders, PaymentRepository payments,
             AddressRepository addresses, PaymentService paymentService, StripeProperties stripe, Clock clock,
-            ApplicationEventPublisher events) {
+            ApplicationEventPublisher events, OrderExpiryPolicy expiry) {
+        this.expiry = expiry;
         this.carts = carts;
         this.orders = orders;
         this.payments = payments;
@@ -97,6 +99,7 @@ public class CheckoutTransaction {
                     new Order.Delivery(address.getLabel(), address.getStreet(), address.getDistrict(),
                             address.getReference(), address.getContactPhone(), address.getLatitude(), address.getLongitude()),
                     Instant.now(clock));
+            order.setExpiresAt(expiry.expiresAt(order.getCreatedAt()));
             applyOptions(order, request);
             for (CartResponse.Line line : view.lines()) {
                 order.addLine(line.productId(), line.name(), line.unitPrice(), line.quantity(), line.lineTotal());
@@ -109,7 +112,7 @@ public class CheckoutTransaction {
             }
             carts.clearAfterCheckout(cart);
             events.publishEvent(new OrderPlacedEvent(orderId));
-            return new Confirmation(OrderResponse.of(order, PaymentStatus.AUTHORIZED), true);
+            return new Confirmation(OrderResponse.of(order, PaymentStatus.AUTHORIZED, Instant.now(clock)), true);
         } catch (RuntimeException e) {
             // Una clave duplicada comparte la misma reserva con el pedido ya registrado: no se libera.
             if (!cash && !isDuplicateConfirmation(e)) {
@@ -129,7 +132,7 @@ public class CheckoutTransaction {
     @Transactional(readOnly = true)
     public OrderResponse find(UUID customerId, UUID orderId) {
         Order order = orders.findByIdAndCustomerId(orderId, customerId).orElseThrow(OrderNotFoundException::new);
-        return OrderResponse.of(order, paymentStatus(order));
+        return OrderResponse.of(order, paymentStatus(order), Instant.now(clock));
     }
 
     @Transactional(readOnly = true)
@@ -143,7 +146,7 @@ public class CheckoutTransaction {
             throw new OrderConflictException(OrderConflictException.AMOUNTS_CHANGED,
                     "Esta confirmación ya se procesó con otro total");
         }
-        return new Confirmation(OrderResponse.of(order, paymentStatus(order)), false);
+        return new Confirmation(OrderResponse.of(order, paymentStatus(order), Instant.now(clock)), false);
     }
 
     private PaymentStatus paymentStatus(Order order) {

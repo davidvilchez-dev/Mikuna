@@ -78,3 +78,14 @@
 .rs-copy { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .rs-copy label { color: var(--color-mikuna-gray); font-size: 14px; font-weight: 600; }
 .rs-copy select { min-height: 44px; padding: 0 12px; border: 1px solid var(--app-border); border-radius: 12px; background: var(--color-mikuna-white); color: var(--color-mikuna-indigo); font: inherit; }
+
+/* Vencimiento de pedidos nuevos (spec 012): cuenta regresiva y aviso en el último 20 % del plazo */
+.rs-order-tags { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; }
+.rs-expiry {
+  display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px;
+  background: var(--color-mikuna-ivory); color: var(--color-mikuna-gray);
+  font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.rs-expiry svg { width: 14px; height: 14px; }
+.rs-expiry-near { background: #FEF3F2; color: #B42318; }
+.rs-expired-note { margin: 12px 0 0; color: #B42318; font-size: 14px; font-weight: 600; }

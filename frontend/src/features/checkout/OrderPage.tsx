@@ -4,7 +4,15 @@ import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
 import { AuthLayout } from '../auth/AuthLayout'
 import { clearSession, getSession } from '../auth/session-storage'
 import { formatPrice } from '../catalog/catalog-validation'
-import { canCustomerCancel, orderStatusLabels } from '../restaurant/orders-logic'
+import {
+  canCustomerCancel,
+  expiryDeadline,
+  formatRemaining,
+  orderCode,
+  orderStatusLabels,
+  remainingMs,
+} from '../restaurant/orders-logic'
+import { useConfirm } from '../ui/useConfirm'
 import { cancelOrder, getOrder, paymentStatusLabel, type Order } from './checkout-api'
 import { getTracking, type Tracking } from './tracking-api'
 import {
@@ -20,9 +28,14 @@ import './checkout.css'
 
 const RouteMap = lazy(() => import('../delivery/RouteMap'))
 
+/** Estado listo con el momento de recepción: la cuenta regresiva parte de los segundos que da el servidor (spec 012). */
+function ready(order: Order, notice?: string): ViewState {
+  return { kind: 'ready', order, notice, receivedAt: Date.now() }
+}
+
 type ViewState =
   | { kind: 'loading' }
-  | { kind: 'ready'; order: Order; notice?: string }
+  | { kind: 'ready'; order: Order; notice?: string; receivedAt: number }
   | { kind: 'notFound' }
   | { kind: 'error'; message: string }
 
@@ -36,6 +49,7 @@ export function OrderPage() {
   const [tracking, setTracking] = useState<Tracking | null>(null)
   const [offline, setOffline] = useState(false)
   const [now, setNow] = useState(() => Date.now())
+  const [confirmDialog, confirm] = useConfirm()
   const token = session?.token ?? ''
 
   const handleFailure = useCallback((error: unknown): string => {
@@ -51,7 +65,7 @@ export function OrderPage() {
     if (!token) return
     let active = true
     getOrder(token, id)
-      .then((order) => { if (active) setState({ kind: 'ready', order }) })
+      .then((order) => { if (active) setState(ready(order)) })
       .catch((error: unknown) => {
         if (!active) return
         if (error instanceof ApiError && error.status === 404) setState({ kind: 'notFound' })
@@ -85,13 +99,29 @@ export function OrderPage() {
     return () => { active = false; if (timer) clearTimeout(timer) }
   }, [token, id])
 
-  // La antigüedad de la ubicación se recalcula cada segundo mientras se muestra.
+  // Cuenta regresiva del pedido Pendiente (spec 012): fecha límite según los segundos que dio el servidor.
+  const loadedOrder = state.kind === 'ready' ? state.order : null
+  const currentStatus = tracking?.status ?? loadedOrder?.status
+  const deadline = state.kind === 'ready' && currentStatus === 'PENDING'
+    ? expiryDeadline(state.order.secondsToExpire, state.receivedAt) : null
+
+  // La antigüedad de la ubicación y la cuenta regresiva se recalculan cada segundo mientras se muestran.
   const showsLocation = tracking?.courierLocation != null
+  const ticking = showsLocation || deadline !== null
   useEffect(() => {
-    if (!showsLocation) return
+    if (!ticking) return
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
-  }, [showsLocation])
+  }, [ticking])
+
+  // Si el seguimiento informa otro estado (por ejemplo, Cancelado por vencimiento), se refresca el pedido y su pago.
+  const staleStatus = tracking && loadedOrder && tracking.status !== loadedOrder.status ? tracking.status : null
+  useEffect(() => {
+    if (!staleStatus || !token) return
+    let active = true
+    getOrder(token, id).then((order) => { if (active) setState(ready(order)) }).catch(() => undefined)
+    return () => { active = false }
+  }, [staleStatus, token, id])
 
   if (!session) return <Navigate to="/iniciar-sesion" replace />
   if (state.kind === 'loading') return <AuthLayout title="Mi pedido" wide><p className="auth-notice" role="status">Cargando pedido...</p></AuthLayout>
@@ -103,20 +133,28 @@ export function OrderPage() {
 
   async function cancel() {
     if (busy) return
+    const ok = await confirm({
+      title: '¿Cancelar el pedido?',
+      message: 'El restaurante aún no lo acepta, así que no se te cobrará nada. Esta acción no se puede deshacer.',
+      confirmLabel: 'Sí, cancelar pedido',
+      cancelLabel: 'Mantener pedido',
+      danger: true,
+    })
+    if (!ok) return
     setBusy(true)
     try {
       const updated = await cancelOrder(token, id)
-      setState({ kind: 'ready', order: updated, notice: 'Pedido cancelado. La reserva se liberó y no se cobró nada.' })
+      setState(ready(updated, 'Pedido cancelado. La reserva se liberó y no se cobró nada.'))
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
         // El restaurante decidió a la vez: se muestra el estado vigente y el motivo.
         try {
-          setState({ kind: 'ready', order: await getOrder(token, id), notice: error.message })
+          setState(ready(await getOrder(token, id), error.message))
         } catch (reloadError) {
           setState({ kind: 'error', message: handleFailure(reloadError) })
         }
       } else {
-        setState({ kind: 'ready', order, notice: handleFailure(error) })
+        setState({ kind: 'ready', order, notice: handleFailure(error), receivedAt: state.kind === 'ready' ? state.receivedAt : Date.now() })
       }
     } finally {
       setBusy(false)
@@ -124,8 +162,15 @@ export function OrderPage() {
   }
 
   return (
-    <AuthLayout title="Mi pedido" description={`${order.restaurant.name} - ${orderStatusLabels[status]}`} wide>
+    <AuthLayout title={`Pedido ${orderCode(order.id)}`} description={`${order.restaurant.name} · ${orderStatusLabels[status]}`} wide>
       {notice && <p className="auth-notice" role="status">{notice}</p>}
+      {deadline !== null && (
+        <p className="catalog-banner order-expiry" role="timer">
+          {remainingMs(deadline, now) > 0
+            ? <>Esperando al restaurante. Si no responde, el pedido se cancelará en <strong>{formatRemaining(remainingMs(deadline, now))}</strong> y no se te cobrará nada.</>
+            : 'El restaurante no respondió a tiempo. Estamos cancelando el pedido y liberando tu reserva…'}
+        </p>
+      )}
       {status === 'DELIVERED' && (
         <p className="catalog-banner" role="status">
           Tu pedido fue entregado. <Link to="/historial">Califícalo en tu historial</Link>.
@@ -179,7 +224,7 @@ export function OrderPage() {
         <dl className="cart-totals">
           <div><dt>Subtotal</dt><dd>{formatPrice(order.totals.subtotal)}</dd></div>
           <div><dt>Envío</dt><dd>{formatPrice(order.totals.deliveryFee)}</dd></div>
-          <div><dt>Comisión</dt><dd>{formatPrice(order.totals.commission)}</dd></div>
+          <div><dt>Tarifa de servicio</dt><dd>{formatPrice(order.totals.commission)}</dd></div>
           <div className="cart-total"><dt>Total</dt><dd>{formatPrice(order.totals.total)}</dd></div>
         </dl>
         <p className="auth-hint">Tu pago: {paymentStatusLabel(order.payment.method, order.payment.status)}.</p>
@@ -192,6 +237,7 @@ export function OrderPage() {
       <Link to="/restaurantes" className="cart-more">Seguir buscando restaurantes</Link>
       </aside>
       </div>
+      {confirmDialog}
     </AuthLayout>
   )
 }

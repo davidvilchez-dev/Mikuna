@@ -16,7 +16,15 @@ export const orderStatusLabels: Record<OrderStatus, string> = {
   DELIVERED: 'Entregado',
 }
 
-export type RestaurantAction = 'accept' | 'reject' | 'start-preparation' | 'mark-ready'
+/**
+ * Código corto del pedido (#A1B2) para nombrarlo en voz alta: el mismo en las pantallas del cliente, el
+ * restaurante, el repartidor y el administrador.
+ */
+export function orderCode(id: string): string {
+  return '#' + id.replace(/-/g, '').slice(-4).toUpperCase()
+}
+
+export type RestaurantAction ='accept' | 'reject' | 'start-preparation' | 'mark-ready'
 
 export interface ActionOption {
   action: RestaurantAction
@@ -45,4 +53,34 @@ export function canCustomerCancel(status: OrderStatus): boolean {
 export function validateOrderReason(reason: string): string | undefined {
   if (reason.trim().length > ORDER_REASON_MAX) return `El motivo admite hasta ${ORDER_REASON_MAX} caracteres`
   return undefined
+}
+
+/**
+ * Vencimiento de pedidos Pendientes (spec 012). La fecha límite local se calcula desde los segundos restantes que
+ * da el servidor al responder, no desde el reloj del navegador, para que un reloj desfasado no altere la cuenta.
+ */
+export function expiryDeadline(secondsToExpire: number | null | undefined, receivedAt: number): number | null {
+  if (secondsToExpire == null) return null
+  return receivedAt + Math.max(0, secondsToExpire) * 1000
+}
+
+/** Milisegundos que faltan, nunca negativos. */
+export function remainingMs(deadline: number, now: number): number {
+  return Math.max(0, deadline - now)
+}
+
+/** Próximo a vencer: queda el 20 % del plazo total o menos. */
+export function isNearExpiry(remaining: number, createdAt: string, expiresAt: string | null): boolean {
+  if (!expiresAt) return false
+  const total = Date.parse(expiresAt) - Date.parse(createdAt)
+  if (!(total > 0)) return remaining > 0
+  return remaining <= total * 0.2
+}
+
+/** Tiempo restante como m:ss, redondeando hacia arriba para no mostrar 0:00 antes de tiempo. */
+export function formatRemaining(ms: number): string {
+  const totalSeconds = Math.ceil(Math.max(0, ms) / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`
 }

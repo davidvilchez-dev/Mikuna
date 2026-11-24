@@ -30,6 +30,9 @@ export interface Order {
   payment: { method: string; status: PaymentStatus }
   createdAt: string
   options: OrderOptions
+  /** Vencimiento si el restaurante no responde (spec 012) y segundos restantes según el servidor. */
+  expiresAt: string | null
+  secondsToExpire: number | null
 }
 
 export interface OrderOptions {
