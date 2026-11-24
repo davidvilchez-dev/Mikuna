@@ -65,7 +65,8 @@ jobs:
 
   deploy:
     needs: verify
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Solo se despliega cuando el destino AWS está configurado (variable MIKUNA_SITE_BUCKET del repositorio).
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.MIKUNA_SITE_BUCKET != ''
     runs-on: ubuntu-24.04
     permissions:
       contents: read
