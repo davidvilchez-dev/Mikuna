@@ -1,6 +1,8 @@
 package com.mikuna.backend.catalog.repository;
 
 import com.mikuna.backend.catalog.model.Product;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -19,4 +21,7 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     /** Público: solo activos y disponibles. */
     Page<Product> findByRestaurantIdAndActiveTrueAndAvailableTrue(UUID restaurantId, Pageable pageable);
+
+    /** Asistente (spec 013): platos activos y disponibles de varios restaurantes a la vez. */
+    List<Product> findByRestaurantIdInAndActiveTrueAndAvailableTrue(Collection<UUID> restaurantIds);
 }

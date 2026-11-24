@@ -167,6 +167,37 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(problem);
     }
 
+    /** 429 con Retry-After: el cliente superó su límite de mensajes al asistente (spec 013). */
+    @ExceptionHandler(AssistantRateLimitedException.class)
+    ResponseEntity<ProblemDetail> handleAssistantRateLimited(AssistantRateLimitedException ex) {
+        ProblemDetail problem = problem(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+        problem.setProperty("code", AssistantRateLimitedException.CODE);
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
+                .body(problem);
+    }
+
+    @ExceptionHandler(AssistantUnavailableException.class)
+    ResponseEntity<ProblemDetail> handleAssistantUnavailable(AssistantUnavailableException ex) {
+        ProblemDetail problem = problem(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+        problem.setProperty("code", AssistantUnavailableException.CODE);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(problem);
+    }
+
+    @ExceptionHandler(AssistantBusyException.class)
+    ResponseEntity<ProblemDetail> handleAssistantBusy(AssistantBusyException ex) {
+        ProblemDetail problem = problem(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+        problem.setProperty("code", AssistantBusyException.CODE);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(problem);
+    }
+
+    @ExceptionHandler(AssistantMessageInvalidException.class)
+    ResponseEntity<ProblemDetail> handleAssistantMessageInvalid(AssistantMessageInvalidException ex) {
+        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, INVALID_FORM);
+        problem.setProperty("errors", Map.of("messages", ex.getMessage()));
+        return ResponseEntity.badRequest().body(problem);
+    }
+
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
     ResponseEntity<ProblemDetail> handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)

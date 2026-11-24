@@ -1,13 +1,13 @@
 <!--
 Sync Impact Report (temporal; retirar antes del commit)
-Version change: 3.0.0 -> 3.1.0 (MINOR: integración permitida y requisito de pago vigente)
-Principios modificados: III (Stripe permitido en sandbox, claves, tarjetas, RNF-06/08),
-  IV (RF-16/RF-17 vigentes desde 006, idempotencia, sin reembolsos),
-  V (dobles para Stripe en pruebas unitarias).
-Secciones modificadas: tabla de arquitectura (integraciones), aplazamientos (Stripe retirado),
-  tabla RNF (RNF-06, RNF-08), Governance (aprobación 3.1.0).
-Secciones añadidas/eliminadas: ninguna.
-TODO: ninguno. Revisar spec 006 (nombrar Stripe) y plan al planificar.
+Version change: 3.1.0 -> 3.2.0 (MINOR: nueva integración permitida, Gemini plan gratuito, inc. 013)
+Principios modificados: II (proveedor de IA aislado tras interfaz propia por decisión del usuario),
+  III (Gemini permitido, clave solo en backend/.env, solo datos públicos de catálogo),
+  V (dobles para Gemini en pruebas unitarias).
+Secciones modificadas: tabla de arquitectura (integraciones), aplazamientos (otras integraciones),
+  Governance (aprobación 3.2.0 y versión).
+Secciones añadidas/eliminadas: ninguna. RF/RNF y principios I, IV, VI, VII sin cambios.
+TODO: ninguno. Al planificar el 013, nombrar Gemini en el plan y declarar la ruta del chat como protegida.
 -->
 
 # Mikuna Constitution
@@ -40,6 +40,10 @@ entregar funcionalidad local sin preparar una plataforma distribuida.
   enviados por el cliente.
 - Las integraciones DEBEN separarse de las reglas de negocio cuando se implementen. No se exige
   diseñar adaptadores ni mecanismos de sustitución para proveedores o funciones futuras.
+- Excepción por decisión del usuario del 2026-11-24: el proveedor de IA (incremento 013) DEBE
+  quedar aislado de las reglas del chat y del catálogo detrás de una interfaz propia, de modo que
+  sustituirlo no exija cambiar la interfaz ni las consultas. Esta excepción NO obliga a crear
+  abstracciones equivalentes para las demás integraciones.
 
 **Verificación:** revisar responsabilidades y probar las reglas y colaboraciones implementadas
 sin depender de servicios externos reales en las pruebas unitarias.
@@ -50,10 +54,11 @@ sin depender de servicios externos reales en las pruebas unitarias.
   certificadoras ni TLS local. La comprobación de HTTPS del despliegue queda aplazada;
   RNF-06 NO DEBE declararse cumplido por una ejecución local.
 - Las únicas integraciones externas permitidas son Cloudinary para imágenes, el servicio de
-  correo electrónico y, desde el incremento 006 (decisión del usuario del 2026-11-17), Stripe
-  exclusivamente en modo de pruebas (sandbox). DEBEN prepararse solo cuando la funcionalidad
-  actual las necesite y usar el cifrado correspondiente a su protocolo: HTTPS para APIs y TLS
-  para transporte de correo.
+  correo electrónico, desde el incremento 006 (decisión del usuario del 2026-11-17) Stripe
+  exclusivamente en modo de pruebas (sandbox) y, desde el incremento 013 (decisión del usuario
+  del 2026-11-24), la API de Gemini en su plan gratuito. DEBEN prepararse solo cuando la
+  funcionalidad actual las necesite y usar el cifrado correspondiente a su protocolo: HTTPS para
+  APIs y TLS para transporte de correo.
 - La autenticación DEBE usar tokens sin sesiones en memoria de la API. El inicio, el registro,
   el inicio de sesión, la recuperación de contraseña y RF-09/RF-10 son públicos, conforme a la
   aclaración del usuario del 2026-11-12. Las operaciones personales y de gestión DEBEN protegerse;
@@ -72,6 +77,11 @@ sin depender de servicios externos reales en las pruebas unitarias.
 - Las claves de Stripe (`sk_test_` y `pk_test_`) DEBEN residir solo en `backend/.env`, sin incluirse
   en commits, registros ni respuestas. El backend DEBE rechazar cualquier clave secreta que no
   comience con `sk_test_`. NO se admiten claves reales (`sk_live_`) ni otras pasarelas.
+- La clave de Gemini DEBE residir solo en `backend/.env`, sin incluirse en commits, registros,
+  respuestas ni en el navegador. Al proveedor de IA SOLO DEBEN enviarse el texto escrito por el
+  cliente y datos públicos del catálogo (restaurantes, platos y categorías); NUNCA datos
+  personales, pedidos, direcciones, pagos ni credenciales. El asistente NO DEBE ejecutar acciones
+  que modifiquen datos. La ruta del chat DEBE ser protegida y limitar el uso por cliente.
 - RNF-06 y RNF-08 NO DEBEN declararse cumplidos por una ejecución local con claves de prueba; su
   evidencia completa queda pendiente del despliegue.
 
@@ -122,8 +132,8 @@ comprobando el estado persistido. No se requieren servicios distribuidos para es
   proyecto (decisión del usuario del 2026-11-17). Los agentes NO DEBEN configurarlo, ampliarlo
   ni ejecutarlo, y sus pruebas NO son condición de aceptación. Las pruebas E2E automatizadas
   de navegador siguen aplazadas y NO DEBEN sustituirse por otra herramienta para el mismo trabajo.
-- Las pruebas unitarias NO DEBEN llamar a Stripe real; DEBEN usar dobles (Mockito). Las pruebas
-  contra el sandbox de Stripe son opcionales y manuales.
+- Las pruebas unitarias NO DEBEN llamar a Stripe ni a Gemini reales; DEBEN usar dobles (Mockito).
+  Las pruebas contra el sandbox de Stripe o contra Gemini son opcionales y manuales.
 - Se DEBEN verificar compilación, funcionamiento local y reglas relevantes del incremento.
   Las comprobaciones aprobadas NO DEBEN repetirse sin cambios, fallos o dudas concretas que
   lo justifiquen. CI/CD y publicación de cobertura en CI quedan aplazados.
@@ -190,7 +200,7 @@ comercio, reembolsos y conciliación contable.
 | Backend | Una aplicación Java + Spring Boot organizada por funcionalidades. |
 | Persistencia | PostgreSQL local mediante Spring Data JPA; base creada manualmente por el usuario. |
 | Configuración | `src/main/resources/application.properties` del backend. |
-| Integraciones permitidas | Cloudinary, correo (Resend según la propuesta) y Stripe solo en modo de pruebas, solo cuando sean necesarios y con cifrado. |
+| Integraciones permitidas | Cloudinary, correo (Resend según la propuesta), Stripe solo en modo de pruebas y Gemini en plan gratuito (asistente, desde el 013), solo cuando sean necesarios y con cifrado. |
 
 La conexión PostgreSQL, el puerto y, cuando correspondan, los parámetros de correo y Cloudinary
 DEBEN centralizarse y quedar configurables en `src/main/resources/application.properties`.
@@ -208,9 +218,9 @@ herramientas de migración por anticipado.
 - **Infraestructura adicional:** Redis, RabbitMQ, workers separados, contenedores y demás
   infraestructura adicional quedan aplazados. El correo que se necesite NO DEBE exigirlos.
 - **Otras integraciones:** MapTiler y FCM quedan como referencias aplazadas de mapas y
-  notificaciones push; no se permite integrarlos durante esta etapa. Cloudinary, correo y Stripe
-  (solo pruebas, desde el incremento 006) se preparan exclusivamente cuando sean necesarios para
-  la funcionalidad actual.
+  notificaciones push; no se permite integrarlos durante esta etapa. Cloudinary, correo, Stripe
+  (solo pruebas, desde el incremento 006) y Gemini (plan gratuito, desde el incremento 013) se
+  preparan exclusivamente cuando sean necesarios para la funcionalidad actual.
 - **Verificaciones posteriores:** HTTPS del despliegue, E2E automatizadas de navegador,
   validación de infraestructura y evaluaciones de carga y disponibilidad correspondientes
   quedan pendientes. NO DEBEN prepararse certificados ni TLS local para anticiparlas.
@@ -338,6 +348,8 @@ del responsable del proyecto. Cuando cambie lo ya construido, DEBE indicar su ad
 Esta solicitud constituye la aprobación de la enmienda 2.0.0; no requiere una nueva confirmación.
 La enmienda 3.1.0 (Stripe en modo de pruebas para el incremento 006) cuenta con la aprobación
 explícita del usuario del 2026-11-17.
+La enmienda 3.2.0 (Gemini en plan gratuito para el asistente del incremento 013) cuenta con la
+aprobación explícita del usuario del 2026-11-24.
 Un conflicto nuevo sobre alcance o reglas de negocio DEBE consultarse cuando afecte al incremento.
 Las decisiones rutinarias se resuelven conforme al principio VII.
 
@@ -353,4 +365,4 @@ y RNF aplazados NO DEBEN declararse cumplidos ni bloquear la entrega local por s
 La infraestructura futura y las pruebas E2E se abordarán después mediante una decisión explícita
 y la planificación correspondiente.
 
-**Version**: 3.1.0 | **Ratified**: 2026-11-12 | **Last Amended**: 2026-11-17
+**Version**: 3.2.0 | **Ratified**: 2026-11-12 | **Last Amended**: 2026-11-24

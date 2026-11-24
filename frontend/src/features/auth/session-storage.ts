@@ -30,6 +30,7 @@ export function clearSession(): void {
   try {
     storage()?.removeItem(SESSION_KEY)
     storage()?.removeItem('mikuna.branch')
+    storage()?.removeItem('mikuna.assistant')
   } catch {
     // Nada que limpiar.
   }

@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
-import { Navigate, Route, Routes } from 'react-router'
+import { Navigate, Route, Routes, useLocation } from 'react-router'
 import { HomePage } from './features/home/HomePage'
+import { getSession } from './features/auth/session-storage'
 
 // Cada página se carga bajo demanda: en desarrollo Vite solo transforma lo que se visita.
 const AccountPage = lazy(() => import('./features/auth/AccountPage').then((m) => ({ default: m.AccountPage })))
@@ -27,6 +28,15 @@ const AdminAccountsPage = lazy(() => import('./features/admin/AdminAccountsPage'
 const AdminOrdersPage = lazy(() => import('./features/admin/AdminOrdersPage').then((m) => ({ default: m.AdminOrdersPage })))
 const PublicInfoPage = lazy(() => import('./features/public-pages/PublicInfoPage').then((m) => ({ default: m.PublicInfoPage })))
 const AdminDashboardPage = lazy(() => import('./features/admin/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })))
+const AssistantChat = lazy(() => import('./features/assistant/AssistantChat').then((m) => ({ default: m.AssistantChat })))
+
+/** El asistente de IA (spec 013) solo existe para clientes con sesión; se relee la sesión en cada cambio de ruta. */
+function AssistantGate() {
+  useLocation()
+  const session = getSession()
+  if (!session || session.role !== 'CUSTOMER') return null
+  return <AssistantChat key={session.token} token={session.token} />
+}
 
 export default function App() {
   return (
@@ -62,6 +72,7 @@ export default function App() {
       <Route path="/admin/pedidos" element={<AdminOrdersPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    <AssistantGate />
     </Suspense>
   )
 }
