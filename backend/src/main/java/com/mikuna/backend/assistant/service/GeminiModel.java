@@ -90,7 +90,7 @@ public class GeminiModel implements AssistantModel {
                             throw new AssistantBusyException();
                         }
                         if (status < 200 || status >= 300) {
-                            log.warn("Gemini respondió con HTTP {}", status);
+                            log.warn("Gemini respondió con HTTP {}: {}", status, errorSummary(response.getBody()));
                             throw new AssistantUnavailableException();
                         }
                         readStream(new BufferedReader(new InputStreamReader(response.getBody(),
@@ -104,6 +104,16 @@ public class GeminiModel implements AssistantModel {
             throw new AssistantUnavailableException();
         }
         return calls;
+    }
+
+    /** Resumen del error del proveedor para el registro (nunca incluye la clave ni lo escrito por el cliente). */
+    private static String errorSummary(java.io.InputStream body) {
+        try {
+            String text = new String(body.readAllBytes(), StandardCharsets.UTF_8).replaceAll("[\r\n\t ]+", " ");
+            return text.length() > 300 ? text.substring(0, 300) : text;
+        } catch (IOException e) {
+            return "sin detalle";
+        }
     }
 
     private void readStream(BufferedReader reader, Consumer<String> onText, List<ToolCall> calls) {

@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -61,6 +62,8 @@ class AssistantControllerTest extends IntegrationTestSupport {
     private String stream(String bearer, String json) throws Exception {
         MvcResult started = chat(bearer, json).andExpect(request().asyncStarted()).andReturn();
         started.getAsyncResult(5000);
+        // El despacho asíncrono final también pasa por la seguridad: no debe fallar (regresión del 403 tardío).
+        mvc.perform(asyncDispatch(started)).andExpect(status().isOk());
         return started.getResponse().getContentAsString();
     }
 

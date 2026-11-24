@@ -2,6 +2,7 @@ package com.mikuna.backend.common.security;
 
 import com.mikuna.backend.account.repository.AccountRepository;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import jakarta.servlet.DispatcherType;
 import java.time.Clock;
 import java.util.Map;
 import javax.crypto.SecretKey;
@@ -43,6 +44,9 @@ public class SecurityConfig {
                 .logout(logout -> logout.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // El SSE del asistente (spec 013) termina con un despacho asíncrono sin token: la autorización
+                        // ya se resolvió en la petición original, así que ASYNC y ERROR no se vuelven a evaluar.
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         // RF-09/RF-10 son públicos (constitución III): solo lectura de datos comerciales.
