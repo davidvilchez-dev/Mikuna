@@ -16,7 +16,11 @@ import com.mikuna.backend.auth.dto.LoginResponse;
 import com.mikuna.backend.common.exception.AccountDisabledException;
 import com.mikuna.backend.common.exception.InvalidCredentialsException;
 import com.mikuna.backend.support.TestAccounts;
+import com.mikuna.backend.common.exception.LoginRateLimitedException;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,12 +44,53 @@ class AuthServiceTest {
     @Mock
     private TokenService tokenService;
 
+    private static final String IP = "10.0.0.1";
+
     private AuthService service;
+    private LoginAttemptLimiter limiter;
 
     @BeforeEach
     void setUp() {
         when(passwordEncoder.encode(anyString())).thenReturn(DUMMY_HASH);
-        service = new AuthService(accounts, passwordEncoder, tokenService);
+        limiter = new LoginAttemptLimiter(Clock.fixed(Instant.parse("2026-11-25T15:00:00Z"), ZoneOffset.UTC),
+                new LoginProperties(3, 100, Duration.ofMinutes(15)));
+        service = new AuthService(accounts, passwordEncoder, tokenService, limiter);
+    }
+
+    @Test
+    void trasVariosFallosLaCuentaQuedaBloqueadaSinComprobarLaContrasena() {
+        Account account = TestAccounts.account(Role.CUSTOMER, "ana@mail.com", "{hash}");
+        when(accounts.findByEmail("ana@mail.com")).thenReturn(Optional.of(account));
+        when(passwordEncoder.matches("mala", "{hash}")).thenReturn(false);
+        for (int i = 0; i < 3; i++) {
+            assertThatThrownBy(() -> service.login("ana@mail.com", "mala", IP))
+                    .isInstanceOf(InvalidCredentialsException.class);
+        }
+
+        // Ni siquiera la contraseña correcta entra mientras dure el bloqueo.
+        assertThatThrownBy(() -> service.login(" ANA@mail.com", "clave", IP))
+                .isInstanceOf(LoginRateLimitedException.class);
+        verify(passwordEncoder, never()).matches("clave", "{hash}");
+        verify(tokenService, never()).issue(any());
+    }
+
+    @Test
+    void unAccesoCorrectoReiniciaLosFallosDeLaCuenta() {
+        Account account = TestAccounts.account(Role.CUSTOMER, "ana@mail.com", "{hash}");
+        when(accounts.findByEmail("ana@mail.com")).thenReturn(Optional.of(account));
+        when(passwordEncoder.matches("mala", "{hash}")).thenReturn(false);
+        when(passwordEncoder.matches("clave", "{hash}")).thenReturn(true);
+        when(tokenService.issue(account)).thenReturn(new TokenService.IssuedToken("jwt", Instant.now()));
+        for (int i = 0; i < 2; i++) {
+            assertThatThrownBy(() -> service.login("ana@mail.com", "mala", IP))
+                    .isInstanceOf(InvalidCredentialsException.class);
+        }
+        service.login("ana@mail.com", "clave", IP);
+
+        for (int i = 0; i < 2; i++) {
+            assertThatThrownBy(() -> service.login("ana@mail.com", "mala", IP))
+                    .isInstanceOf(InvalidCredentialsException.class);
+        }
     }
 
     @Test
@@ -56,7 +101,7 @@ class AuthServiceTest {
         Instant expiresAt = Instant.parse("2026-11-17T12:00:00Z");
         when(tokenService.issue(account)).thenReturn(new TokenService.IssuedToken("jwt", expiresAt));
 
-        LoginResponse response = service.login("  ANA@mail.com ", "clave");
+        LoginResponse response = service.login("  ANA@mail.com ", "clave", IP);
 
         assertThat(response.accessToken()).isEqualTo("jwt");
         assertThat(response.tokenType()).isEqualTo("Bearer");
@@ -68,7 +113,7 @@ class AuthServiceTest {
     void correoInexistenteCompruebaHashFicticioYFalla() {
         when(accounts.findByEmail("nadie@mail.com")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.login("nadie@mail.com", "clave"))
+        assertThatThrownBy(() -> service.login("nadie@mail.com", "clave", IP))
                 .isInstanceOf(InvalidCredentialsException.class)
                 .hasMessage("Correo o contraseña incorrectos");
         verify(passwordEncoder).matches("clave", DUMMY_HASH);
@@ -81,7 +126,7 @@ class AuthServiceTest {
         when(accounts.findByEmail("ana@mail.com")).thenReturn(Optional.of(account));
         when(passwordEncoder.matches("mala", "{hash}")).thenReturn(false);
 
-        assertThatThrownBy(() -> service.login("ana@mail.com", "mala"))
+        assertThatThrownBy(() -> service.login("ana@mail.com", "mala", IP))
                 .isInstanceOf(InvalidCredentialsException.class)
                 .hasMessage("Correo o contraseña incorrectos");
     }
@@ -92,7 +137,7 @@ class AuthServiceTest {
         when(accounts.findByEmail("rep@mail.com")).thenReturn(Optional.of(account));
         when(passwordEncoder.matches("clave", "{hash}")).thenReturn(true);
 
-        assertThatThrownBy(() -> service.login("rep@mail.com", "clave")).isInstanceOf(AccountDisabledException.class);
+        assertThatThrownBy(() -> service.login("rep@mail.com", "clave", IP)).isInstanceOf(AccountDisabledException.class);
         verify(tokenService, never()).issue(any());
     }
 
@@ -103,7 +148,7 @@ class AuthServiceTest {
         when(passwordEncoder.matches("clave", "{hash}")).thenReturn(true);
         when(tokenService.issue(account)).thenReturn(new TokenService.IssuedToken("jwt", Instant.now()));
 
-        LoginResponse response = service.login("local@mail.com", "clave");
+        LoginResponse response = service.login("local@mail.com", "clave", IP);
 
         assertThat(response.account().role()).isEqualTo(Role.RESTAURANT);
     }

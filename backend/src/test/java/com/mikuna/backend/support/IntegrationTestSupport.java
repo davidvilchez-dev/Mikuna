@@ -11,6 +11,7 @@ import com.mikuna.backend.account.model.Account;
 import com.mikuna.backend.account.model.Role;
 import com.mikuna.backend.account.repository.AccountRepository;
 import com.mikuna.backend.account.service.AccountRegistrationService;
+import com.mikuna.backend.auth.service.LoginAttemptLimiter;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +44,9 @@ public abstract class IntegrationTestSupport {
     @Autowired
     protected JdbcTemplate jdbc;
 
+    @Autowired
+    private LoginAttemptLimiter loginAttempts;
+
     /** Cloudinary nunca se llama en las pruebas; por defecto devuelve una imagen fija. */
     @MockitoBean
     protected CloudinaryImageStorage imageStorage;
@@ -58,6 +62,7 @@ public abstract class IntegrationTestSupport {
                         null, null));
         when(imageStorage.upload(any(), any()))
                 .thenReturn(new CloudinaryImageStorage.StoredImage("https://img.test/p.jpg", "mikuna/products/p"));
+        loginAttempts.reset();
         jdbc.update("delete from acciones_admin_cuenta");
         jdbc.update("delete from calificaciones");
         jdbc.update("delete from avisos");

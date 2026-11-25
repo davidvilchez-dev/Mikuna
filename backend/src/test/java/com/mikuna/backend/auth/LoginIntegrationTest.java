@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -61,6 +62,22 @@ class LoginIntegrationTest extends IntegrationTestSupport {
                 .andExpect(jsonPath("$.detail").value(BAD_CREDENTIALS));
         login("ana@mail.com", "contraseña-incorrecta").andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.detail").value(BAD_CREDENTIALS));
+    }
+
+    @Test
+    void cincoFallosBloqueanLaCuentaCon429YRetryAfter() throws Exception {
+        create(Role.CUSTOMER, "ana@mail.com");
+        for (int i = 0; i < 5; i++) {
+            login("ana@mail.com", "contraseña-incorrecta").andExpect(status().isUnauthorized());
+        }
+
+        login("ana@mail.com", PASSWORD).andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"))
+                .andExpect(jsonPath("$.code").value("LOGIN_RATE_LIMITED"))
+                .andExpect(jsonPath("$.accessToken").doesNotExist());
+        // Otra cuenta desde el mismo origen no queda afectada.
+        create(Role.CUSTOMER, "luis@mail.com");
+        login("luis@mail.com", PASSWORD).andExpect(status().isOk());
     }
 
     @Test

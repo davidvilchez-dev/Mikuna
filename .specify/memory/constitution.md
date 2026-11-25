@@ -1,13 +1,12 @@
 <!--
 Sync Impact Report (temporal; retirar antes del commit)
-Version change: 3.1.0 -> 3.2.0 (MINOR: nueva integración permitida, Gemini plan gratuito, inc. 013)
-Principios modificados: II (proveedor de IA aislado tras interfaz propia por decisión del usuario),
-  III (Gemini permitido, clave solo en backend/.env, solo datos públicos de catálogo),
-  V (dobles para Gemini en pruebas unitarias).
-Secciones modificadas: tabla de arquitectura (integraciones), aplazamientos (otras integraciones),
-  Governance (aprobación 3.2.0 y versión).
-Secciones añadidas/eliminadas: ninguna. RF/RNF y principios I, IV, VI, VII sin cambios.
-TODO: ninguno. Al planificar el 013, nombrar Gemini en el plan y declarar la ruta del chat como protegida.
+Version change: 3.2.0 -> 4.0.0 (MAJOR: se redefine la obligación ddl-auto=update y la prohibición
+  de herramientas de migración)
+Principios modificados: ninguno.
+Secciones modificadas: arquitectura local (Flyway + ddl-auto=validate), aplazamientos (CI permitida,
+  despliegue continuo sigue aplazado), Governance (aprobación 4.0.0 y versión).
+Secciones añadidas/eliminadas: ninguna. RF/RNF sin cambios.
+TODO: los plan.md de specs anteriores citan ddl-auto=update como contexto histórico; no se reescriben.
 -->
 
 # Mikuna Constitution
@@ -207,14 +206,19 @@ DEBEN centralizarse y quedar configurables en `src/main/resources/application.pr
 El usuario completará los valores locales y creará manualmente la base de datos. Las credenciales
 externas reales NO DEBEN incluirse en commits.
 
-Durante esta etapa se DEBE utilizar `spring.jpa.hibernate.ddl-auto=update`. NO DEBEN añadirse
-herramientas de migración por anticipado.
+El esquema DEBE versionarse con Flyway en `src/main/resources/db/migration`: cada cambio de
+esquema es una migración nueva (`V<n>__descripcion.sql`) y NO DEBE editarse una migración ya
+aplicada. Hibernate DEBE usar `spring.jpa.hibernate.ddl-auto=validate`. La V1 reproduce el
+esquema que dejaba `ddl-auto=update`; las bases previas se marcan en ella sin ejecutarla.
 
 ### Registro explícito de aplazamientos
 
 - **Cloud y entrega:** NO DEBEN realizarse configuraciones, despliegues, investigaciones ni
   comparaciones sobre AWS u otros proveedores. Quedan aplazados infraestructura como código,
-  balanceadores, escalamiento, réplicas, CDN, monitoreo cloud y CI/CD.
+  balanceadores, escalamiento, réplicas, CDN, monitoreo cloud y despliegue continuo (el job de
+  despliegue del frontend permanece inactivo mientras no se configure su destino). La
+  integración continua (GitHub Actions que verifica frontend y backend en cada cambio) sí está
+  permitida.
 - **Infraestructura adicional:** Redis, RabbitMQ, workers separados, contenedores y demás
   infraestructura adicional quedan aplazados. El correo que se necesite NO DEBE exigirlos.
 - **Otras integraciones:** MapTiler y FCM quedan como referencias aplazadas de mapas y
@@ -350,6 +354,8 @@ La enmienda 3.1.0 (Stripe en modo de pruebas para el incremento 006) cuenta con 
 explícita del usuario del 2026-11-17.
 La enmienda 3.2.0 (Gemini en plan gratuito para el asistente del incremento 013) cuenta con la
 aprobación explícita del usuario del 2026-11-24.
+La enmienda 4.0.0 (Flyway con `ddl-auto=validate` en lugar de `ddl-auto=update`, e integración
+continua del backend) cuenta con la aprobación explícita del usuario del 2026-11-25.
 Un conflicto nuevo sobre alcance o reglas de negocio DEBE consultarse cuando afecte al incremento.
 Las decisiones rutinarias se resuelven conforme al principio VII.
 
@@ -365,4 +371,4 @@ y RNF aplazados NO DEBEN declararse cumplidos ni bloquear la entrega local por s
 La infraestructura futura y las pruebas E2E se abordarán después mediante una decisión explícita
 y la planificación correspondiente.
 
-**Version**: 3.2.0 | **Ratified**: 2026-11-12 | **Last Amended**: 2026-11-24
+**Version**: 4.0.0 | **Ratified**: 2026-11-12 | **Last Amended**: 2026-11-25

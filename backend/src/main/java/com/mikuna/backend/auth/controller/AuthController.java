@@ -7,6 +7,7 @@ import com.mikuna.backend.auth.dto.LoginResponse;
 import com.mikuna.backend.auth.dto.RegisterRequest;
 import com.mikuna.backend.auth.service.AuthService;
 import com.mikuna.backend.common.security.AccountPrincipal;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -37,9 +38,13 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED).body(AccountResponse.from(account));
     }
 
+    /**
+     * La IP es la del socket. Detrás de un proxy o balanceador, configurar {@code server.forward-headers-strategy}
+     * para que sea la del cliente real y no la del proxy (si no, todos compartirían el límite por IP).
+     */
     @PostMapping("/login")
-    public LoginResponse login(@Valid @RequestBody LoginRequest request) {
-        return authService.login(request.email(), request.password());
+    public LoginResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
+        return authService.login(request.email(), request.password(), http.getRemoteAddr());
     }
 
     /** Solo el titular del token; no acepta parámetros de identidad. */

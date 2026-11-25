@@ -177,6 +177,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 .body(problem);
     }
 
+    /** 429 con Retry-After: demasiados intentos fallidos de inicio de sesión. */
+    @ExceptionHandler(LoginRateLimitedException.class)
+    ResponseEntity<ProblemDetail> handleLoginRateLimited(LoginRateLimitedException ex) {
+        ProblemDetail problem = problem(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+        problem.setProperty("code", LoginRateLimitedException.CODE);
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
+                .body(problem);
+    }
+
     @ExceptionHandler(AssistantUnavailableException.class)
     ResponseEntity<ProblemDetail> handleAssistantUnavailable(AssistantUnavailableException ex) {
         ProblemDetail problem = problem(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
