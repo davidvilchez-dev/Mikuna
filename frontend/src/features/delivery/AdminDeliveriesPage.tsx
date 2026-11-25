@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router'
-import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
+import { ApiError, errorMessage } from '../auth/auth-api'
 import { AuthLayout } from '../auth/AuthLayout'
-import { clearSession, getSession } from '../auth/session-storage'
+import { useSession } from '../auth/RequireSession'
 import { assignDelivery, listPending, releaseDelivery, type PendingDelivery } from './admin-deliveries-api'
 import { DELIVERY_POLL_MS } from './courier-logic'
+import { orderCode } from '../restaurant/orders-logic'
 import { AdminLayout } from '../admin/AdminLayout'
 import { Badge, EmptyState, ErrorState, LoadingBlock } from '../admin/admin-ui'
 
@@ -18,26 +19,15 @@ type ViewState =
 
 /** Entregas por resolver (RF-24): asigna manualmente a un candidato y libera las de repartidores inhabilitados. */
 export function AdminDeliveriesPage() {
-  const navigate = useNavigate()
-  const [session] = useState(() => getSession())
+  const session = useSession()
   const [view, setView] = useState<ViewState>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const token = session?.token ?? ''
-
-  const fail = useCallback((error: unknown): string => {
-    if (error instanceof ApiError && error.status === 401) {
-      clearSession()
-      navigate('/iniciar-sesion', { replace: true })
-      return 'Tu sesión venció'
-    }
-    return error instanceof ApiError ? error.message : GENERIC_ERROR
-  }, [navigate])
+  const token = session.token
 
   useEffect(() => {
-    if (!token) return
     let active = true
     const load = () => {
       listPending(token)
@@ -46,7 +36,7 @@ export function AdminDeliveriesPage() {
           if (!active) return
           if (error instanceof ApiError && error.status === 403) setView({ kind: 'forbidden' })
           else {
-            const message = fail(error)
+            const message = errorMessage(error)
             setView((current) => (current.kind === 'ready' ? current : { kind: 'error', message }))
           }
         })
@@ -54,9 +44,8 @@ export function AdminDeliveriesPage() {
     load()
     const timer = setInterval(load, DELIVERY_POLL_MS)
     return () => { active = false; clearInterval(timer) }
-  }, [token, attempt, fail])
+  }, [token, attempt])
 
-  if (!session) return <Navigate to="/iniciar-sesion" replace />
 
   const reload = () => setAttempt((n) => n + 1)
 
@@ -69,7 +58,7 @@ export function AdminDeliveriesPage() {
       setNotice(done)
     } catch (error) {
       // 409: otra solicitud ya la resolvió o el repartidor dejó de ser candidato; se muestra el motivo.
-      setNotice(fail(error))
+      setNotice(errorMessage(error))
     } finally {
       setBusy(false)
       reload()
@@ -98,7 +87,7 @@ export function AdminDeliveriesPage() {
           {view.items.map((item) => (
             <li key={item.orderId}>
               <div className="adm-cards-head">
-                <h2>{item.restaurantName}</h2>
+                <h2>{item.restaurantName} <small>· Pedido {orderCode(item.orderId)}</small></h2>
                 <Badge tone={item.courierDisabled ? 'bad' : 'warn'}>{item.courierDisabled ? 'Repartidor inhabilitado' : 'Sin repartidor'}</Badge>
               </div>
               <dl className="adm-facts">

@@ -135,6 +135,7 @@ class CourierServicesTest {
         verify(rejections).save(any());
         assertThat(delivery.getCourierId()).isNull();
         verify(dispatcher).dispatch(order.getId());
+        verify(dispatcher).courierBecameFree(courier);
     }
 
     @Test
@@ -148,6 +149,7 @@ class CourierServicesTest {
         verify(rejections, never()).save(any());
         assertThat(delivery.getCourierId()).isEqualTo(courier);
         verify(dispatcher, never()).dispatch(any());
+        verify(dispatcher, never()).courierBecameFree(any());
     }
 
     @Test

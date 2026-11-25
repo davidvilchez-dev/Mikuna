@@ -26,6 +26,10 @@ export interface CourierDelivery {
   }
   lines: { productName: string; quantity: number }[]
   assignedAt: string | null
+  /** Con CASH el repartidor cobra `total` al entregar; con CARD ya está pagado. */
+  payment: { method: 'CARD' | 'CASH'; total: number }
+  /** Otra persona que recibe el pedido, si el cliente la indicó. */
+  receiver: { name: string; phone: string; note: string | null } | null
 }
 
 function headers(token: string): HeadersInit {

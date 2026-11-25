@@ -1,8 +1,8 @@
-import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router'
-import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
+import { Suspense, lazy, useEffect, useState } from 'react'
+import { Link, useParams } from 'react-router'
+import { ApiError, errorMessage } from '../auth/auth-api'
 import { AuthLayout } from '../auth/AuthLayout'
-import { clearSession, getSession } from '../auth/session-storage'
+import { useSession } from '../auth/RequireSession'
 import { formatPrice } from '../catalog/catalog-validation'
 import {
   canCustomerCancel,
@@ -42,41 +42,29 @@ type ViewState =
 /** Pedido propio, su estado y el de su pago (RF-17); el cliente puede cancelarlo mientras esté Pendiente (RF-20). */
 export function OrderPage() {
   const { id = '' } = useParams()
-  const navigate = useNavigate()
-  const [session] = useState(() => getSession())
+  const session = useSession()
   const [state, setState] = useState<ViewState>({ kind: 'loading' })
   const [busy, setBusy] = useState(false)
   const [tracking, setTracking] = useState<Tracking | null>(null)
   const [offline, setOffline] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const [confirmDialog, confirm] = useConfirm()
-  const token = session?.token ?? ''
-
-  const handleFailure = useCallback((error: unknown): string => {
-    if (error instanceof ApiError && error.status === 401) {
-      clearSession()
-      navigate('/iniciar-sesion', { replace: true })
-      return 'Tu sesión venció'
-    }
-    return error instanceof ApiError ? error.message : GENERIC_ERROR
-  }, [navigate])
+  const token = session.token
 
   useEffect(() => {
-    if (!token) return
     let active = true
     getOrder(token, id)
       .then((order) => { if (active) setState(ready(order)) })
       .catch((error: unknown) => {
         if (!active) return
         if (error instanceof ApiError && error.status === 404) setState({ kind: 'notFound' })
-        else setState({ kind: 'error', message: handleFailure(error) })
+        else setState({ kind: 'error', message: errorMessage(error) })
       })
     return () => { active = false }
-  }, [token, id, handleFailure])
+  }, [token, id])
 
   // Seguimiento (RF-27, RF-28): se renueva solo cada pocos segundos, sin recargar, hasta que el pedido termina.
   useEffect(() => {
-    if (!token) return
     let active = true
     let timer: ReturnType<typeof setTimeout> | undefined
     const load = async () => {
@@ -123,7 +111,6 @@ export function OrderPage() {
     return () => { active = false }
   }, [staleStatus, token, id])
 
-  if (!session) return <Navigate to="/iniciar-sesion" replace />
   if (state.kind === 'loading') return <AuthLayout title="Mi pedido" wide><p className="auth-notice" role="status">Cargando pedido...</p></AuthLayout>
   if (state.kind === 'notFound') return <AuthLayout title="Mi pedido" wide><p className="auth-notice" role="status">Pedido no encontrado.</p><Link to="/mi-cuenta" className="auth-switch">Volver a mi cuenta</Link></AuthLayout>
   if (state.kind === 'error') return <AuthLayout title="Mi pedido" wide><p className="auth-alert" role="alert">{state.message}</p></AuthLayout>
@@ -151,10 +138,10 @@ export function OrderPage() {
         try {
           setState(ready(await getOrder(token, id), error.message))
         } catch (reloadError) {
-          setState({ kind: 'error', message: handleFailure(reloadError) })
+          setState({ kind: 'error', message: errorMessage(reloadError) })
         }
       } else {
-        setState({ kind: 'ready', order, notice: handleFailure(error), receivedAt: state.kind === 'ready' ? state.receivedAt : Date.now() })
+        setState({ kind: 'ready', order, notice: errorMessage(error), receivedAt: state.kind === 'ready' ? state.receivedAt : Date.now() })
       }
     } finally {
       setBusy(false)

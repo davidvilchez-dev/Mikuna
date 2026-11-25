@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
 import { AppIcon, type AppIconName } from '../auth/AppIcon'
 import { AuthLayout } from '../auth/AuthLayout'
-import { clearSession, getSession } from '../auth/session-storage'
+import { useSession } from '../auth/RequireSession'
 import { listMyProducts } from '../catalog/catalog-api'
 import { formatPrice } from '../catalog/catalog-validation'
-import { listOrders, type RestaurantOrder } from './orders-api'
+import { listAssignedOrders, listOrders, type RestaurantOrder } from './orders-api'
+import { orderCode as shortCode } from './orders-logic'
 import { getMyRestaurant, type Restaurant } from './restaurant-api'
 import { fetchSalesHistory } from './sales-api'
 import { rangeFor, summarize, type SalesSummary } from './sales-logic'
@@ -42,10 +43,6 @@ function todayHours(restaurant: Restaurant): string {
   return today?.opensAt && today.closesAt ? `${today.opensAt.slice(0, 5)} – ${today.closesAt.slice(0, 5)}` : 'Cerrado hoy'
 }
 
-function shortCode(id: string): string {
-  return '#' + id.replace(/-/g, '').slice(-4).toUpperCase()
-}
-
 function Stat({ icon, label, value, hint, tone, href }: { icon: AppIconName; label: string; value: number | string; hint: string; tone?: 'alert'; href?: string }) {
   const body = (
     <>
@@ -62,25 +59,25 @@ function Stat({ icon, label, value, hint, tone, href }: { icon: AppIconName; lab
 /** Resumen del día del restaurante: cuánto hay por atender, cuántos platos tiene y su horario de hoy. */
 export function RestaurantDashboard() {
   const navigate = useNavigate()
-  const [session] = useState(() => getSession())
+  const session = useSession()
   const [state, setState] = useState<ViewState>({ kind: 'loading' })
-  const token = session?.token ?? ''
+  const token = session.token
 
   useEffect(() => {
-    if (!token) return
     let active = true
     const load = async () => {
       try {
         const restaurant = await getMyRestaurant(token)
         if (restaurant.status !== 'APPROVED') { if (active) setState({ kind: 'ready', data: { restaurant, pending: [], cooking: 0, ready: 0, products: 0, today: summarize([]) } }); return }
         const day = rangeFor('today', new Date())
-        const [pending, accepted, preparing, ready, products, sold] = await Promise.all([
-          listOrders(token, 'PENDING'), listOrders(token, 'ACCEPTED'), listOrders(token, 'PREPARING'), listOrders(token, 'READY'), listMyProducts(token, 0), fetchSalesHistory(token, day.from, day.to),
+        const [pending, accepted, preparing, ready, assigned, products, sold] = await Promise.all([
+          listOrders(token, 'PENDING'), listOrders(token, 'ACCEPTED'), listOrders(token, 'PREPARING'), listOrders(token, 'READY'), listAssignedOrders(token), listMyProducts(token, 0), fetchSalesHistory(token, day.from, day.to),
         ])
-        if (active) setState({ kind: 'ready', data: { restaurant, pending, cooking: accepted.length + preparing.length, ready: ready.length, products: products.totalItems, today: summarize(sold) } })
+        // Un pedido con repartidor asignado sigue en el local hasta que lo recogen.
+        if (active) setState({ kind: 'ready', data: { restaurant, pending, cooking: accepted.length + preparing.length, ready: ready.length + assigned.length, products: products.totalItems, today: summarize(sold) } })
       } catch (error) {
         if (!active) return
-        if (error instanceof ApiError && error.status === 401) { clearSession(); navigate('/iniciar-sesion', { replace: true }); return }
+        if (error instanceof ApiError && error.status === 401) return
         if (error instanceof ApiError && error.status === 404) { navigate('/mi-restaurante/negocio', { replace: true }); return }
         if (error instanceof ApiError && error.status === 403) { setState({ kind: 'forbidden' }); return }
         // Un fallo de una actualización periódica no borra lo que ya se muestra.
@@ -92,7 +89,6 @@ export function RestaurantDashboard() {
     return () => { active = false; clearInterval(timer) }
   }, [token, navigate])
 
-  if (!session) return <Navigate to="/iniciar-sesion" replace />
 
   if (state.kind === 'forbidden') {
     return (
@@ -129,7 +125,7 @@ export function RestaurantDashboard() {
             <div className="rd-stats">
               <Stat icon="receipt" label="Pedidos nuevos" value={pending.length} hint={pending.length ? 'Esperan tu respuesta' : 'Todo al día'} tone={pending.length ? 'alert' : undefined} />
               <Stat icon="store" label="En cocina" value={cooking} hint="Aceptados y en preparación" />
-              <Stat icon="scooter" label="Listos" value={ready} hint="Esperando al repartidor" />
+              <Stat icon="scooter" label="Por recoger" value={ready} hint="Listos, esperando al repartidor" />
               <Stat icon="chart" label="Ventas de hoy" value={formatPrice(today.sales)} hint={`${today.orders} ${today.orders === 1 ? 'pedido' : 'pedidos'} · ver detalle`} href="/mi-restaurante/historial" />
             </div>
 
@@ -152,7 +148,7 @@ export function RestaurantDashboard() {
                         <Link to="/mi-restaurante/pedidos">
                           <strong>{shortCode(order.id)}</strong>
                           <span>{order.lines.map((line) => `${line.quantity}× ${line.name}`).join(', ')}</span>
-                          <em>{formatPrice(order.totals.total)}</em>
+                          <em>{formatPrice(order.totals.subtotal)}</em>
                         </Link>
                       </li>
                     ))}

@@ -4,13 +4,13 @@ import { ApiError, GENERIC_ERROR, fetchMe, type AccountResponse, type Role } fro
 import { roleLabels, statusLabels } from './auth-labels'
 import { AppIcon, type AppIconName } from './AppIcon'
 import { AuthLayout } from './AuthLayout'
-import { clearSession, getSession, saveSession } from './session-storage'
+import { clearSession, saveSession } from './session-storage'
+import { useSession } from './RequireSession'
 import './account.css'
 
 type ViewState =
   | { kind: 'loading' }
   | { kind: 'ready'; account: AccountResponse }
-  | { kind: 'expired' }
   | { kind: 'error'; message: string }
 
 interface QuickAction { to: string; title: string; text: string; icon: AppIconName; primary?: boolean }
@@ -25,14 +25,15 @@ const ACTIONS_BY_ROLE: Partial<Record<Role, QuickAction[]>> = {
     { to: '/restaurantes', title: 'Pedir ahora', text: 'Explora restaurantes de tu ciudad y arma tu pedido.', icon: 'store', primary: true },
     { to: '/carrito', title: 'Mi carrito', text: 'Revisa lo que has agregado y confirma.', icon: 'cart' },
     { to: '/mis-direcciones', title: 'Mis direcciones', text: 'Elige dónde recibir tus pedidos.', icon: 'pin' },
-    { to: '/historial', title: 'Mis pedidos', text: 'Sigue un pedido en curso o repite uno anterior.', icon: 'receipt' },
+    { to: '/historial', title: 'Mis pedidos', text: 'Sigue un pedido en curso y califica los entregados.', icon: 'receipt' },
     { to: '/avisos', title: 'Avisos', text: 'Novedades sobre tus pedidos.', icon: 'bell' },
   ],
   RESTAURANT: [
-    { to: '/mi-restaurante', title: 'Mi restaurante', text: 'Datos, horario y estado de tu habilitación.', icon: 'store', primary: true },
-    { to: '/mi-restaurante/productos', title: 'Productos', text: 'Administra tu carta y su disponibilidad.', icon: 'box' },
+    { to: '/mi-restaurante', title: 'Panel del restaurante', text: 'Pedidos del día, ventas y estado de tu local.', icon: 'store', primary: true },
     { to: '/mi-restaurante/pedidos', title: 'Pedidos', text: 'Acepta, prepara y entrega los pedidos.', icon: 'receipt' },
-    ...COMMON_ACTIONS,
+    { to: '/mi-restaurante/productos', title: 'Mi carta', text: 'Administra tus platos y su disponibilidad.', icon: 'box' },
+    { to: '/mi-restaurante/historial', title: 'Ventas', text: 'Cuánto vendiste y qué pedidos atendiste.', icon: 'chart' },
+    { to: '/avisos', title: 'Avisos', text: 'Novedades sobre tus pedidos.', icon: 'bell' },
   ],
   COURIER: [
     { to: '/repartidor/entregas', title: 'Mis entregas', text: 'Disponibilidad y entregas asignadas.', icon: 'scooter', primary: true },
@@ -58,12 +59,11 @@ const greetings: Partial<Record<Role, string>> = {
 /** Sesión propia: acredita el acceso y reúne los accesos de cada tipo de cuenta; no es el perfil editable de RF-03. */
 export function AccountPage() {
   const navigate = useNavigate()
-  const [session] = useState(() => getSession())
+  const session = useSession()
   const [state, setState] = useState<ViewState>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
-    if (!session) return
     let active = true
     fetchMe(session.token)
       .then((account) => {
@@ -74,10 +74,9 @@ export function AccountPage() {
       })
       .catch((error: unknown) => {
         if (!active) return
-        if (error instanceof ApiError && error.status === 401) {
-          clearSession()
-          setState({ kind: 'expired' })
-        } else if (error instanceof ApiError && error.status === 403) {
+        // El 401 lo resuelve RequireSession (lleva a iniciar sesión).
+        if (error instanceof ApiError && error.status === 401) return
+        if (error instanceof ApiError && error.status === 403) {
           clearSession()
           setState({ kind: 'error', message: 'La cuenta no está habilitada' })
         } else {
@@ -87,7 +86,6 @@ export function AccountPage() {
     return () => { active = false }
   }, [session, attempt])
 
-  if (!session || state.kind === 'expired') return <Navigate to="/iniciar-sesion" replace />
   // El administrador trabaja desde su panel, no desde la tarjeta de cuenta.
   if (state.kind === 'ready' && state.account.role === 'ADMIN') return <Navigate to="/admin" replace />
 

@@ -1,9 +1,9 @@
-import { Fragment, useCallback, useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router'
-import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
+import { Fragment, useEffect, useState } from 'react'
+import { Link } from 'react-router'
+import { ApiError, errorMessage } from '../auth/auth-api'
 import { AuthLayout } from '../auth/AuthLayout'
-import { clearSession, getSession } from '../auth/session-storage'
-import type { OrderStatus } from '../restaurant/orders-logic'
+import { useSession } from '../auth/RequireSession'
+import { orderCode, type OrderStatus } from '../restaurant/orders-logic'
 import {
   deliveryDetail,
   listDeliveries,
@@ -38,8 +38,7 @@ type ViewState =
 
 /** Consulta administrativa (RF-33): todos los pedidos y entregas, por estado, con su pago y cambios de estado. Solo lectura. */
 export function AdminOrdersPage() {
-  const navigate = useNavigate()
-  const [session] = useState(() => getSession())
+  const session = useSession()
   const [tab, setTab] = useState<OrdersTab>('orders')
   const [status, setStatus] = useState<OrderStatus | ''>('')
   const [page, setPage] = useState(0)
@@ -50,19 +49,9 @@ export function AdminOrdersPage() {
   const [deliveryInfo, setDeliveryInfo] = useState<DeliveryDetail | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
-  const token = session?.token ?? ''
-
-  const fail = useCallback((error: unknown): string => {
-    if (error instanceof ApiError && error.status === 401) {
-      clearSession()
-      navigate('/iniciar-sesion', { replace: true })
-      return 'Tu sesión venció'
-    }
-    return error instanceof ApiError ? error.message : GENERIC_ERROR
-  }, [navigate])
+  const token = session.token
 
   useEffect(() => {
-    if (!token) return
     let active = true
     const request: Promise<Page<Row>> = tab === 'orders' ? listOrders(token, status, page) : listDeliveries(token, status, page)
     request
@@ -70,10 +59,10 @@ export function AdminOrdersPage() {
       .catch((error: unknown) => {
         if (!active) return
         if (error instanceof ApiError && error.status === 403) setView({ kind: 'forbidden' })
-        else setView({ kind: 'error', message: fail(error) })
+        else setView({ kind: 'error', message: errorMessage(error) })
       })
     return () => { active = false }
-  }, [token, tab, status, page, attempt, fail])
+  }, [token, tab, status, page, attempt])
 
   useEffect(() => {
     if (!token || !openId) return
@@ -81,11 +70,10 @@ export function AdminOrdersPage() {
     const load = tab === 'orders'
       ? orderDetail(token, openId).then((value) => { if (active) setOrderInfo(value) })
       : deliveryDetail(token, openId).then((value) => { if (active) setDeliveryInfo(value) })
-    load.catch((error: unknown) => { if (active) setNotice(fail(error)) })
+    load.catch((error: unknown) => { if (active) setNotice(errorMessage(error)) })
     return () => { active = false }
-  }, [token, tab, openId, fail])
+  }, [token, tab, openId])
 
-  if (!session) return <Navigate to="/iniciar-sesion" replace />
 
   function changeTab(next: OrdersTab) {
     setTab(next)
@@ -114,7 +102,7 @@ export function AdminOrdersPage() {
   }
 
   const reload = () => { setView({ kind: 'loading' }); setAttempt((n) => n + 1) }
-  const columns = tab === 'orders' ? 6 : 5
+  const columns = tab === 'orders' ? 6 : 4
 
   return (
     <AdminLayout title="Pedidos y entregas" description="Todos los pedidos y entregas de la plataforma, del más reciente al más antiguo. Solo lectura.">
@@ -158,7 +146,12 @@ export function AdminOrdersPage() {
                 return (
                   <Fragment key={item.id}>
                     <tr className={open ? 'adm-row-open' : undefined}>
-                      <td><strong>{isOrder ? item.restaurant.name : item.restaurantName}</strong></td>
+                      <td>
+                        <div className="adm-cell-main">
+                          <strong>{isOrder ? item.restaurant.name : item.restaurantName}</strong>
+                          <span>Pedido {orderCode(isOrder ? item.id : item.orderId)}</span>
+                        </div>
+                      </td>
                       <td>{isOrder ? (item.customer.name ?? '—') : (item.courier?.name ?? 'Sin repartidor')}</td>
                       <td><Badge tone={statusTone(item.status)}>{orderStatusLabel(item.status)}</Badge></td>
                       {isOrder && <td>{paymentLabel(item.paymentStatus)}</td>}

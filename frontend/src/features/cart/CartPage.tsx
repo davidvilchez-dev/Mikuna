@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router'
-import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
+import { ApiError, errorMessage } from '../auth/auth-api'
 import { AuthLayout } from '../auth/AuthLayout'
-import { clearSession, getSession } from '../auth/session-storage'
+import { useSession } from '../auth/RequireSession'
 import { formatPrice } from '../catalog/catalog-validation'
 import {
   changeQuantity,
@@ -16,6 +16,7 @@ import {
   type Cart,
 } from './cart-api'
 import { MAX_QUANTITY, validateQuantity } from './cart-validation'
+import { useConfirm } from '../ui/useConfirm'
 import '../restaurant/restaurant.css'
 import './cart.css'
 
@@ -27,38 +28,24 @@ type ViewState =
 
 /** Carrito del cliente (RF-11), selección de dirección (RF-12) e importes calculados por el servidor (RF-13). */
 export function CartPage() {
-  const navigate = useNavigate()
-  const [session] = useState(() => getSession())
+  const { token } = useSession()
   const [state, setState] = useState<ViewState>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-
-  const token = session?.token ?? ''
-
-  const handleFailure = useCallback((error: unknown): string => {
-    if (error instanceof ApiError && error.status === 401) {
-      clearSession()
-      navigate('/iniciar-sesion', { replace: true })
-      return 'Tu sesión venció'
-    }
-    return error instanceof ApiError ? error.message : GENERIC_ERROR
-  }, [navigate])
+  const [confirmDialog, confirm] = useConfirm()
 
   useEffect(() => {
-    if (!token) return
     let active = true
     Promise.all([getCart(token), listAddresses(token)])
       .then(([cart, addresses]) => { if (active) setState({ kind: 'ready', cart, addresses }) })
       .catch((error: unknown) => {
         if (!active) return
         if (error instanceof ApiError && error.status === 403) setState({ kind: 'forbidden', message: 'El carrito es solo para cuentas de cliente.' })
-        else setState({ kind: 'error', message: handleFailure(error) })
+        else setState({ kind: 'error', message: errorMessage(error) })
       })
     return () => { active = false }
-  }, [token, attempt, handleFailure])
-
-  if (!session) return <Navigate to="/iniciar-sesion" replace />
+  }, [token, attempt])
 
   /** Ejecuta una acción que devuelve el carrito ya recalculado por el servidor y lo muestra. */
   async function run(action: () => Promise<Cart>) {
@@ -69,7 +56,7 @@ export function CartPage() {
       const cart = await action()
       setState({ kind: 'ready', cart, addresses: state.addresses })
     } catch (error) {
-      setNotice(handleFailure(error))
+      setNotice(errorMessage(error))
     } finally {
       setBusy(false)
     }
@@ -139,7 +126,8 @@ export function CartPage() {
           ))}
         </ul>
         <button type="button" className="cart-clear" disabled={busy}
-          onClick={() => { if (window.confirm('¿Vaciar el carrito?')) void run(() => clearCart(token)) }}>Vaciar carrito</button>
+          onClick={() => void confirm({ title: '¿Vaciar el carrito?', message: 'Se quitarán todos los productos de tu pedido.', confirmLabel: 'Vaciar carrito', danger: true })
+            .then((ok) => { if (ok) void run(() => clearCart(token)) })}>Vaciar carrito</button>
       </div>
 
       <aside className="cart-side">
@@ -171,7 +159,7 @@ export function CartPage() {
           ) : totals.pending === 'EMPTY' ? null : (
             <>
               <div><dt>Envío</dt><dd>{totals.deliveryFee === null ? '—' : formatPrice(totals.deliveryFee)}</dd></div>
-              <div><dt>Comisión</dt><dd>{totals.commission === null ? '—' : formatPrice(totals.commission)}</dd></div>
+              <div><dt>Tarifa de servicio</dt><dd>{totals.commission === null ? '—' : formatPrice(totals.commission)}</dd></div>
               <div className="cart-total"><dt>Total</dt><dd>{totals.total === null ? '—' : formatPrice(totals.total)}</dd></div>
             </>
           )}
@@ -185,6 +173,7 @@ export function CartPage() {
       </aside>
       </div>
       )}
+      {confirmDialog}
     </AuthLayout>
   )
 }

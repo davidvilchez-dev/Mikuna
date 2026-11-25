@@ -26,8 +26,8 @@ export function courierActions(status: OrderStatus): CourierActionOption[] {
 }
 
 export const courierStatusHints: Partial<Record<OrderStatus, string>> = {
-  ASSIGNED: 'Recoge el pedido en el restaurante o recházalo.',
-  PICKED_UP: 'Entrega el pedido al cliente.',
+  ASSIGNED: 'Ve al restaurante y pide el pedido con su código.',
+  PICKED_UP: 'Lleva el pedido a la dirección del cliente.',
 }
 
 export function courierStatusLabel(status: OrderStatus): string {

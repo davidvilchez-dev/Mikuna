@@ -1,10 +1,10 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router'
-import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { Link } from 'react-router'
+import { ApiError, errorMessage } from '../auth/auth-api'
 import { AppIcon } from '../auth/AppIcon'
 import { notifyError, notifySuccess } from '../ui/notify'
 import { AuthLayout } from '../auth/AuthLayout'
-import { clearSession, getSession } from '../auth/session-storage'
+import { useSession } from '../auth/RequireSession'
 import {
   actOnDelivery,
   getAvailability,
@@ -28,6 +28,8 @@ import {
   type CourierAction,
 } from './courier-logic'
 import type { RoutePoint } from './RouteMap'
+import { orderCode } from '../restaurant/orders-logic'
+import { formatPrice } from '../catalog/catalog-validation'
 import { sharingMessages, startLocationSharing, type SharingState } from './location-sender'
 import './courier.css'
 
@@ -42,8 +44,7 @@ type ViewState =
 
 /** Panel del repartidor: disponibilidad (RF-21, RF-23) y entrega en curso (RF-25). Se actualiza sola cada pocos segundos. */
 export function CourierPage() {
-  const navigate = useNavigate()
-  const [session] = useState(() => getSession())
+  const session = useSession()
   const [view, setView] = useState<ViewState>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
   const [rejecting, setRejecting] = useState(false)
@@ -56,19 +57,9 @@ export function CourierPage() {
   // Última posición del propio repartidor (la que se envía al cliente); alimenta el mapa de la entrega.
   const [myPosition, setMyPosition] = useState<{ latitude: number; longitude: number } | null>(null)
 
-  const token = session?.token ?? ''
-
-  const fail = useCallback((error: unknown): string => {
-    if (error instanceof ApiError && error.status === 401) {
-      clearSession()
-      navigate('/iniciar-sesion', { replace: true })
-      return 'Tu sesión venció'
-    }
-    return error instanceof ApiError ? error.message : GENERIC_ERROR
-  }, [navigate])
+  const token = session.token
 
   useEffect(() => {
-    if (!token) return
     let active = true
     const load = () => {
       Promise.all([getAvailability(token), listDeliveries(token)])
@@ -77,7 +68,7 @@ export function CourierPage() {
           if (!active) return
           if (error instanceof ApiError && error.status === 403) setView({ kind: 'forbidden' })
           else {
-            const message = fail(error)
+            const message = errorMessage(error)
             // Un fallo de una actualización periódica no borra lo que ya se muestra.
             setView((current) => (current.kind === 'ready' ? current : { kind: 'error', message }))
           }
@@ -86,7 +77,7 @@ export function CourierPage() {
     load()
     const timer = setInterval(load, DELIVERY_POLL_MS)
     return () => { active = false; clearInterval(timer) }
-  }, [token, attempt, fail])
+  }, [token, attempt])
 
   // Mientras haya una entrega Asignada o Recogida se comparte la ubicación del navegador (RF-26).
   const hasActiveDelivery = view.kind === 'ready' && view.deliveries.length > 0
@@ -98,7 +89,6 @@ export function CourierPage() {
     }, setSharing)
   }, [token, hasActiveDelivery, shareAttempt])
 
-  if (!session) return <Navigate to="/iniciar-sesion" replace />
 
   const reload = () => setAttempt((n) => n + 1)
 
@@ -110,7 +100,7 @@ export function CourierPage() {
       notifySuccess(available ? 'Estás en línea: te asignaremos la siguiente entrega' : 'Te desconectaste: no recibirás nuevas entregas')
       reload()
     } catch (error) {
-      notifyError(fail(error))
+      notifyError(errorMessage(error))
     } finally {
       setBusy(false)
     }
@@ -127,7 +117,7 @@ export function CourierPage() {
       reload()
     } catch (error) {
       // 404/409: la entrega cambió (reasignada o ya registrada); se muestra el motivo y se recarga.
-      notifyError(fail(error))
+      notifyError(errorMessage(error))
       reload()
     } finally {
       setBusy(false)
@@ -228,8 +218,23 @@ export function CourierPage() {
             const options = courierActions(delivery.status)
             const main = options.find((option) => option.action !== 'reject')
             const canReject = options.some((option) => option.action === 'reject')
+            // Antes de recoger, la ruta va al restaurante; después, a la casa del cliente.
+            const toRestaurant = delivery.status === 'ASSIGNED'
+            const route = toRestaurant
+              ? navigationUrl({ street: pickup.address ?? pickup.name, district: pickup.zone ?? '', latitude: pickup.latitude, longitude: pickup.longitude })
+              : navigationUrl({ ...delivery.delivery })
+            const receiverPhone = delivery.receiver ? phoneHref(delivery.receiver.phone) : null
+            const cash = delivery.payment?.method === 'CASH'
             return (
               <article key={delivery.orderId} className="cr-delivery">
+                <div className="cr-order-head">
+                  <strong className="cr-order-code">Pedido {orderCode(delivery.orderId)}</strong>
+                  {delivery.payment && (
+                    <span className={cash ? 'cr-pay cr-pay-cash' : 'cr-pay'}>
+                      {cash ? `Cobra ${formatPrice(delivery.payment.total)} en efectivo` : 'Pagado con tarjeta: no cobres'}
+                    </span>
+                  )}
+                </div>
                 <ol className="cr-steps" aria-label="Avance de la entrega">
                   {DELIVERY_STEPS.map((label, index) => (
                     <li key={label} className={index < step ? 'cr-step cr-step-done' : index === step ? 'cr-step cr-step-active' : 'cr-step'} aria-current={index === step ? 'step' : undefined}>
@@ -258,6 +263,13 @@ export function CourierPage() {
                         <strong>{delivery.delivery.street}</strong>
                         <span>{delivery.delivery.district}</span>
                         {delivery.delivery.reference && <span className="cr-reference">Referencia: {delivery.delivery.reference}</span>}
+                        {delivery.receiver && (
+                          <span className="cr-reference">
+                            Recibe: {delivery.receiver.name}
+                            {receiverPhone && <> · <a className="cr-inline" href={receiverPhone}>{delivery.receiver.phone}</a></>}
+                            {delivery.receiver.note ? ` · ${delivery.receiver.note}` : ''}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="cr-block">
@@ -270,8 +282,8 @@ export function CourierPage() {
                       </div>
                     </div>
                     <div className="cr-links">
-                      <a className="cr-link cr-link-primary" href={navigationUrl({ ...delivery.delivery })} target="_blank" rel="noopener noreferrer">
-                        <AppIcon name="navigate" />Cómo llegar
+                      <a className="cr-link cr-link-primary" href={route} target="_blank" rel="noopener noreferrer">
+                        <AppIcon name="navigate" />{toRestaurant ? 'Ir al restaurante' : 'Ir al cliente'}
                       </a>
                       {phone && <a className="cr-link" href={phone}><AppIcon name="phone" />Llamar al cliente</a>}
                     </div>
@@ -302,7 +314,9 @@ export function CourierPage() {
                 {!rejecting && (
                   <div className="cr-actions">
                     {main && (
-                      <button type="button" className="auth-submit cr-main" disabled={busy} onClick={() => void run(delivery, main.action)}>{main.label}</button>
+                      <button type="button" className="auth-submit cr-main" disabled={busy} onClick={() => void run(delivery, main.action)}>
+                        {main.action === 'complete' && cash ? `Entregué y cobré ${formatPrice(delivery.payment.total)}` : main.label}
+                      </button>
                     )}
                     {canReject && (
                       <button type="button" className="cr-reject" disabled={busy} onClick={() => { setRejecting(true); setReason(''); setReasonError(undefined) }}>Rechazar entrega</button>

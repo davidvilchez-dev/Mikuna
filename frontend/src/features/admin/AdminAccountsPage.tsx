@@ -1,10 +1,11 @@
-import { Fragment, useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router'
-import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
+import { Fragment, useEffect, useState, type FormEvent } from 'react'
+import { Link } from 'react-router'
+import { ApiError, errorMessage } from '../auth/auth-api'
 import { AuthLayout } from '../auth/AuthLayout'
-import { clearSession, getSession } from '../auth/session-storage'
+import { useSession } from '../auth/RequireSession'
 import { accountDetail, listAccounts, toggleAccount, type AccountDetail, type AccountSummary, type Page } from './admin-api'
 import { AdminLayout } from './AdminLayout'
+import { useConfirm } from '../ui/useConfirm'
 import { Badge, EmptyState, ErrorState, LoadingBlock, Pager } from './admin-ui'
 import {
   accessLabel,
@@ -31,8 +32,7 @@ const TABS: AccountTab[] = ['users', 'restaurants', 'couriers']
 
 /** Gestión de cuentas (RF-32): lista, busca, consulta el detalle y activa o desactiva usuarios, restaurantes y repartidores. */
 export function AdminAccountsPage() {
-  const navigate = useNavigate()
-  const [session] = useState(() => getSession())
+  const session = useSession()
   const [tab, setTab] = useState<AccountTab>('users')
   const [draft, setDraft] = useState<AccountFilters>(emptyAccountFilters)
   const [filters, setFilters] = useState<AccountFilters>(emptyAccountFilters)
@@ -43,41 +43,31 @@ export function AdminAccountsPage() {
   const [detail, setDetail] = useState<AccountDetail | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [confirmDialog, confirm] = useConfirm()
 
-  const token = session?.token ?? ''
-
-  const fail = useCallback((error: unknown): string => {
-    if (error instanceof ApiError && error.status === 401) {
-      clearSession()
-      navigate('/iniciar-sesion', { replace: true })
-      return 'Tu sesión venció'
-    }
-    return error instanceof ApiError ? error.message : GENERIC_ERROR
-  }, [navigate])
+  const token = session.token
 
   useEffect(() => {
-    if (!token) return
     let active = true
     listAccounts(token, tab, filters, page)
       .then((data) => { if (active) setView({ kind: 'ready', data }) })
       .catch((error: unknown) => {
         if (!active) return
         if (error instanceof ApiError && error.status === 403) setView({ kind: 'forbidden' })
-        else setView({ kind: 'error', message: fail(error) })
+        else setView({ kind: 'error', message: errorMessage(error) })
       })
     return () => { active = false }
-  }, [token, tab, filters, page, attempt, fail])
+  }, [token, tab, filters, page, attempt])
 
   useEffect(() => {
     if (!token || !selected) return
     let active = true
     accountDetail(token, selected.tab, selected.id)
       .then((value) => { if (active) setDetail(value) })
-      .catch((error: unknown) => { if (active) setNotice(fail(error)) })
+      .catch((error: unknown) => { if (active) setNotice(errorMessage(error)) })
     return () => { active = false }
-  }, [token, selected, attempt, fail])
+  }, [token, selected, attempt])
 
-  if (!session) return <Navigate to="/iniciar-sesion" replace />
 
   function changeTab(next: AccountTab) {
     setTab(next)
@@ -99,7 +89,9 @@ export function AdminAccountsPage() {
 
   async function toggle(target: AccountTab, id: string, enabledNow: boolean) {
     if (busy) return
-    if (!window.confirm(toggleInfo(target, enabledNow).confirm)) return
+    const info = toggleInfo(target, enabledNow)
+    const ok = await confirm({ title: `¿${info.button}?`, message: info.confirm, confirmLabel: info.button, danger: enabledNow })
+    if (!ok) return
     setBusy(true)
     setNotice(null)
     try {
@@ -107,7 +99,7 @@ export function AdminAccountsPage() {
       setDetail(result)
       setNotice('Cambio aplicado y registrado.')
     } catch (error) {
-      setNotice(fail(error))
+      setNotice(errorMessage(error))
     } finally {
       setBusy(false)
       setAttempt((n) => n + 1)
@@ -258,6 +250,7 @@ export function AdminAccountsPage() {
             onToggle={(target, id, enabledNow) => void toggle(target, id, enabledNow)} />
         </section>
       )}
+      {confirmDialog}
     </AdminLayout>
   )
 }

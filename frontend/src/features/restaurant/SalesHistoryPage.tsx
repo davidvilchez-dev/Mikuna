@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
 import { AppIcon } from '../auth/AppIcon'
 import { AuthLayout } from '../auth/AuthLayout'
-import { clearSession, getSession } from '../auth/session-storage'
+import { useSession } from '../auth/RequireSession'
 import { formatPrice } from '../catalog/catalog-validation'
 import type { HistoryItem } from '../history/history-api'
-import { orderStatusLabels } from './orders-logic'
+import { orderCode as shortCode, orderStatusLabels } from './orders-logic'
 import { fetchSalesHistory } from './sales-api'
 import { LOST_STATUSES, RANGE_LABELS, SALE_STATUSES, rangeFor, summarize, type RangePreset } from './sales-logic'
 import { RestaurantLayout } from './RestaurantLayout'
@@ -25,10 +25,6 @@ type ViewState =
 
 const dateFormat = new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 
-function shortCode(id: string): string {
-  return '#' + id.replace(/-/g, '').slice(-4).toUpperCase()
-}
-
 function chipClass(status: HistoryItem['status']): string {
   if (status === 'DELIVERED') return 'rs-chip rs-chip-ok'
   if ((LOST_STATUSES as readonly string[]).includes(status)) return 'rs-chip rs-chip-bad'
@@ -38,22 +34,21 @@ function chipClass(status: HistoryItem['status']): string {
 /** Historial de pedidos del restaurante con sus ventas por periodo (RF-30). Solo lectura. */
 export function SalesHistoryPage() {
   const navigate = useNavigate()
-  const [session] = useState(() => getSession())
+  const session = useSession()
   const [preset, setPreset] = useState<RangePreset>('today')
   const [state, setState] = useState<ViewState>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
   const [shown, setShown] = useState(PAGE)
-  const token = session?.token ?? ''
+  const token = session.token
 
   useEffect(() => {
-    if (!token) return
     let active = true
     const { from, to } = rangeFor(preset, new Date())
     fetchSalesHistory(token, from, to)
       .then((items) => { if (active) setState({ kind: 'ready', items }) })
       .catch((error: unknown) => {
         if (!active) return
-        if (error instanceof ApiError && error.status === 401) { clearSession(); navigate('/iniciar-sesion', { replace: true }); return }
+        if (error instanceof ApiError && error.status === 401) return
         if (error instanceof ApiError && (error.status === 403 || error.status === 404)) { setState({ kind: 'forbidden' }); return }
         setState({ kind: 'error', message: error instanceof ApiError ? error.message : GENERIC_ERROR })
       })
@@ -71,7 +66,6 @@ export function SalesHistoryPage() {
     return [...totals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
   }, [items])
 
-  if (!session) return <Navigate to="/iniciar-sesion" replace />
 
   if (state.kind === 'forbidden') {
     return (

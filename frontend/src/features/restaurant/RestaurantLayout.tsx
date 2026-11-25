@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router'
 import logo from '../../assets/branding/logo-mikuna.svg'
-import { ApiError } from '../auth/auth-api'
 import { AppIcon, type AppIconName } from '../auth/AppIcon'
 import { clearSession, getSession } from '../auth/session-storage'
 import { getMyRestaurant, listBranches, setAvailability, type Restaurant } from './restaurant-api'
@@ -93,12 +92,12 @@ export function RestaurantLayout({ title, description, actions, children }: Rest
     setBusy(true)
     try {
       setRestaurant(await setAvailability(token, !restaurant.available))
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 401) { clearSession(); navigate('/iniciar-sesion', { replace: true }) }
+    } catch {
+      // Si la sesión venció, RequireSession lleva a iniciar sesión; otro fallo deja el estado como estaba.
     } finally {
       setBusy(false)
     }
-  }, [restaurant, busy, token, navigate])
+  }, [restaurant, busy, token])
 
   const logout = () => { clearSession(); navigate('/', { replace: true }) }
   const businessName = restaurant?.name ?? session?.name ?? 'Mi restaurante'

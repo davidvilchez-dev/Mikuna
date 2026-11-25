@@ -11,6 +11,8 @@ interface AddressDialogProps {
   /** Dirección que hoy usa el carrito para la entrega. */
   selectedId: string | null
   onClose: () => void
+  /** Por qué se pide la dirección (p. ej. antes de agregar al carrito); sin direcciones guardadas abre directo el formulario. */
+  reason?: string
 }
 
 type ListState =
@@ -21,7 +23,7 @@ type ListState =
 const emptyData: AddressData = { label: '', street: '', district: '', reference: '', contactPhone: '', latitude: null, longitude: null }
 
 /** Panel para elegir la dirección de entrega o agregar una nueva sin salir de la pantalla. */
-export function AddressDialog({ token, selectedId, onClose }: AddressDialogProps) {
+export function AddressDialog({ token, selectedId, onClose, reason }: AddressDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [step, setStep] = useState<'list' | 'new'>('list')
   const [state, setState] = useState<ListState>({ kind: 'loading' })
@@ -36,12 +38,16 @@ export function AddressDialog({ token, selectedId, onClose }: AddressDialogProps
   useEffect(() => {
     let active = true
     listAddresses(token)
-      .then((addresses) => { if (active) setState({ kind: 'ready', addresses }) })
+      .then((addresses) => {
+        if (!active) return
+        setState({ kind: 'ready', addresses })
+        if (reason && addresses.length === 0) setStep('new')
+      })
       .catch((error: unknown) => {
         if (active) setState({ kind: 'error', message: error instanceof ApiError ? error.message : GENERIC_ERROR })
       })
     return () => { active = false }
-  }, [token])
+  }, [token, reason])
 
   async function choose(address: Address) {
     if (busy) return
@@ -88,6 +94,7 @@ export function AddressDialog({ token, selectedId, onClose }: AddressDialogProps
         </header>
 
         <h2 id="addr-dialog-title">{step === 'new' ? 'Agrega tu dirección' : '¿Dónde quieres recibir tu pedido?'}</h2>
+        {reason && <p className="addr-dialog-reason">{reason}</p>}
 
         {step === 'list' && (
           <>

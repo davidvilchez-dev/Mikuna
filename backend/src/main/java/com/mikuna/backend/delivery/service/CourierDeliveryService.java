@@ -95,7 +95,11 @@ public class CourierDeliveryService {
         orderStatus.changeStatus(order, OrderStatus.READY, courierId, ActorRole.COURIER, reason);
         rejections.save(new DeliveryRejection(delivery.getId(), courierId, Instant.now(clock)));
         delivery.release();
-        AfterCommit.run(() -> dispatcher.dispatch(orderId));
+        AfterCommit.run(() -> {
+            dispatcher.dispatch(orderId);
+            // Quien rechaza queda libre: se le ofrece otra pendiente (nunca la que rechazó).
+            dispatcher.courierBecameFree(courierId);
+        });
         return CourierDeliveryResponse.of(order, delivery, place(order));
     }
 

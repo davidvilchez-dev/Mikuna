@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router'
-import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
+import { ApiError, errorMessage } from '../auth/auth-api'
 import { AuthLayout } from '../auth/AuthLayout'
-import { clearSession, getSession } from '../auth/session-storage'
+import { useSession } from '../auth/RequireSession'
 import { listPending } from '../delivery/admin-deliveries-api'
 import { listOrders, countOf, type OrderSummary } from './admin-api'
 import { AdminLayout } from './AdminLayout'
 import { Badge, EmptyState, ErrorState, Icon, LoadingBlock, type IconName } from './admin-ui'
 import { formatDateTime, formatMoney, ORDER_STATUSES, orderStatusLabel, statusTone } from './admin-logic'
-import type { OrderStatus } from '../restaurant/orders-logic'
+import { orderCode, type OrderStatus } from '../restaurant/orders-logic'
 
 interface Metrics {
   users: number
@@ -54,35 +54,23 @@ async function loadMetrics(token: string): Promise<Metrics> {
 
 /** Resumen de la plataforma: lo que requiere atención, la actividad de pedidos y los últimos movimientos. */
 export function AdminDashboardPage() {
-  const navigate = useNavigate()
-  const [session] = useState(() => getSession())
+  const session = useSession()
   const [view, setView] = useState<ViewState>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
-  const token = session?.token ?? ''
-
-  const fail = useCallback((error: unknown): string => {
-    if (error instanceof ApiError && error.status === 401) {
-      clearSession()
-      navigate('/iniciar-sesion', { replace: true })
-      return 'Tu sesión venció'
-    }
-    return error instanceof ApiError ? error.message : GENERIC_ERROR
-  }, [navigate])
+  const token = session.token
 
   useEffect(() => {
-    if (!token) return
     let active = true
     loadMetrics(token)
       .then((metrics) => { if (active) setView({ kind: 'ready', metrics }) })
       .catch((error: unknown) => {
         if (!active) return
         if (error instanceof ApiError && error.status === 403) setView({ kind: 'forbidden' })
-        else setView({ kind: 'error', message: fail(error) })
+        else setView({ kind: 'error', message: errorMessage(error) })
       })
     return () => { active = false }
-  }, [token, attempt, fail])
+  }, [token, attempt])
 
-  if (!session) return <Navigate to="/iniciar-sesion" replace />
 
   if (view.kind === 'forbidden') {
     return (
@@ -117,9 +105,9 @@ function Content({ metrics }: { metrics: Metrics }) {
         <p className="adm-note" role="status">
           <Icon name="alert" />
           Hay {attention} {attention === 1 ? 'asunto' : 'asuntos'} por resolver:{' '}
-          {metrics.restaurantsPending > 0 && <Link to="/admin/solicitudes"><u>{metrics.restaurantsPending} solicitud(es) de restaurante</u></Link>}
+          {metrics.restaurantsPending > 0 && <Link to="/admin/solicitudes"><u>{metrics.restaurantsPending} {metrics.restaurantsPending === 1 ? 'solicitud' : 'solicitudes'} de restaurante</u></Link>}
           {metrics.restaurantsPending > 0 && metrics.pendingDeliveries > 0 && ' y '}
-          {metrics.pendingDeliveries > 0 && <Link to="/admin/entregas"><u>{metrics.pendingDeliveries} entrega(s) sin repartidor</u></Link>}.
+          {metrics.pendingDeliveries > 0 && <Link to="/admin/entregas"><u>{metrics.pendingDeliveries} {metrics.pendingDeliveries === 1 ? 'entrega' : 'entregas'} sin repartidor</u></Link>}.
         </p>
       )}
 
@@ -127,7 +115,7 @@ function Content({ metrics }: { metrics: Metrics }) {
         <Stat icon="inbox" label="Solicitudes pendientes" value={metrics.restaurantsPending} to="/admin/solicitudes" tone={metrics.restaurantsPending > 0 ? 'accent' : undefined} hint="Restaurantes por aprobar" />
         <Stat icon="truck" label="Entregas por asignar" value={metrics.pendingDeliveries} to="/admin/entregas" tone={metrics.pendingDeliveries > 0 ? 'accent' : undefined} hint="Sin repartidor o inhabilitado" />
         <Stat icon="receipt" label="Pedidos totales" value={metrics.orders} to="/admin/pedidos" hint={`${number.format(metrics.byStatus.DELIVERED)} entregados`} />
-        <Stat icon="store" label="Restaurantes activos" value={metrics.restaurantsApproved} to="/admin/cuentas" hint="Aprobados en la plataforma" />
+        <Stat icon="store" label="Restaurantes aprobados" value={metrics.restaurantsApproved} to="/admin/cuentas" hint="Publicados en la plataforma" />
         <Stat icon="scooter" label="Repartidores activos" value={metrics.couriersActive} to="/admin/cuentas" hint="Candidatos a entregas" />
         <Stat icon="users" label="Usuarios" value={metrics.users} to="/admin/cuentas" hint={`${number.format(metrics.customers)} clientes`} />
       </dl>
@@ -156,7 +144,7 @@ function Content({ metrics }: { metrics: Metrics }) {
             <ul className="adm-timeline">
               {metrics.recent.map((order) => (
                 <li key={order.id}>
-                  <span><strong>{order.restaurant.name ?? 'Restaurante'}</strong> · {formatMoney(order.total)}</span>
+                  <span><strong>{orderCode(order.id)} · {order.restaurant.name ?? 'Restaurante'}</strong> · {formatMoney(order.total)}</span>
                   <span><Badge tone={statusTone(order.status)}>{orderStatusLabel(order.status)}</Badge></span>
                   <small>{order.customer.name ?? 'Cliente'} · {formatDateTime(order.createdAt)}</small>
                 </li>

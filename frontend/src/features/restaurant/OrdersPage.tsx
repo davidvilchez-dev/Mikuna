@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router'
-import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
+import { ApiError, errorMessage } from '../auth/auth-api'
 import { AppIcon } from '../auth/AppIcon'
 import { RestaurantLayout } from './RestaurantLayout'
-import { clearSession, getSession } from '../auth/session-storage'
+import { useSession } from '../auth/RequireSession'
 import { formatPrice } from '../catalog/catalog-validation'
 import { actOnOrder, listAssignedOrders, listOrders, type RestaurantOrder } from './orders-api'
 import {
@@ -64,8 +64,7 @@ type ViewState =
 
 /** Pedidos del restaurante (RF-18, RF-19): acepta o rechaza los nuevos y avanza los aceptados. Se actualiza sola. */
 export function OrdersPage() {
-  const navigate = useNavigate()
-  const [session] = useState(() => getSession())
+  const session = useSession()
   const [status, setStatus] = useState<OrderStatus>('PENDING')
   const [state, setState] = useState<ViewState>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
@@ -76,19 +75,9 @@ export function OrdersPage() {
   const [busy, setBusy] = useState(false)
   const [now, setNow] = useState(() => Date.now())
 
-  const token = session?.token ?? ''
-
-  const fail = useCallback((error: unknown): string => {
-    if (error instanceof ApiError && error.status === 401) {
-      clearSession()
-      navigate('/iniciar-sesion', { replace: true })
-      return 'Tu sesión venció'
-    }
-    return error instanceof ApiError ? error.message : GENERIC_ERROR
-  }, [navigate])
+  const token = session.token
 
   useEffect(() => {
-    if (!token) return
     let active = true
     const load = () => {
       Promise.all([...tabs.map((tab) => listOrders(token, tab.status)), listAssignedOrders(token)])
@@ -105,7 +94,7 @@ export function OrdersPage() {
           if (!active) return
           if (error instanceof ApiError && error.status === 403) setState({ kind: 'forbidden' })
           else {
-            const message = fail(error)
+            const message = errorMessage(error)
             // Un fallo de una actualización periódica no borra lo que ya se muestra.
             setState((current) => (current.kind === 'ready' ? current : { kind: 'error', message }))
           }
@@ -114,7 +103,7 @@ export function OrdersPage() {
     load()
     const timer = setInterval(load, POLL_MS)
     return () => { active = false; clearInterval(timer) }
-  }, [token, attempt, fail])
+  }, [token, attempt])
 
   // Reloj de 1 s para la cuenta regresiva de los pedidos nuevos (spec 012).
   useEffect(() => {
@@ -139,7 +128,6 @@ export function OrdersPage() {
     return () => clearTimeout(timer)
   }, [shouldRefreshExpired])
 
-  if (!session) return <Navigate to="/iniciar-sesion" replace />
 
   const reload = () => setAttempt((n) => n + 1)
 
@@ -159,7 +147,7 @@ export function OrdersPage() {
       reload()
     } catch (error) {
       // 409: el estado cambió (p. ej. el cliente canceló a la vez): se muestra el motivo y se recarga.
-      setNotice({ text: fail(error), ok: false })
+      setNotice({ text: errorMessage(error), ok: false })
       if (error instanceof ApiError && error.status === 409) reload()
     } finally {
       setBusy(false)

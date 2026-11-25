@@ -16,8 +16,8 @@ interface NavItem { to: string; label: string; icon: AppIconName }
 const NAV_BY_ROLE: Record<string, NavItem[]> = {
   RESTAURANT: [
     { to: '/mi-restaurante', label: 'Mi restaurante', icon: 'store' },
-    { to: '/mi-restaurante/productos', label: 'Productos', icon: 'box' },
     { to: '/mi-restaurante/pedidos', label: 'Pedidos', icon: 'receipt' },
+    { to: '/mi-restaurante/productos', label: 'Mi carta', icon: 'box' },
   ],
   COURIER: [
     { to: '/repartidor/entregas', label: 'Entregas', icon: 'scooter' },
@@ -33,7 +33,7 @@ const MENU_BY_ROLE: Record<string, NavItem[]> = {
     { to: '/mi-cuenta', label: 'Mi perfil', icon: 'user' },
   ],
   RESTAURANT: [
-    { to: '/historial', label: 'Historial', icon: 'receipt' },
+    { to: '/mi-restaurante/historial', label: 'Ventas', icon: 'chart' },
     { to: '/avisos', label: 'Avisos', icon: 'bell' },
     { to: '/mi-cuenta', label: 'Mi perfil', icon: 'user' },
   ],
@@ -151,7 +151,7 @@ export function AppHeader() {
     navigate('/', { replace: true })
   }
 
-  const home = isCustomer ? '/restaurantes' : role === 'RESTAURANT' ? '/mi-restaurante' : session ? '/mi-cuenta' : '/'
+  const home = isCustomer ? '/restaurantes' : role === 'RESTAURANT' ? '/mi-restaurante' : role === 'COURIER' ? '/repartidor/entregas' : session ? '/mi-cuenta' : '/'
   return (
     <header className="app-header">
       <div className={isCustomer ? 'app-header-inner app-header-customer' : 'app-header-inner'}>

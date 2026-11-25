@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router'
 import { loadStripe } from '@stripe/stripe-js'
 import { CardCvcElement, CardExpiryElement, CardNumberElement, Elements, useElements, useStripe } from '@stripe/react-stripe-js'
-import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
+import { ApiError, errorMessage } from '../auth/auth-api'
 import { AuthLayout } from '../auth/AuthLayout'
-import { clearSession, getSession } from '../auth/session-storage'
+import { useSession } from '../auth/RequireSession'
 import { formatPrice } from '../catalog/catalog-validation'
 import { confirmOrder, getCheckout, type Checkout, type PaymentChoice } from './checkout-api'
 import { AddressDialog } from '../auth/AddressDialog'
@@ -23,40 +23,28 @@ type ViewState =
 
 /** Resumen de confirmación (RF-14), método de pago (RF-15) y reserva del monto con Stripe en pruebas (RF-16). */
 export function CheckoutPage() {
-  const navigate = useNavigate()
-  const [session] = useState(() => getSession())
+  const session = useSession()
   const [state, setState] = useState<ViewState>({ kind: 'loading' })
-  const token = session?.token ?? ''
-
-  const handleFailure = useCallback((error: unknown): string => {
-    if (error instanceof ApiError && error.status === 401) {
-      clearSession()
-      navigate('/iniciar-sesion', { replace: true })
-      return 'Tu sesión venció'
-    }
-    return error instanceof ApiError ? error.message : GENERIC_ERROR
-  }, [navigate])
+  const token = session.token
 
   useEffect(() => {
-    if (!token) return
     let active = true
     getCheckout(token)
       .then((checkout) => { if (active) setState({ kind: 'ready', checkout }) })
       .catch((error: unknown) => {
         if (!active) return
         if (error instanceof ApiError && error.status === 403) setState({ kind: 'forbidden', message: 'La confirmación de pedidos es solo para cuentas de cliente.' })
-        else setState({ kind: 'error', message: handleFailure(error) })
+        else setState({ kind: 'error', message: errorMessage(error) })
       })
     return () => { active = false }
-  }, [token, handleFailure])
+  }, [token])
 
-  if (!session) return <Navigate to="/iniciar-sesion" replace />
 
   if (state.kind === 'loading') return <AuthLayout title="Confirmar pedido" wide><p className="auth-notice" role="status">Cargando resumen...</p></AuthLayout>
   if (state.kind === 'forbidden') return <AuthLayout title="Confirmar pedido" wide><p className="auth-notice" role="status">{state.message}</p><Link to="/mi-cuenta" className="auth-switch">Volver a mi cuenta</Link></AuthLayout>
   if (state.kind === 'error') return <AuthLayout title="Confirmar pedido" wide><p className="auth-alert" role="alert">{state.message}</p></AuthLayout>
 
-  return <CheckoutView checkout={state.checkout} token={token} onRefresh={(checkout) => setState({ kind: 'ready', checkout })} onFailure={handleFailure} />
+  return <CheckoutView checkout={state.checkout} token={token} onRefresh={(checkout) => setState({ kind: 'ready', checkout })} onFailure={errorMessage} />
 }
 
 interface ViewProps {
@@ -104,7 +92,7 @@ function CheckoutView({ checkout, token, onRefresh, onFailure }: ViewProps) {
         <dl className="cart-totals">
           <div><dt>Subtotal</dt><dd>{formatPrice(totals.subtotal)}</dd></div>
           <div><dt>Envío</dt><dd>{totals.deliveryFee === null ? '-' : formatPrice(totals.deliveryFee)}</dd></div>
-          <div><dt>Comisión</dt><dd>{totals.commission === null ? '-' : formatPrice(totals.commission)}</dd></div>
+          <div><dt>Tarifa de servicio</dt><dd>{totals.commission === null ? '-' : formatPrice(totals.commission)}</dd></div>
           <div className="cart-total"><dt>Total</dt><dd>{totals.total === null ? '-' : formatPrice(totals.total)}</dd></div>
         </dl>
         <p className="auth-hint">Con tarjeta se reserva el monto y solo se cobra cuando el restaurante acepte el pedido. En efectivo pagas al recibir.</p>

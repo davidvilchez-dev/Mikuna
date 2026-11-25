@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router'
-import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
+import { ApiError, errorMessage } from '../auth/auth-api'
 import { AppIcon } from '../auth/AppIcon'
 import { notifyError, notifySuccess } from '../ui/notify'
+import { useConfirm } from '../ui/useConfirm'
 import { AuthLayout } from '../auth/AuthLayout'
-import { clearSession, getSession } from '../auth/session-storage'
+import { useSession } from '../auth/RequireSession'
 import { AddressForm } from './AddressForm'
 import { createAddress, deleteAddress, listAddresses, updateAddress, type Address, type AddressData } from './cart-api'
 import '../restaurant/restaurant.css'
@@ -35,38 +36,27 @@ function toData(address: Address): AddressData {
 
 /** Libreta de direcciones de entrega del cliente (RF-12). */
 export function AddressesPage() {
-  const navigate = useNavigate()
-  const [session] = useState(() => getSession())
+  const session = useSession()
   const [state, setState] = useState<ViewState>({ kind: 'loading' })
   const [mode, setMode] = useState<Mode>({ kind: 'list' })
   const [attempt, setAttempt] = useState(0)
   const [busy, setBusy] = useState(false)
+  const [confirmDialog, confirm] = useConfirm()
 
-  const token = session?.token ?? ''
-
-  const handleFailure = useCallback((error: unknown): string => {
-    if (error instanceof ApiError && error.status === 401) {
-      clearSession()
-      navigate('/iniciar-sesion', { replace: true })
-      return 'Tu sesión venció'
-    }
-    return error instanceof ApiError ? error.message : GENERIC_ERROR
-  }, [navigate])
+  const token = session.token
 
   useEffect(() => {
-    if (!token) return
     let active = true
     listAddresses(token)
       .then((addresses) => { if (active) setState({ kind: 'ready', addresses }) })
       .catch((error: unknown) => {
         if (!active) return
         if (error instanceof ApiError && error.status === 403) setState({ kind: 'forbidden', message: 'Las direcciones de entrega son solo para cuentas de cliente.' })
-        else setState({ kind: 'error', message: handleFailure(error) })
+        else setState({ kind: 'error', message: errorMessage(error) })
       })
     return () => { active = false }
-  }, [token, attempt, handleFailure])
+  }, [token, attempt])
 
-  if (!session) return <Navigate to="/iniciar-sesion" replace />
 
   const reload = (message: string | null) => {
     if (message) notifySuccess(message)
@@ -76,13 +66,20 @@ export function AddressesPage() {
   }
 
   async function remove(address: Address) {
-    if (busy || !window.confirm('¿Eliminar esta dirección?')) return
+    if (busy) return
+    const ok = await confirm({
+      title: '¿Eliminar esta dirección?',
+      message: `${address.label ? address.label + ' · ' : ''}${address.street}, ${address.district}. Tus pedidos anteriores no cambian.`,
+      confirmLabel: 'Eliminar dirección',
+      danger: true,
+    })
+    if (!ok) return
     setBusy(true)
     try {
       await deleteAddress(token, address.id)
       reload('Dirección eliminada')
     } catch (error) {
-      notifyError(handleFailure(error))
+      notifyError(errorMessage(error))
     } finally {
       setBusy(false)
     }
@@ -154,6 +151,7 @@ export function AddressesPage() {
           </button>
         </li>
       </ul>
+      {confirmDialog}
     </AuthLayout>
   )
 }

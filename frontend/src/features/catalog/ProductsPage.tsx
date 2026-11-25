@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router'
-import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
+import { ApiError, errorMessage } from '../auth/auth-api'
 import { AppIcon } from '../auth/AppIcon'
 import { notifyError, notifySuccess } from '../ui/notify'
 import { RestaurantLayout } from '../restaurant/RestaurantLayout'
 import { Modal } from '../ui/Modal'
-import { clearSession, getSession } from '../auth/session-storage'
+import { useConfirm } from '../ui/useConfirm'
+import { parseDescription } from './product-description'
+import { useSession } from '../auth/RequireSession'
 import { getBranchId } from '../restaurant/branch-storage'
 import { listBranches, type Restaurant } from '../restaurant/restaurant-api'
 import {
@@ -89,28 +91,18 @@ function CopyMenu({ token, onCopied, onFailure }: { token: string; onCopied: (me
 
 /** Gestión del catálogo propio del restaurante aprobado (RF-08). */
 export function ProductsPage() {
-  const navigate = useNavigate()
-  const [session] = useState(() => getSession())
+  const session = useSession()
   const [state, setState] = useState<ViewState>({ kind: 'loading' })
   const [mode, setMode] = useState<Mode>({ kind: 'list' })
   const [page, setPage] = useState(0)
   const [attempt, setAttempt] = useState(0)
   const [busy, setBusy] = useState(false)
+  const [confirmDialog, confirm] = useConfirm()
 
-  const token = session?.token ?? ''
+  const token = session.token
 
   /** 401: la sesión no vale; otros errores se muestran. Devuelve el mensaje para el usuario. */
-  const handleFailure = useCallback((error: unknown): string => {
-    if (error instanceof ApiError && error.status === 401) {
-      clearSession()
-      navigate('/iniciar-sesion', { replace: true })
-      return 'Tu sesión venció'
-    }
-    return error instanceof ApiError ? error.message : GENERIC_ERROR
-  }, [navigate])
-
   useEffect(() => {
-    if (!token) return
     let active = true
     listMyProducts(token, page)
       .then((data) => { if (active) setState({ kind: 'ready', data }) })
@@ -119,13 +111,12 @@ export function ProductsPage() {
         if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
           setState({ kind: 'forbidden', message: error.status === 404 ? 'Primero envía la solicitud de tu restaurante.' : error.message })
         } else {
-          setState({ kind: 'error', message: handleFailure(error) })
+          setState({ kind: 'error', message: errorMessage(error) })
         }
       })
     return () => { active = false }
-  }, [token, page, attempt, handleFailure])
+  }, [token, page, attempt])
 
-  if (!session) return <Navigate to="/iniciar-sesion" replace />
 
   const reload = (message: string | null, isError = false) => {
     if (message) (isError ? notifyError : notifySuccess)(message)
@@ -141,7 +132,7 @@ export function ProductsPage() {
       await action()
       reload(success)
     } catch (error) {
-      const message = handleFailure(error)
+      const message = errorMessage(error)
       // 409: otra edición cambió el producto; se recarga para ver la versión vigente.
       if (error instanceof ApiError && error.status === 409) reload(message, true)
       else notifyError(message)
@@ -151,12 +142,12 @@ export function ProductsPage() {
   }
 
   if (state.kind === 'loading') {
-    return <RestaurantLayout title="Mi catálogo" wide><p className="auth-description" role="status">Cargando tus productos…</p></RestaurantLayout>
+    return <RestaurantLayout title="Mi carta" wide><p className="auth-description" role="status">Cargando tus productos…</p></RestaurantLayout>
   }
 
   if (state.kind === 'forbidden') {
     return (
-      <RestaurantLayout title="Mi catálogo" wide>
+      <RestaurantLayout title="Mi carta" wide>
         <p className="auth-alert" role="alert">{state.message || 'Tu restaurante debe estar aprobado para gestionar productos.'}</p>
         <Link to="/mi-restaurante" className="auth-submit auth-submit-secondary">Ir a mi restaurante</Link>
       </RestaurantLayout>
@@ -165,7 +156,7 @@ export function ProductsPage() {
 
   if (state.kind === 'error') {
     return (
-      <RestaurantLayout title="Mi catálogo" wide>
+      <RestaurantLayout title="Mi carta" wide>
         <p className="auth-alert" role="alert">{state.message}</p>
         <button type="button" className="auth-submit" onClick={() => { setState({ kind: 'loading' }); setAttempt((n) => n + 1) }}>Reintentar</button>
       </RestaurantLayout>
@@ -178,7 +169,7 @@ export function ProductsPage() {
       <div className="rs-toolbar">
         <span>{data.totalItems} {data.totalItems === 1 ? 'producto' : 'productos'}</span>
         <div className="rs-toolbar-actions">
-          <CopyMenu token={token} onCopied={(message) => reload(message)} onFailure={handleFailure} />
+          <CopyMenu token={token} onCopied={(message) => reload(message)} onFailure={errorMessage} />
           <button type="button" className="auth-submit" onClick={() => setMode({ kind: 'create' })}>+ Nuevo producto</button>
         </div>
       </div>
@@ -200,7 +191,7 @@ export function ProductsPage() {
               <div className="rs-product-body">
                 <small>{product.category}</small>
                 <h2>{product.name}</h2>
-                {product.description && <p>{product.description}</p>}
+                {parseDescription(product.description).summary && <p>{parseDescription(product.description).summary}</p>}
                 <strong className="rs-price">{formatPrice(product.price)}</strong>
               </div>
               <div className="rs-product-foot">
@@ -215,7 +206,12 @@ export function ProductsPage() {
                 <button type="button" className="rs-link" disabled={busy}
                   onClick={() => setMode({ kind: 'edit', product })}>Editar</button>
                 <button type="button" className="rs-link rs-link-danger" disabled={busy}
-                  onClick={() => { if (window.confirm(`¿Retirar «${product.name}»? Esta acción no se puede deshacer.`)) void run(() => withdrawProduct(token, product.id, product.version), 'Producto retirado') }}>
+                  onClick={() => void confirm({
+                    title: `¿Retirar «${product.name}»?`,
+                    message: 'Desaparece de tu carta y los clientes ya no podrán pedirlo. Esta acción no se puede deshacer; si solo se agotó, márcalo como no disponible.',
+                    confirmLabel: 'Retirar producto',
+                    danger: true,
+                  }).then((ok) => { if (ok) void run(() => withdrawProduct(token, product.id, product.version), 'Producto retirado') })}>
                   Retirar
                 </button>
               </div>
@@ -238,13 +234,8 @@ export function ProductsPage() {
             submitLabel="Guardar producto"
             onCancel={() => setMode({ kind: 'list' })}
             onSubmit={async (data, image) => {
-              try {
-                await createProduct(token, data, image as File)
-                reload('Producto creado')
-              } catch (error) {
-                if (error instanceof ApiError && error.status === 401) handleFailure(error)
-                throw error
-              }
+              await createProduct(token, data, image as File)
+              reload('Producto creado')
             }}
           />
         </Modal>
@@ -262,7 +253,6 @@ export function ProductsPage() {
                 await updateProduct(token, product.id, product.version, data, image)
                 reload('Cambios guardados')
               } catch (error) {
-                if (error instanceof ApiError && error.status === 401) handleFailure(error)
                 // 409: el producto cambió; se muestra el aviso y se recarga la lista con la versión vigente.
                 if (error instanceof ApiError && error.status === 409) {
                   reload(error.message, true)
@@ -274,6 +264,7 @@ export function ProductsPage() {
           />
         </Modal>
       )}
+      {confirmDialog}
     </RestaurantLayout>
   )
 }

@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router'
-import { ApiError, GENERIC_ERROR, fetchMe, type Role } from '../auth/auth-api'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router'
+import { ApiError, errorMessage, fetchMe, type Role } from '../auth/auth-api'
 import { AuthLayout } from '../auth/AuthLayout'
-import { clearSession, getSession } from '../auth/session-storage'
+import { useSession } from '../auth/RequireSession'
 import { listNotices, markAllNoticesRead, markNoticeRead, type Notice } from './notifications-api'
 import { formatNoticeTime, noticeTarget } from './notifications-logic'
 import '../restaurant/restaurant.css'
@@ -17,37 +17,26 @@ type ViewState =
 /** Avisos propios (RF-29): del más reciente al más antiguo, con los no leídos destacados. */
 export function NotificationsPage() {
   const navigate = useNavigate()
-  const [session] = useState(() => getSession())
+  const session = useSession()
   const [view, setView] = useState<ViewState>({ kind: 'loading' })
   const [unreadOnly, setUnreadOnly] = useState(false)
   const [role, setRole] = useState<Role | null>(null)
   const [busy, setBusy] = useState(false)
-  const token = session?.token ?? ''
-
-  const fail = useCallback((error: unknown): string => {
-    if (error instanceof ApiError && error.status === 401) {
-      clearSession()
-      navigate('/iniciar-sesion', { replace: true })
-      return 'Tu sesión venció'
-    }
-    return error instanceof ApiError ? error.message : GENERIC_ERROR
-  }, [navigate])
+  const token = session.token
 
   useEffect(() => {
-    if (!token) return
     let active = true
     listNotices(token, 0, unreadOnly)
       .then((result) => { if (active) setView({ kind: 'ready', items: result.items, page: result.page, totalPages: result.totalPages }) })
       .catch((error: unknown) => {
         if (!active) return
         if (error instanceof ApiError && error.status === 403) setView({ kind: 'forbidden' })
-        else setView({ kind: 'error', message: fail(error) })
+        else setView({ kind: 'error', message: errorMessage(error) })
       })
     fetchMe(token).then((me) => { if (active) setRole(me.role) }).catch(() => undefined)
     return () => { active = false }
-  }, [token, unreadOnly, fail])
+  }, [token, unreadOnly])
 
-  if (!session) return <Navigate to="/iniciar-sesion" replace />
 
   async function loadMore(current: Extract<ViewState, { kind: 'ready' }>) {
     if (busy) return
@@ -56,7 +45,7 @@ export function NotificationsPage() {
       const result = await listNotices(token, current.page + 1, unreadOnly)
       setView({ kind: 'ready', items: [...current.items, ...result.items], page: result.page, totalPages: result.totalPages })
     } catch (error) {
-      setView({ kind: 'error', message: fail(error) })
+      setView({ kind: 'error', message: errorMessage(error) })
     } finally {
       setBusy(false)
     }
@@ -82,7 +71,7 @@ export function NotificationsPage() {
         ? { ...current, items: unreadOnly ? [] : current.items.map((n) => ({ ...n, read: true })) }
         : current))
     } catch (error) {
-      setView({ kind: 'error', message: fail(error) })
+      setView({ kind: 'error', message: errorMessage(error) })
     } finally {
       setBusy(false)
     }

@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
 import { AuthLayout } from '../auth/AuthLayout'
 import { notifyAddedToCart, notifyError } from '../ui/notify'
+import { useConfirm } from '../ui/useConfirm'
 import { clearSession, getSession } from '../auth/session-storage'
-import { addToCart, clearCart } from '../cart/cart-api'
+import { addToCart, clearCart, getCart } from '../cart/cart-api'
+import { AddressDialog } from '../auth/AddressDialog'
 import { attentionLabels, getCatalog, type Catalog, type PublicProduct } from './catalog-api'
 import { formatPrice } from './catalog-validation'
 import { ProductDialog } from './ProductDialog'
@@ -38,6 +40,10 @@ export function RestaurantCatalogPage() {
   const [page, setPage] = useState(0)
   const [attempt, setAttempt] = useState(0)
   const [state, setState] = useState<ViewState>({ kind: 'loading' })
+  const [confirmDialog, confirm] = useConfirm()
+  // Mientras se pide la dirección, guarda cómo continuar al cerrar el panel.
+  const [askAddress, setAskAddress] = useState<(() => void) | null>(null)
+  const hasAddress = useRef(false)
 
   useEffect(() => {
     let active = true
@@ -61,11 +67,30 @@ export function RestaurantCatalogPage() {
     if (adding) return
     setAdding(true)
     try {
+      // Sin dirección de entrega no hay a dónde llevar el pedido: se pide antes de llenar el carrito.
+      if (session.role === 'CUSTOMER' && !hasAddress.current) {
+        const cart = await getCart(session.token)
+        if (!cart.address) {
+          await new Promise<void>((resolve) => setAskAddress(() => resolve))
+          const updated = await getCart(session.token)
+          if (!updated.address) {
+            notifyError('Elige una dirección de entrega para agregar productos.')
+            return
+          }
+        }
+        hasAddress.current = true
+      }
       try {
         await addToCart(session.token, product.id, quantity)
       } catch (error) {
         if (!(error instanceof ApiError && error.code === 'CART_OTHER_RESTAURANT')) throw error
-        if (!window.confirm('Tu carrito es de otro restaurante. ¿Vaciarlo y agregar este producto?')) return
+        const replace = await confirm({
+          title: '¿Empezar un carrito nuevo?',
+          message: 'Tu carrito tiene productos de otro restaurante. Si continúas, se vaciará y agregaremos este producto.',
+          confirmLabel: 'Vaciar y agregar',
+          cancelLabel: 'Mantener mi carrito',
+        })
+        if (!replace) return
         await clearCart(session.token)
         await addToCart(session.token, product.id, quantity)
       }
@@ -176,6 +201,15 @@ export function RestaurantCatalogPage() {
       )}
 
       <Link to="/restaurantes" className="auth-switch">Volver a la búsqueda</Link>
+      {confirmDialog}
+      {askAddress && getSession() && (
+        <AddressDialog
+          token={getSession()!.token}
+          selectedId={null}
+          reason="Antes de armar tu pedido, dinos dónde lo recibirás. Así sabremos si llegamos a tu zona y cuánto cuesta el envío."
+          onClose={() => { askAddress(); setAskAddress(null) }}
+        />
+      )}
     </AuthLayout>
   )
 }

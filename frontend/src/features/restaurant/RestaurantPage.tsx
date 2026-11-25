@@ -1,13 +1,13 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router'
-import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
+import { Suspense, lazy, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Link, useNavigate } from 'react-router'
+import { ApiError, GENERIC_ERROR, errorMessage } from '../auth/auth-api'
 import { AppIcon } from '../auth/AppIcon'
 import { notifyError, notifySuccess } from '../ui/notify'
 import { Modal } from '../ui/Modal'
 import { AuthLayout } from '../auth/AuthLayout'
 import { RestaurantLayout } from './RestaurantLayout'
 import { FormField } from '../auth/FormField'
-import { clearSession, getSession } from '../auth/session-storage'
+import { useSession } from '../auth/RequireSession'
 import {
   getMyRestaurant,
   resubmitMyRestaurant,
@@ -267,26 +267,15 @@ function ImageUploader({ restaurant, onSave }: ImageUploaderProps) {
 }
 
 export function RestaurantPage() {
-  const navigate = useNavigate()
-  const [session] = useState(() => getSession())
+  const session = useSession()
   const [state, setState] = useState<ViewState>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
   const [editing, setEditing] = useState(false)
 
-  const token = session?.token ?? ''
+  const token = session.token
 
   /** 401: la sesión no vale; otros errores se muestran. Devuelve el mensaje para el usuario. */
-  const handleFailure = useCallback((error: unknown): string => {
-    if (error instanceof ApiError && error.status === 401) {
-      clearSession()
-      navigate('/iniciar-sesion', { replace: true })
-      return 'Tu sesión venció'
-    }
-    return error instanceof ApiError ? error.message : GENERIC_ERROR
-  }, [navigate])
-
   useEffect(() => {
-    if (!token) return
     let active = true
     getMyRestaurant(token)
       .then((restaurant) => { if (active) setState({ kind: 'ready', restaurant }) })
@@ -294,12 +283,11 @@ export function RestaurantPage() {
         if (!active) return
         if (error instanceof ApiError && error.status === 404) setState({ kind: 'none' })
         else if (error instanceof ApiError && error.status === 403) setState({ kind: 'forbidden' })
-        else setState({ kind: 'error', message: handleFailure(error) })
+        else setState({ kind: 'error', message: errorMessage(error) })
       })
     return () => { active = false }
-  }, [token, attempt, handleFailure])
+  }, [token, attempt])
 
-  if (!session) return <Navigate to="/iniciar-sesion" replace />
 
   const show = (restaurant: Restaurant, message: string | null = null) => {
     setState({ kind: 'ready', restaurant })
@@ -343,7 +331,6 @@ export function RestaurantPage() {
                 // Ya existe una solicitud (otra pestaña o un reintento): se muestra la existente.
                 setAttempt((n) => n + 1)
               }
-              if (error instanceof ApiError && error.status === 401) handleFailure(error)
               throw error
             }
           }}
@@ -389,7 +376,7 @@ export function RestaurantPage() {
               try {
                 show(await updateImages(token, logo, cover), 'Imágenes guardadas')
               } catch (error) {
-                throw new Error(handleFailure(error), { cause: error })
+                throw new Error(errorMessage(error), { cause: error })
               }
             }}
           />
@@ -413,14 +400,9 @@ export function RestaurantPage() {
                 initial={toInput(restaurant)}
                 submitLabel={restaurant.status === 'REJECTED' ? 'Guardar y reenviar solicitud' : 'Guardar cambios'}
                 onSubmit={async (input) => {
-                  try {
-                    const saved = await updateMyRestaurant(token, input)
-                    show(restaurant.status === 'REJECTED' ? await resubmitMyRestaurant(token) : saved,
-                      restaurant.status === 'REJECTED' ? 'Solicitud reenviada: queda pendiente de aprobación.' : 'Cambios guardados')
-                  } catch (error) {
-                    if (error instanceof ApiError && error.status === 401) handleFailure(error)
-                    throw error
-                  }
+                  const saved = await updateMyRestaurant(token, input)
+                  show(restaurant.status === 'REJECTED' ? await resubmitMyRestaurant(token) : saved,
+                    restaurant.status === 'REJECTED' ? 'Solicitud reenviada: queda pendiente de aprobación.' : 'Cambios guardados')
                 }}
               />
             </Modal>
@@ -436,7 +418,7 @@ export function RestaurantPage() {
             editable={isApproved}
             token={token}
             onChange={(updated) => show(updated, null)}
-            onFailure={handleFailure}
+            onFailure={errorMessage}
           />
         </section>
       </div>
@@ -447,18 +429,16 @@ export function RestaurantPage() {
 /** Alta de una sucursal más: nace pendiente y la revisa un administrador como cualquier solicitud. */
 export function NewBranchPage() {
   const navigate = useNavigate()
-  const [session] = useState(() => getSession())
+  const session = useSession()
   const [base, setBase] = useState<Restaurant | null>(null)
-  const token = session?.token ?? ''
+  const token = session.token
 
   useEffect(() => {
-    if (!token) return
     let active = true
     getMyRestaurant(token).then((value) => { if (active) setBase(value) }).catch(() => { /* el formulario funciona sin datos base */ })
     return () => { active = false }
   }, [token])
 
-  if (!session) return <Navigate to="/iniciar-sesion" replace />
 
   return (
     <RestaurantLayout title="Agregar sucursal" description="Cada sucursal tiene su dirección, su horario y sus pedidos. Un administrador la aprueba antes de publicarla.">

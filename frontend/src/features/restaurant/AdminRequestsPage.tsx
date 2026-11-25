@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router'
-import { ApiError, GENERIC_ERROR } from '../auth/auth-api'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
+import { ApiError, errorMessage } from '../auth/auth-api'
 import { AuthLayout } from '../auth/AuthLayout'
-import { clearSession, getSession } from '../auth/session-storage'
+import { useSession } from '../auth/RequireSession'
 import {
   approveRestaurant,
   listRestaurants,
@@ -30,8 +30,7 @@ type ViewState =
 
 /** Revisión de solicitudes de restaurantes (RF-06): lista, aprueba y rechaza con motivo. */
 export function AdminRequestsPage() {
-  const navigate = useNavigate()
-  const [session] = useState(() => getSession())
+  const session = useSession()
   const [status, setStatus] = useState<RestaurantStatus>('PENDING')
   const [state, setState] = useState<ViewState>({ kind: 'loading' })
   const [attempt, setAttempt] = useState(0)
@@ -41,31 +40,20 @@ export function AdminRequestsPage() {
   const [reasonError, setReasonError] = useState<string | undefined>()
   const [busy, setBusy] = useState(false)
 
-  const token = session?.token ?? ''
-
-  const fail = useCallback((error: unknown): string => {
-    if (error instanceof ApiError && error.status === 401) {
-      clearSession()
-      navigate('/iniciar-sesion', { replace: true })
-      return 'Tu sesión venció'
-    }
-    return error instanceof ApiError ? error.message : GENERIC_ERROR
-  }, [navigate])
+  const token = session.token
 
   useEffect(() => {
-    if (!token) return
     let active = true
     listRestaurants(token, status)
       .then((items) => { if (active) setState({ kind: 'ready', items }) })
       .catch((error: unknown) => {
         if (!active) return
         if (error instanceof ApiError && error.status === 403) setState({ kind: 'forbidden' })
-        else setState({ kind: 'error', message: fail(error) })
+        else setState({ kind: 'error', message: errorMessage(error) })
       })
     return () => { active = false }
-  }, [token, status, attempt, fail])
+  }, [token, status, attempt])
 
-  if (!session) return <Navigate to="/iniciar-sesion" replace />
 
   const reload = () => { setState({ kind: 'loading' }); setAttempt((n) => n + 1) }
 
@@ -84,7 +72,7 @@ export function AdminRequestsPage() {
         setNotice(`${item.name}: otra persona ya resolvió esta solicitud. Se actualizó la lista.`)
         reload()
       } else {
-        setNotice(fail(error))
+        setNotice(errorMessage(error))
       }
     } finally {
       setBusy(false)

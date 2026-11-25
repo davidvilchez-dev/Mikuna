@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router'
-import { ApiError, GENERIC_ERROR, fetchMe, type Role } from '../auth/auth-api'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
+import { errorMessage, fetchMe, type Role } from '../auth/auth-api'
 import { AuthLayout } from '../auth/AuthLayout'
-import { clearSession, getSession } from '../auth/session-storage'
+import { useSession } from '../auth/RequireSession'
 import { formatPrice } from '../catalog/catalog-validation'
-import { orderStatusLabels } from '../restaurant/orders-logic'
+import { orderCode, orderStatusLabels } from '../restaurant/orders-logic'
+import { paymentStatusLabel, type PaymentStatus } from '../checkout/checkout-api'
 import { fetchHistory, type HistoryItem } from './history-api'
 import {
   emptyFilter,
@@ -25,13 +26,12 @@ type ViewState =
   | { kind: 'forbidden' }
   | { kind: 'error'; message: string }
 
-const paymentLabels: Record<string, string> = { AUTHORIZED: 'Reservado', CAPTURED: 'Cobrado', RELEASED: 'Liberado sin cobro' }
+const TITLES: Partial<Record<Role, string>> = { CUSTOMER: 'Mis pedidos', COURIER: 'Mis entregas', RESTAURANT: 'Historial de pedidos' }
 
 /** Historial propio de pedidos o entregas (RF-30), paginado, del más reciente al más antiguo, con filtros y calificación (RF-31). */
 export function HistoryPage() {
-  const navigate = useNavigate()
-  const [session] = useState(() => getSession())
-  const token = session?.token ?? ''
+  const session = useSession()
+  const token = session.token
   const [role, setRole] = useState<Role | null>(null)
   const [view, setView] = useState<ViewState>({ kind: 'loading' })
   const [draft, setDraft] = useState<HistoryFilter>(emptyFilter)
@@ -39,17 +39,7 @@ export function HistoryPage() {
   const [rangeError, setRangeError] = useState<string | undefined>()
   const [busy, setBusy] = useState(false)
 
-  const fail = useCallback((error: unknown): string => {
-    if (error instanceof ApiError && error.status === 401) {
-      clearSession()
-      navigate('/iniciar-sesion', { replace: true })
-      return 'Tu sesión venció'
-    }
-    return error instanceof ApiError ? error.message : GENERIC_ERROR
-  }, [navigate])
-
   useEffect(() => {
-    if (!token) return
     let active = true
     fetchMe(token)
       .then((me) => {
@@ -57,20 +47,19 @@ export function HistoryPage() {
         if (!hasHistory(me.role)) setView({ kind: 'forbidden' })
         else setRole(me.role)
       })
-      .catch((error: unknown) => { if (active) setView({ kind: 'error', message: fail(error) }) })
+      .catch((error: unknown) => { if (active) setView({ kind: 'error', message: errorMessage(error) }) })
     return () => { active = false }
-  }, [token, fail])
+  }, [token])
 
   useEffect(() => {
     if (!token || !role) return
     let active = true
     fetchHistory(role, token, filter, 0)
       .then((result) => { if (active) setView({ kind: 'ready', items: result.items, page: result.page, totalPages: result.totalPages, totalItems: result.totalItems }) })
-      .catch((error: unknown) => { if (active) setView({ kind: 'error', message: fail(error) }) })
+      .catch((error: unknown) => { if (active) setView({ kind: 'error', message: errorMessage(error) }) })
     return () => { active = false }
-  }, [token, role, filter, fail])
+  }, [token, role, filter])
 
-  if (!session) return <Navigate to="/iniciar-sesion" replace />
 
   function apply() {
     const problem = validateRange(draft.from, draft.to)
@@ -94,7 +83,7 @@ export function HistoryPage() {
       const result = await fetchHistory(role, token, filter, current.page + 1)
       setView({ kind: 'ready', items: mergePages(current.items, result.items), page: result.page, totalPages: result.totalPages, totalItems: result.totalItems })
     } catch (error) {
-      setView({ kind: 'error', message: fail(error) })
+      setView({ kind: 'error', message: errorMessage(error) })
     } finally {
       setBusy(false)
     }
@@ -121,7 +110,7 @@ export function HistoryPage() {
   const subject = role === 'COURIER' ? 'entregas' : 'pedidos'
 
   return (
-    <AuthLayout wide title="Mi historial" description={`Tus ${subject}, del más reciente al más antiguo.`}>
+    <AuthLayout wide title={(role && TITLES[role]) ?? 'Mi historial'} description={`Tus ${subject}, del más reciente al más antiguo.`}>
       {role && (
         <form className="history-filters" onSubmit={(event) => { event.preventDefault(); apply() }}>
           <label>Estado
@@ -150,7 +139,7 @@ export function HistoryPage() {
             {view.items.map((item) => (
               <li key={item.orderId} className="history-item">
                 <div className="history-head">
-                  <strong>{item.restaurant?.name ?? `Pedido de ${item.customerName ?? 'cliente'}`}</strong>
+                  <strong>{item.restaurant?.name ?? `Pedido de ${item.customerName ?? 'cliente'}`} <small>{orderCode(item.orderId)}</small></strong>
                   <span>{orderStatusLabels[item.status]}</span>
                   <span className="history-time">{formatHistoryDate(item.createdAt)}</span>
                 </div>
@@ -166,9 +155,9 @@ export function HistoryPage() {
                 {item.deliveryAddress && (
                   <p className="auth-hint">Entrega en: {item.deliveryAddress.street}, {item.deliveryAddress.district}{item.deliveryAddress.reference ? ` (${item.deliveryAddress.reference})` : ''}</p>
                 )}
-                {item.totals && <p>Total: {formatPrice(item.totals.total)} (envío {formatPrice(item.totals.deliveryFee)}, comisión {formatPrice(item.totals.commission)})</p>}
+                {item.totals && <p>Total: {formatPrice(item.totals.total)} (envío {formatPrice(item.totals.deliveryFee)}, tarifa de servicio {formatPrice(item.totals.commission)})</p>}
                 {item.deliveryFee != null && <p>Costo de envío: {formatPrice(item.deliveryFee)}</p>}
-                {item.payment && <p className="auth-hint">Pago: {paymentLabels[item.payment.status] ?? item.payment.status}</p>}
+                {item.payment && <p className="auth-hint">Pago: {paymentStatusLabel(item.payment.method, item.payment.status as PaymentStatus)}</p>}
                 <p className="history-rating">{item.rating != null ? `Calificación: ${item.rating} de 5` : 'Sin calificar'}</p>
                 {role === 'CUSTOMER' && item.canRate && (
                   <RatingControl token={token} orderId={item.orderId} onRated={(value) => markRated(item.orderId, value)} />

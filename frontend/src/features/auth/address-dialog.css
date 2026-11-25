@@ -18,6 +18,7 @@
 .addr-dialog-icon:hover { background: #F1F2F4; }
 .addr-dialog-icon:focus-visible { outline: 3px solid var(--color-mikuna-indigo); outline-offset: 0; }
 .addr-dialog h2 { margin: -4px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
+.addr-dialog-reason { margin: -8px 0 0; color: var(--color-mikuna-gray); font-size: 16px; line-height: 1.5; }
 
 .addr-options { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .addr-option {

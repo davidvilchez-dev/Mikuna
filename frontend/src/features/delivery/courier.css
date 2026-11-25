@@ -46,6 +46,10 @@
   display: grid; gap: 18px; padding: 22px; border: 1px solid var(--app-border); border-radius: 16px;
   background: var(--color-mikuna-white); box-shadow: var(--app-shadow);
 }
+.cr-order-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.cr-order-code { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; color: var(--color-mikuna-indigo); }
+.cr-pay { padding: 6px 12px; border-radius: 999px; background: #F3FBF6; color: #067647; font-size: 14px; font-weight: 700; }
+.cr-pay-cash { background: var(--color-mikuna-peach); color: var(--color-mikuna-orange-deep); }
 .cr-steps { display: flex; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .cr-step {
   display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 10px 14px; border-radius: 12px; background: #F5F6F8;

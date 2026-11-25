@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router'
 import { HomePage } from './features/home/HomePage'
 import { getSession } from './features/auth/session-storage'
+import { RequireSession } from './features/auth/RequireSession'
 
 // Cada página se carga bajo demanda: en desarrollo Vite solo transforma lo que se visita.
 const AccountPage = lazy(() => import('./features/auth/AccountPage').then((m) => ({ default: m.AccountPage })))
@@ -49,27 +50,27 @@ export default function App() {
       <Route path="/sobre-nosotros" element={<PublicInfoPage page="sobre-nosotros" />} />
       <Route path="/registro" element={<RegisterPage />} />
       <Route path="/iniciar-sesion" element={<LoginPage />} />
-      <Route path="/mi-cuenta" element={<AccountPage />} />
-      <Route path="/mi-restaurante" element={<RestaurantDashboard />} />
-      <Route path="/mi-restaurante/negocio" element={<RestaurantPage />} />
-      <Route path="/mi-restaurante/sucursales/nueva" element={<NewBranchPage />} />
-      <Route path="/mi-restaurante/historial" element={<SalesHistoryPage />} />
+      <Route path="/mi-cuenta" element={<RequireSession><AccountPage /></RequireSession>} />
+      <Route path="/mi-restaurante" element={<RequireSession><RestaurantDashboard /></RequireSession>} />
+      <Route path="/mi-restaurante/negocio" element={<RequireSession><RestaurantPage /></RequireSession>} />
+      <Route path="/mi-restaurante/sucursales/nueva" element={<RequireSession><NewBranchPage /></RequireSession>} />
+      <Route path="/mi-restaurante/historial" element={<RequireSession><SalesHistoryPage /></RequireSession>} />
       <Route path="/restaurantes" element={<RestaurantSearchPage />} />
       <Route path="/restaurantes/:id" element={<RestaurantCatalogPage />} />
-      <Route path="/mi-restaurante/productos" element={<ProductsPage />} />
-      <Route path="/mi-restaurante/pedidos" element={<OrdersPage />} />
-      <Route path="/carrito" element={<CartPage />} />
-      <Route path="/mis-direcciones" element={<AddressesPage />} />
-      <Route path="/confirmar-pedido" element={<CheckoutPage />} />
-      <Route path="/pedido/:id" element={<OrderPage />} />
-      <Route path="/admin" element={<AdminDashboardPage />} />
-      <Route path="/admin/solicitudes" element={<AdminRequestsPage />} />
-      <Route path="/repartidor/entregas" element={<CourierPage />} />
-      <Route path="/avisos" element={<NotificationsPage />} />
-      <Route path="/historial" element={<HistoryPage />} />
-      <Route path="/admin/entregas" element={<AdminDeliveriesPage />} />
-      <Route path="/admin/cuentas" element={<AdminAccountsPage />} />
-      <Route path="/admin/pedidos" element={<AdminOrdersPage />} />
+      <Route path="/mi-restaurante/productos" element={<RequireSession><ProductsPage /></RequireSession>} />
+      <Route path="/mi-restaurante/pedidos" element={<RequireSession><OrdersPage /></RequireSession>} />
+      <Route path="/carrito" element={<RequireSession><CartPage /></RequireSession>} />
+      <Route path="/mis-direcciones" element={<RequireSession><AddressesPage /></RequireSession>} />
+      <Route path="/confirmar-pedido" element={<RequireSession><CheckoutPage /></RequireSession>} />
+      <Route path="/pedido/:id" element={<RequireSession><OrderPage /></RequireSession>} />
+      <Route path="/admin" element={<RequireSession><AdminDashboardPage /></RequireSession>} />
+      <Route path="/admin/solicitudes" element={<RequireSession><AdminRequestsPage /></RequireSession>} />
+      <Route path="/repartidor/entregas" element={<RequireSession><CourierPage /></RequireSession>} />
+      <Route path="/avisos" element={<RequireSession><NotificationsPage /></RequireSession>} />
+      <Route path="/historial" element={<RequireSession><HistoryPage /></RequireSession>} />
+      <Route path="/admin/entregas" element={<RequireSession><AdminDeliveriesPage /></RequireSession>} />
+      <Route path="/admin/cuentas" element={<RequireSession><AdminAccountsPage /></RequireSession>} />
+      <Route path="/admin/pedidos" element={<RequireSession><AdminOrdersPage /></RequireSession>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     <AssistantGate />

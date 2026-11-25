@@ -1,4 +1,7 @@
-export type Role = 'CUSTOMER' | 'RESTAURANT' | 'COURIER' | 'ADMIN'
+import { notifySessionExpired } from './session-events'
+import { clearSession } from './session-storage'
+
+export type Role ='CUSTOMER' | 'RESTAURANT' | 'COURIER' | 'ADMIN'
 export type PublicRole = Exclude<Role, 'ADMIN'>
 export type AccountStatus = 'ENABLED' | 'DISABLED'
 
@@ -43,6 +46,11 @@ export class ApiError extends Error {
   }
 }
 
+/** Texto para mostrar de cualquier error de una llamada a la API. */
+export function errorMessage(error: unknown): string {
+  return error instanceof ApiError ? error.message : GENERIC_ERROR
+}
+
 /** Llamada JSON a la API con errores normalizados; la comparten las funcionalidades con sesión. */
 export async function apiRequest<T>(url: string, init: RequestInit = {}): Promise<T> {
   let response: Response
@@ -58,6 +66,13 @@ export async function apiRequest<T>(url: string, init: RequestInit = {}): Promis
 
   if (response.status === 204) return undefined as T
   if (response.ok) return (await response.json()) as T
+
+  // Un 401 con token es una sesión que el servidor ya no acepta: se borra y se avisa a toda la aplicación
+  // (RequireSession lleva a iniciar sesión). El 401 del login, sin token, es solo un error de credenciales.
+  if (response.status === 401 && new Headers(init.headers).has('Authorization')) {
+    clearSession()
+    notifySessionExpired()
+  }
 
   // Solo los ProblemDetail del backend se leen; el resto (p. ej. el 502 en texto del proxy de Vite) es genérico.
   const contentType = response.headers.get('Content-Type') ?? ''
