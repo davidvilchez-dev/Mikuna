@@ -114,7 +114,7 @@ detalle admin trae `transactions`; en el frontend, las vistas lo muestran.
 ## Phase 7: Polish & Cross-Cutting
 
 - [X] T032 Ejecutar `./mvnw test` en `backend/` y `pnpm test`, `pnpm lint`, `pnpm exec tsc -b` en `frontend/`; corregir fallos
-- [ ] T033 Recorrer `specs/014-cancelacion-reembolso/quickstart.md` (los pasos con la pasarela real se dejan al usuario si no hay claves de prueba)
+- [X] T033 Recorrer `specs/014-cancelacion-reembolso/quickstart.md` (los pasos con la pasarela real se dejan al usuario si no hay claves de prueba)
 - [X] T034 [P] Revisar que `specs/014-cancelacion-reembolso/checklists/requirements.md` siga completo tras la implementación
 
 ---

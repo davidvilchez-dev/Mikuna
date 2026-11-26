@@ -152,22 +152,23 @@ export function OrderPage() {
     <AuthLayout title={`Pedido ${orderCode(order.id)}`} description={`${order.restaurant.name} · ${orderStatusLabels[status]}`} wide>
       {notice && <p className="auth-notice" role="status">{notice}</p>}
       {deadline !== null && (
-        <p className="catalog-banner order-expiry" role="timer">
+        <p className="order-banner order-expiry" role="timer">
           {remainingMs(deadline, now) > 0
             ? <>Esperando al restaurante. Si no responde, el pedido se cancelará en <strong>{formatRemaining(remainingMs(deadline, now))}</strong> y no se te cobrará nada.</>
             : 'El restaurante no respondió a tiempo. Estamos cancelando el pedido y liberando tu reserva…'}
         </p>
       )}
       {status === 'DELIVERED' && (
-        <p className="catalog-banner" role="status">
+        <p className="order-banner order-banner-done" role="status">
           Tu pedido fue entregado. <Link to="/historial">Califícalo en tu historial</Link>.
         </p>
       )}
       {status === 'CANCELLED' && order.cancellation?.by === 'ADMIN' && (
-        <p className="catalog-banner" role="status">
-          Cancelado por la plataforma{order.cancellation.reason ? `: ${order.cancellation.reason}` : ''}.
-          {order.payment.status === 'REFUNDED' && ' Te devolvimos el total que pagaste.'}
-        </p>
+        <div className="order-banner order-banner-cancelled" role="status">
+          <strong>Cancelado por la plataforma</strong>
+          {order.cancellation.reason && <span>Motivo: {order.cancellation.reason}</span>}
+          {order.payment.status === 'REFUNDED' && <span>Te devolvimos el total que pagaste.</span>}
+        </div>
       )}
       <div className="cart-layout">
       <div className="cart-main">
