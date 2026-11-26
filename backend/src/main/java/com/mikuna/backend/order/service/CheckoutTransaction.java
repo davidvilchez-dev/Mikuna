@@ -15,8 +15,10 @@ import com.mikuna.backend.order.dto.ConfirmOrderRequest;
 import com.mikuna.backend.order.dto.OrderResponse;
 import com.mikuna.backend.order.model.Order;
 import com.mikuna.backend.order.model.OrderPlacedEvent;
+import com.mikuna.backend.order.model.OrderStatus;
 import com.mikuna.backend.order.model.PaymentMethod;
 import com.mikuna.backend.order.repository.OrderRepository;
+import com.mikuna.backend.order.repository.OrderStatusChangeRepository;
 import com.mikuna.backend.payment.model.Payment;
 import com.mikuna.backend.payment.model.PaymentStatus;
 import com.mikuna.backend.payment.repository.PaymentRepository;
@@ -58,11 +60,13 @@ public class CheckoutTransaction {
     private final Clock clock;
     private final ApplicationEventPublisher events;
     private final OrderExpiryPolicy expiry;
+    private final OrderStatusChangeRepository changes;
 
     public CheckoutTransaction(CartService carts, OrderRepository orders, PaymentRepository payments,
             AddressRepository addresses, PaymentService paymentService, StripeProperties stripe, Clock clock,
-            ApplicationEventPublisher events, OrderExpiryPolicy expiry) {
+            ApplicationEventPublisher events, OrderExpiryPolicy expiry, OrderStatusChangeRepository changes) {
         this.expiry = expiry;
+        this.changes = changes;
         this.carts = carts;
         this.orders = orders;
         this.payments = payments;
@@ -132,7 +136,17 @@ public class CheckoutTransaction {
     @Transactional(readOnly = true)
     public OrderResponse find(UUID customerId, UUID orderId) {
         Order order = orders.findByIdAndCustomerId(orderId, customerId).orElseThrow(OrderNotFoundException::new);
-        return OrderResponse.of(order, paymentStatus(order), Instant.now(clock));
+        return OrderResponse.of(order, paymentStatus(order), Instant.now(clock), cancellation(order));
+    }
+
+    /** Quién canceló y por qué, del último cambio de estado (spec 014); nulo si el pedido no está Cancelado. */
+    private OrderResponse.Cancellation cancellation(Order order) {
+        if (order.getStatus() != OrderStatus.CANCELLED) {
+            return null;
+        }
+        return changes.findFirstByOrderIdOrderByChangedAtDesc(order.getId())
+                .map(change -> new OrderResponse.Cancellation(change.getActorRole().name(), change.getReason()))
+                .orElse(null);
     }
 
     @Transactional(readOnly = true)

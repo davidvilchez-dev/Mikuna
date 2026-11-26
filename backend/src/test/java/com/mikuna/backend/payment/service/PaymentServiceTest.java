@@ -17,6 +17,7 @@ import static org.mockito.Mockito.when;
 import com.mikuna.backend.common.exception.PaymentDeclinedException;
 import com.mikuna.backend.common.exception.PaymentStateException;
 import com.mikuna.backend.common.exception.PaymentUnavailableException;
+import com.mikuna.backend.common.exception.RefundFailedException;
 import com.mikuna.backend.payment.model.Payment;
 import com.mikuna.backend.payment.model.PaymentStatus;
 import com.mikuna.backend.payment.model.PaymentTransaction;
@@ -244,6 +245,117 @@ class PaymentServiceTest {
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.AUTHORIZED);
         verify(recorder).record(eq(orderId), eq(customerId), isNull(), eq(TransactionType.CAPTURE),
                 eq(TransactionStatus.FAILED), eq(AMOUNT), eq("gateway_unavailable"), isNull(), eq("pi_1"));
+        verify(transactions, never()).save(any());
+    }
+
+    // Spec 014: reembolso por cancelación administrativa y efectivo cobrado al entregar.
+
+    private Payment capturedCard() {
+        Payment payment = Payment.authorized(orderId, customerId, AMOUNT, "pen", "pi_1", CLOCK.instant());
+        payment.capture(CLOCK.instant());
+        return payment;
+    }
+
+    private Payment cash() {
+        return Payment.cash(orderId, customerId, AMOUNT, "pen", CLOCK.instant());
+    }
+
+    @Test
+    void reembolsaUnaTarjetaCobradaConLaClaveDelPedido() {
+        Payment payment = capturedCard();
+        when(payments.findByOrderIdForUpdate(orderId)).thenReturn(Optional.of(payment));
+
+        assertThat(service.refundOrVoid(orderId)).isTrue();
+
+        verify(gateway).refund("pi_1", "refund-" + orderId);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        ArgumentCaptor<PaymentTransaction> saved = ArgumentCaptor.forClass(PaymentTransaction.class);
+        verify(transactions).save(saved.capture());
+        assertThat(saved.getValue().getType()).isEqualTo(TransactionType.REFUND);
+        assertThat(saved.getValue().getStatus()).isEqualTo(TransactionStatus.REFUNDED);
+        assertThat(saved.getValue().getAmount()).isEqualByComparingTo(AMOUNT);
+    }
+
+    @Test
+    void unReembolsoFallidoQuedaRegistradoYNoCambiaElPago() {
+        Payment payment = capturedCard();
+        when(payments.findByOrderIdForUpdate(orderId)).thenReturn(Optional.of(payment));
+        doThrow(new PaymentUnavailableException()).when(gateway).refund(anyString(), anyString());
+
+        assertThatThrownBy(() -> service.refundOrVoid(orderId)).isInstanceOf(RefundFailedException.class);
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CAPTURED);
+        verify(recorder).record(eq(orderId), eq(customerId), isNull(), eq(TransactionType.REFUND),
+                eq(TransactionStatus.FAILED), eq(AMOUNT), eq("gateway_unavailable"), isNull(), eq("pi_1"));
+        verify(transactions, never()).save(any());
+    }
+
+    @Test
+    void unRechazoDelReembolsoSeRegistraConSuCodigo() {
+        when(payments.findByOrderIdForUpdate(orderId)).thenReturn(Optional.of(capturedCard()));
+        doThrow(new RefundFailedException()).when(gateway).refund(anyString(), anyString());
+
+        assertThatThrownBy(() -> service.refundOrVoid(orderId)).isInstanceOf(RefundFailedException.class);
+
+        verify(recorder).record(eq(orderId), eq(customerId), isNull(), eq(TransactionType.REFUND),
+                eq(TransactionStatus.FAILED), eq(AMOUNT), eq("refund_failed"), isNull(), eq("pi_1"));
+    }
+
+    @Test
+    void elEfectivoCanceladoQuedaSinCobroSinLlamarALaPasarela() {
+        Payment payment = cash();
+        when(payments.findByOrderIdForUpdate(orderId)).thenReturn(Optional.of(payment));
+
+        assertThat(service.refundOrVoid(orderId)).isFalse();
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.RELEASED);
+        verify(gateway, never()).refund(anyString(), anyString());
+        ArgumentCaptor<PaymentTransaction> saved = ArgumentCaptor.forClass(PaymentTransaction.class);
+        verify(transactions).save(saved.capture());
+        assertThat(saved.getValue().getType()).isEqualTo(TransactionType.RELEASE);
+        assertThat(saved.getValue().getResultCode()).isEqualTo("cash");
+    }
+
+    @Test
+    void unaTarjetaSoloReservadaNoSeReembolsa() {
+        when(payments.findByOrderIdForUpdate(orderId)).thenReturn(Optional.of(
+                Payment.authorized(orderId, customerId, AMOUNT, "pen", "pi_1", CLOCK.instant())));
+
+        assertThatThrownBy(() -> service.refundOrVoid(orderId)).isInstanceOf(PaymentStateException.class);
+        verify(gateway, never()).refund(anyString(), anyString());
+    }
+
+    @Test
+    void aceptarEnEfectivoNoLoCobra() {
+        Payment payment = cash();
+        when(payments.findByOrderIdForUpdate(orderId)).thenReturn(Optional.of(payment));
+
+        assertThat(service.capture(orderId)).isEqualTo(CaptureResult.CAPTURED);
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.AUTHORIZED);
+        verify(transactions, never()).save(any());
+    }
+
+    @Test
+    void entregarCobraElEfectivoPendienteUnaSolaVez() {
+        Payment payment = cash();
+        when(payments.findByOrderIdForUpdate(orderId)).thenReturn(Optional.of(payment));
+
+        service.collectCash(orderId);
+        service.collectCash(orderId);
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CAPTURED);
+        verify(transactions, times(1)).save(any());
+    }
+
+    @Test
+    void entregarNoTocaUnaTarjeta() {
+        Payment payment = capturedCard();
+        when(payments.findByOrderIdForUpdate(orderId)).thenReturn(Optional.of(payment));
+
+        service.collectCash(orderId);
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CAPTURED);
         verify(transactions, never()).save(any());
     }
 }

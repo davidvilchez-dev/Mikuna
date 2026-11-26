@@ -4,6 +4,10 @@ import {
   DELIVERY_STATUSES,
   ORDER_STATUSES,
   accessLabel,
+  canAdminCancel,
+  transactionStatusLabels,
+  transactionTypeLabels,
+  validateCancelReason,
   accountBase,
   accountsPath,
   actionLabel,
@@ -114,5 +118,26 @@ describe('formato', () => {
     expect(formatMoney(undefined)).toBe('—')
     expect(formatDateTime('no es fecha')).toBe('no es fecha')
     expect(formatDateTime('2026-11-18T12:00:00Z')).not.toBe('2026-11-18T12:00:00Z')
+  })
+})
+
+describe('cancelación administrativa (spec 014)', () => {
+  it('solo se ofrece de Aceptado a Recogido', () => {
+    for (const status of ['ACCEPTED', 'PREPARING', 'READY', 'ASSIGNED', 'PICKED_UP']) expect(canAdminCancel(status)).toBe(true)
+    for (const status of ['PENDING', 'REJECTED', 'CANCELLED', 'DELIVERED']) expect(canAdminCancel(status)).toBe(false)
+  })
+
+  it('exige un motivo de hasta 200 caracteres', () => {
+    expect(validateCancelReason('')).toBe('Indica el motivo de la cancelación')
+    expect(validateCancelReason('   ')).toBe('Indica el motivo de la cancelación')
+    expect(validateCancelReason('x'.repeat(201))).toBe('El motivo admite hasta 200 caracteres')
+    expect(validateCancelReason('  ' + 'x'.repeat(200) + '  ')).toBeNull()
+    expect(validateCancelReason('El local cerró')).toBeNull()
+  })
+
+  it('nombra el reembolso y las transacciones', () => {
+    expect(paymentLabel('REFUNDED')).toBe('Reembolsado')
+    expect(transactionTypeLabels.REFUND).toBe('Reembolso')
+    expect(transactionStatusLabels.FAILED).toBe('Fallido')
   })
 })

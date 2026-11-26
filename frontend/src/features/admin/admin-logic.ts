@@ -148,6 +148,39 @@ export const paymentLabels: Record<string, string> = {
   AUTHORIZED: 'Reservado',
   CAPTURED: 'Cobrado',
   RELEASED: 'Liberado',
+  REFUNDED: 'Reembolsado',
+}
+
+/** Spec 014: estados en los que el administrador puede cancelar (aceptado y aún no entregado). */
+export const ADMIN_CANCELLABLE: OrderStatus[] = ['ACCEPTED', 'PREPARING', 'READY', 'ASSIGNED', 'PICKED_UP']
+
+export function canAdminCancel(status: string): boolean {
+  return (ADMIN_CANCELLABLE as string[]).includes(status)
+}
+
+export const CANCEL_REASON_MAX = 200
+
+/** Motivo obligatorio de la cancelación administrativa; devuelve el error o null si es válido. */
+export function validateCancelReason(text: string): string | null {
+  const reason = text.trim()
+  if (!reason) return 'Indica el motivo de la cancelación'
+  if (reason.length > CANCEL_REASON_MAX) return 'El motivo admite hasta 200 caracteres'
+  return null
+}
+
+export const transactionTypeLabels: Record<string, string> = {
+  AUTHORIZATION: 'Reserva',
+  CAPTURE: 'Cobro',
+  RELEASE: 'Liberación',
+  REFUND: 'Reembolso',
+}
+
+export const transactionStatusLabels: Record<string, string> = {
+  AUTHORIZED: 'Reservado',
+  CAPTURED: 'Cobrado',
+  RELEASED: 'Liberado',
+  REFUNDED: 'Reembolsado',
+  FAILED: 'Fallido',
 }
 
 export function paymentLabel(status: string | undefined): string {

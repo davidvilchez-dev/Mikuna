@@ -1,12 +1,12 @@
 <!--
 Sync Impact Report (temporal; retirar antes del commit)
-Version change: 3.2.0 -> 4.0.0 (MAJOR: se redefine la obligación ddl-auto=update y la prohibición
-  de herramientas de migración)
-Principios modificados: ninguno.
-Secciones modificadas: arquitectura local (Flyway + ddl-auto=validate), aplazamientos (CI permitida,
-  despliegue continuo sigue aplazado), Governance (aprobación 4.0.0 y versión).
-Secciones añadidas/eliminadas: ninguna. RF/RNF sin cambios.
-TODO: los plan.md de specs anteriores citan ddl-auto=update como contexto histórico; no se reescriben.
+Version change: 4.0.0 -> 5.0.0 (MAJOR: se redefine "NO hay reembolsos" y el flujo de estados)
+Principios modificados: IV (cancelación administrativa desde Aceptado hasta Recogido; reembolso total
+  solo en ese caso; efectivo cobrado al entregar).
+Secciones modificadas: alcance (fuera solo reembolsos parciales o a pedido del cliente), Governance
+  (aprobación 5.0.0 y versión).
+Secciones añadidas/eliminadas: ninguna. RF/RNF sin cambios de texto; RF-16 se amplía por el 014.
+TODO: ninguno. Specs 006/007 citan "sin reembolsos" como contexto histórico; no se reescriben.
 -->
 
 # Mikuna Constitution
@@ -98,15 +98,21 @@ que existan; probar rutas públicas y rechazos del incremento.
   preservar esa unicidad al reasignar. Un bloqueo en memoria NO DEBE ser la única protección.
 - El flujo nominal conserva Pendiente → Aceptado → En preparación → Listo para recoger →
   Asignado → Recogido → Entregado. Desde Pendiente se permite Rechazado por el restaurante o
-  Cancelado por su cliente antes de la aceptación. Rechazar una asignación activa la reasignación,
-  no el rechazo del pedido. NO DEBEN introducirse saltos o retrocesos no especificados.
+  Cancelado por su cliente antes de la aceptación. Desde Aceptado, En preparación, Listo,
+  Asignado o Recogido solo el administrador DEBE poder pasar el pedido a Cancelado, con motivo
+  obligatorio (incremento 014); Entregado es final. Rechazar una asignación activa la
+  reasignación, no el rechazo del pedido. NO DEBEN introducirse saltos o retrocesos no
+  especificados.
 - Los reintentos de una operación lógica NO DEBEN duplicar pedidos o asignaciones. Las carreras
   entre aceptación y cancelación DEBEN resolverse y probarse en el incremento correspondiente.
   RF-31 DEBE garantizar una única calificación de 1 a 5 por pedido propio entregado, incluso
   ante solicitudes simultáneas.
 - RF-16/RF-17 son requisito vigente desde el incremento 006: el pago DEBE autorizarse al confirmar
   (reserva con captura manual), capturarse al aceptar, liberarse al rechazar o cancelar antes de
-  aceptar, y cada transacción DEBE asociarse al pedido. NO hay reembolsos. Confirmar o reintentar
+  aceptar, y cada transacción DEBE asociarse al pedido. El único reembolso permitido es el total
+  de un pedido con tarjeta ya cobrado que el administrador cancela (incremento 014); NO hay
+  reembolsos parciales ni solicitados por el cliente. El efectivo NO pasa por la pasarela: se
+  registra como cobrado al entregarse el pedido y, si se cancela antes, sin cobro. Confirmar o reintentar
   NO DEBE duplicar pedido ni reserva (idempotencia) y NO DEBE quedar una reserva sin pedido. Los
   webhooks y la recuperación avanzada ante fallos siguen aplazados. NO DEBEN declararse pagos
   completos sin la evidencia del incremento.
@@ -189,7 +195,7 @@ Mikuna es una plataforma web de delivery multi-restaurante para clientes, restau
 repartidores y administradores. Se mantienen fuera del alcance las aplicaciones móviles nativas,
 múltiples pasarelas, transacciones financieras reales, contabilidad, inventario avanzado,
 optimización avanzada de rutas, operación fuera del ámbito urbano considerado, otros tipos de
-comercio, reembolsos y conciliación contable.
+comercio, reembolsos parciales o a pedido del cliente y conciliación contable.
 
 ### Arquitectura local ejecutable y configuración
 
@@ -356,6 +362,8 @@ La enmienda 3.2.0 (Gemini en plan gratuito para el asistente del incremento 013)
 aprobación explícita del usuario del 2026-11-24.
 La enmienda 4.0.0 (Flyway con `ddl-auto=validate` en lugar de `ddl-auto=update`, e integración
 continua del backend) cuenta con la aprobación explícita del usuario del 2026-11-25.
+La enmienda 5.0.0 (cancelación administrativa tras aceptar con reembolso total, y cobro del
+efectivo al entregar; incremento 014) cuenta con la aprobación explícita del usuario del 2026-11-25.
 Un conflicto nuevo sobre alcance o reglas de negocio DEBE consultarse cuando afecte al incremento.
 Las decisiones rutinarias se resuelven conforme al principio VII.
 
@@ -371,4 +379,4 @@ y RNF aplazados NO DEBEN declararse cumplidos ni bloquear la entrega local por s
 La infraestructura futura y las pruebas E2E se abordarán después mediante una decisión explícita
 y la planificación correspondiente.
 
-**Version**: 4.0.0 | **Ratified**: 2026-11-12 | **Last Amended**: 2026-11-25
+**Version**: 5.0.0 | **Ratified**: 2026-11-12 | **Last Amended**: 2026-11-25

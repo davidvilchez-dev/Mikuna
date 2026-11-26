@@ -56,7 +56,7 @@ class DeliveryAdminServiceTest {
     @BeforeEach
     void setUp() {
         service = new DeliveryAdminService(orders, deliveries, availability, accounts, assignment, orderStatus,
-                dispatcher);
+                dispatcher, java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC));
         order = OrderTransitionTest.orderIn(OrderStatus.READY);
         delivery = delivery(order);
         when(orders.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));

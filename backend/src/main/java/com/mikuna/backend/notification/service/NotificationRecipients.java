@@ -4,7 +4,9 @@ import com.mikuna.backend.delivery.model.Delivery;
 import com.mikuna.backend.delivery.repository.DeliveryRepository;
 import com.mikuna.backend.notification.model.Notification;
 import com.mikuna.backend.notification.model.NotificationType;
+import com.mikuna.backend.order.model.ActorRole;
 import com.mikuna.backend.order.model.Order;
+import com.mikuna.backend.order.model.PaymentMethod;
 import com.mikuna.backend.order.model.OrderPlacedEvent;
 import com.mikuna.backend.order.model.OrderStatus;
 import com.mikuna.backend.order.model.OrderStatusChangedEvent;
@@ -33,8 +35,16 @@ public class NotificationRecipients {
     public record Draft(UUID recipientId, NotificationType type, String message) {
     }
 
-    /** Participantes del pedido; el repartidor es nulo si no hay uno asignado. */
-    public record Participants(UUID orderId, UUID customerId, UUID restaurantOwnerId, UUID courierId) {
+    /**
+     * Participantes del pedido; el repartidor es nulo si nunca tuvo uno. {@code cardPayment} distingue el aviso de
+     * reembolso de una cancelación administrativa (spec 014).
+     */
+    public record Participants(UUID orderId, UUID customerId, UUID restaurantOwnerId, UUID courierId,
+            boolean cardPayment) {
+
+        public Participants(UUID orderId, UUID customerId, UUID restaurantOwnerId, UUID courierId) {
+            this(orderId, customerId, restaurantOwnerId, courierId, false);
+        }
     }
 
     private final OrderRepository orders;
@@ -92,6 +102,15 @@ public class NotificationRecipients {
                             "Se canceló el " + ref + " porque no se respondió a tiempo");
                     break;
                 }
+                if (event.actorRole() == ActorRole.ADMIN) {
+                    // Cancelación administrativa (spec 014): todos ven el motivo; con tarjeta, el reembolso ya se hizo.
+                    String reason = event.reason() == null ? "" : ": " + event.reason();
+                    add(drafts, p.customerId(), NotificationType.CANCELLED, "Se canceló tu " + ref + reason
+                            + (p.cardPayment() ? ". Te devolvimos el pago." : ""));
+                    add(drafts, p.restaurantOwnerId(), NotificationType.CANCELLED, "Se canceló el " + ref + reason);
+                    add(drafts, p.courierId(), NotificationType.CANCELLED, "Se canceló el " + ref + reason);
+                    break;
+                }
                 add(drafts, p.customerId(), NotificationType.CANCELLED, "Se canceló tu " + ref);
                 add(drafts, p.restaurantOwnerId(), NotificationType.CANCELLED, "Se canceló el " + ref);
                 add(drafts, p.courierId(), NotificationType.CANCELLED, "Se canceló el " + ref + " asignado");
@@ -140,6 +159,7 @@ public class NotificationRecipients {
         }
         UUID owner = restaurants.findById(order.get().getRestaurantId()).map(Restaurant::getOwnerId).orElse(null);
         UUID courier = deliveries.findByOrderId(orderId).map(Delivery::getCourierId).orElse(null);
-        return Optional.of(new Participants(orderId, order.get().getCustomerId(), owner, courier));
+        return Optional.of(new Participants(orderId, order.get().getCustomerId(), owner, courier,
+                order.get().getPaymentMethod() == PaymentMethod.CARD));
     }
 }

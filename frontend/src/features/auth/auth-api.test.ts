@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { ApiError, apiRequest, errorMessage, GENERIC_ERROR } from './auth-api'
 import { onSessionExpired } from './session-events'
 import { getSession, saveSession } from './session-storage'
@@ -8,12 +8,12 @@ function problem(status: number, detail: string): Response {
 }
 
 describe('apiRequest ante un 401', () => {
-  let expired: ReturnType<typeof vi.fn>
+  let expired: Mock<() => void>
   let unsubscribe: () => void
 
   beforeEach(() => {
     saveSession({ token: 'jwt', expiresAt: Date.now() + 60_000 })
-    expired = vi.fn()
+    expired = vi.fn<() => void>()
     unsubscribe = onSessionExpired(expired)
   })
 

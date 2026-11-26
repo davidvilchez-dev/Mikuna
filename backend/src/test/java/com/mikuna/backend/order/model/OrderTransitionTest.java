@@ -19,11 +19,12 @@ public class OrderTransitionTest {
 
     private static final Map<OrderStatus, Set<OrderStatus>> ALLOWED = Map.of(
             OrderStatus.PENDING, Set.of(OrderStatus.ACCEPTED, OrderStatus.REJECTED, OrderStatus.CANCELLED),
-            OrderStatus.ACCEPTED, Set.of(OrderStatus.PREPARING),
-            OrderStatus.PREPARING, Set.of(OrderStatus.READY),
-            OrderStatus.READY, Set.of(OrderStatus.ASSIGNED),
-            OrderStatus.ASSIGNED, Set.of(OrderStatus.PICKED_UP, OrderStatus.READY),
-            OrderStatus.PICKED_UP, Set.of(OrderStatus.DELIVERED));
+            // Spec 014: de Aceptado a Recogido también a Cancelado (cancelación administrativa).
+            OrderStatus.ACCEPTED, Set.of(OrderStatus.PREPARING, OrderStatus.CANCELLED),
+            OrderStatus.PREPARING, Set.of(OrderStatus.READY, OrderStatus.CANCELLED),
+            OrderStatus.READY, Set.of(OrderStatus.ASSIGNED, OrderStatus.CANCELLED),
+            OrderStatus.ASSIGNED, Set.of(OrderStatus.PICKED_UP, OrderStatus.READY, OrderStatus.CANCELLED),
+            OrderStatus.PICKED_UP, Set.of(OrderStatus.DELIVERED, OrderStatus.CANCELLED));
 
     public static Order orderIn(OrderStatus status) {
         Order order = new Order(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "Local", "k",

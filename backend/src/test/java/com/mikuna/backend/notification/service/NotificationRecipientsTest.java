@@ -114,6 +114,44 @@ class NotificationRecipientsTest {
                 .containsExactly(customer);
     }
 
+    // Spec 014: cancelación administrativa después de aceptar.
+
+    private List<Draft> adminCancel(OrderStatus from, Participants p, String reason) {
+        return NotificationRecipients.plan(new OrderStatusChangedEvent(UUID.randomUUID(), orderId, from,
+                OrderStatus.CANCELLED, UUID.randomUUID(), ActorRole.ADMIN, reason), p);
+    }
+
+    @Test
+    void laCancelacionDelAdministradorConTarjetaAvisaATodosConElMotivoYElReembolso() {
+        Participants card = new Participants(orderId, customer, owner, courier, true);
+
+        List<Draft> drafts = adminCancel(OrderStatus.PICKED_UP, card, "Accidente del repartidor");
+
+        assertThat(recipients(drafts)).containsExactly(customer, owner, courier);
+        assertThat(drafts).allSatisfy(d -> {
+            assertThat(d.type()).isEqualTo(NotificationType.CANCELLED);
+            assertThat(d.message()).contains(": Accidente del repartidor");
+        });
+        assertThat(drafts.get(0).message()).endsWith("Te devolvimos el pago.");
+        assertThat(drafts.get(1).message()).doesNotContain("devolvimos");
+    }
+
+    @Test
+    void laCancelacionDelAdministradorEnEfectivoNoMencionaReembolsoNiAvisaSinRepartidor() {
+        List<Draft> drafts = adminCancel(OrderStatus.ACCEPTED, withoutCourier, "El local cerró");
+
+        assertThat(recipients(drafts)).containsExactly(customer, owner);
+        assertThat(drafts.get(0).message()).contains(": El local cerró").doesNotContain("devolvimos");
+    }
+
+    @Test
+    void unMotivoLargoSeRecortaAlLimiteDelAviso() {
+        List<Draft> drafts = adminCancel(OrderStatus.READY, new Participants(orderId, customer, owner, null, true),
+                "x".repeat(200));
+
+        assertThat(drafts).allSatisfy(d -> assertThat(d.message().length()).isLessThanOrEqualTo(200));
+    }
+
     @Test
     void losMensajesCitanElPedidoYCaben() {
         List<Draft> drafts = plan(OrderStatus.READY, OrderStatus.ASSIGNED, null, ActorRole.SYSTEM, withCourier);

@@ -84,6 +84,16 @@ export interface OrderDetail {
   payment: { method: string; status?: string; amount?: number; currency?: string }
   deliveryAddress: { street: string; district: string; reference?: string; phone?: string }
   statusChanges: StatusChange[]
+  /** Transacciones de pago en orden cronológico (spec 014). */
+  transactions: PaymentTransaction[]
+}
+
+export interface PaymentTransaction {
+  type: string
+  status: string
+  amount: number
+  code?: string
+  at: string
 }
 
 export interface DeliverySummary {
@@ -136,6 +146,13 @@ export function listOrders(token: string, status: OrderStatus | '', page: number
 
 export function orderDetail(token: string, id: string): Promise<OrderDetail> {
   return apiRequest('/api/admin/orders/' + encodeURIComponent(id), { headers: headers(token) })
+}
+
+/** Cancelación administrativa con motivo; con tarjeta cobrada reembolsa el total (spec 014). */
+export function cancelAdminOrder(token: string, id: string, reason: string): Promise<OrderDetail> {
+  return apiRequest('/api/admin/orders/' + encodeURIComponent(id) + '/cancel', {
+    method: 'POST', headers: headers(token), body: JSON.stringify({ reason: reason.trim() }),
+  })
 }
 
 export function listDeliveries(token: string, status: OrderStatus | '', page: number): Promise<Page<DeliverySummary>> {

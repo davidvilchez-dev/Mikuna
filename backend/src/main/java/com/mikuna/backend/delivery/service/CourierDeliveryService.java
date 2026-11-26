@@ -12,6 +12,7 @@ import com.mikuna.backend.order.model.Order;
 import com.mikuna.backend.order.model.OrderStatus;
 import com.mikuna.backend.order.repository.OrderRepository;
 import com.mikuna.backend.order.service.OrderStatusService;
+import com.mikuna.backend.payment.service.PaymentService;
 import com.mikuna.backend.restaurant.model.Restaurant;
 import com.mikuna.backend.restaurant.repository.RestaurantRepository;
 import java.time.Clock;
@@ -38,11 +39,14 @@ public class CourierDeliveryService {
     private final OrderStatusService orderStatus;
     private final RestaurantRepository restaurants;
     private final DeliveryDispatcher dispatcher;
+    private final PaymentService paymentService;
     private final Clock clock;
 
     public CourierDeliveryService(OrderRepository orders, DeliveryRepository deliveries,
             DeliveryRejectionRepository rejections, CourierAvailabilityRepository availability,
-            OrderStatusService orderStatus, RestaurantRepository restaurants, DeliveryDispatcher dispatcher, Clock clock) {
+            OrderStatusService orderStatus, RestaurantRepository restaurants, DeliveryDispatcher dispatcher,
+            PaymentService paymentService, Clock clock) {
+        this.paymentService = paymentService;
         this.orders = orders;
         this.deliveries = deliveries;
         this.rejections = rejections;
@@ -76,6 +80,8 @@ public class CourierDeliveryService {
         Order order = orders.findByIdForUpdate(orderId).orElseThrow(OrderNotFoundException::new);
         Delivery delivery = ownDelivery(courierId, orderId);
         orderStatus.changeStatus(order, OrderStatus.DELIVERED, courierId, ActorRole.COURIER, null);
+        // Spec 014: el efectivo se cobra en la entrega (orden de bloqueo pedido → pago → repartidor).
+        paymentService.collectCash(orderId);
         availability.findByIdForUpdate(courierId).ifPresent(row -> {
             row.markFree(Instant.now(clock));
             availability.save(row);

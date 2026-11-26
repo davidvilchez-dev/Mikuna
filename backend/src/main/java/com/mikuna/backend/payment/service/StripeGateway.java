@@ -1,6 +1,7 @@
 package com.mikuna.backend.payment.service;
 
 import com.mikuna.backend.common.exception.PaymentUnavailableException;
+import com.mikuna.backend.common.exception.RefundFailedException;
 import com.mikuna.backend.common.exception.ReservationExpiredException;
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -140,6 +141,31 @@ public class StripeGateway {
             throw unavailable("liberar", e);
         } catch (RestClientException e) {
             throw unavailable("liberar", e);
+        }
+    }
+
+    /**
+     * Reembolsa por completo el intento ya cobrado (spec 014). {@code succeeded} o {@code pending} cuentan como hecho
+     * (la acreditación bancaria no depende de la plataforma); {@code failed} o {@code canceled} lanzan
+     * {@link RefundFailedException}. Un cargo ya reembolsado (respuesta anterior perdida) se da por hecho; cualquier
+     * otro fallo es {@link PaymentUnavailableException}.
+     */
+    public void refund(String intentId, String idempotencyKey) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("payment_intent", intentId);
+        try {
+            String status = text(post("/refunds", form, idempotencyKey), "status");
+            if ("failed".equals(status) || "canceled".equals(status)) {
+                log.warn("Stripe rechazó el reembolso del intento {} (estado {})", intentId, status);
+                throw new RefundFailedException();
+            }
+        } catch (HttpStatusCodeException e) {
+            if (e.getStatusCode().value() == 400 && e.getResponseBodyAsString().contains("charge_already_refunded")) {
+                return;
+            }
+            throw unavailable("reembolsar", e);
+        } catch (RestClientException e) {
+            throw unavailable("reembolsar", e);
         }
     }
 

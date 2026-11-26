@@ -3,6 +3,7 @@ package com.mikuna.backend.payment.service;
 import com.mikuna.backend.common.exception.PaymentDeclinedException;
 import com.mikuna.backend.common.exception.PaymentStateException;
 import com.mikuna.backend.common.exception.PaymentUnavailableException;
+import com.mikuna.backend.common.exception.RefundFailedException;
 import com.mikuna.backend.common.exception.ReservationExpiredException;
 import com.mikuna.backend.payment.model.Payment;
 import com.mikuna.backend.payment.model.PaymentStatus;
@@ -29,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PaymentService {
 
     private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
+    static final String CASH_CODE = "cash";
     static final String MSG_DECLINED = "Tu tarjeta fue rechazada. Revisa los datos o usa otra tarjeta";
     static final String MSG_ACTION_REQUIRED =
             "Tu tarjeta exige una verificación adicional que aún no admitimos. Usa otra tarjeta";
@@ -161,6 +163,59 @@ public class PaymentService {
         settle(orderId, TransactionType.RELEASE);
     }
 
+    /**
+     * Cancelación administrativa (spec 014), dentro de la transacción del llamador que ya bloqueó el pedido. Tarjeta
+     * cobrada: reembolso total en la pasarela con la clave {@code refund-<orderId>} (los reintentos no reembolsan dos
+     * veces) y pago {@code REFUNDED}; devuelve {@code true}. Efectivo: queda sin cobro, sin pasarela; devuelve
+     * {@code false}. Si la pasarela falla, el intento queda registrado aparte y se lanza
+     * {@link RefundFailedException}, que revierte la transacción del llamador.
+     */
+    @Transactional
+    public boolean refundOrVoid(UUID orderId) {
+        Payment payment = payments.findByOrderIdForUpdate(orderId).orElseThrow(PaymentStateException::new);
+        Instant now = Instant.now(clock);
+        if (payment.isCash()) {
+            payment.voidCash(now);
+            payments.save(payment);
+            transactions.save(new PaymentTransaction(orderId, payment.getCustomerId(), null, TransactionType.RELEASE,
+                    TransactionStatus.RELEASED, payment.getAmount(), CASH_CODE, null, payment.getGatewayRef(), now));
+            return false;
+        }
+        if (payment.getStatus() != PaymentStatus.CAPTURED) {
+            throw new PaymentStateException();
+        }
+        try {
+            gateway.refund(payment.getGatewayRef(), "refund-" + orderId);
+        } catch (PaymentUnavailableException | RefundFailedException e) {
+            String code = e instanceof RefundFailedException ? "refund_failed" : "gateway_unavailable";
+            recorder.record(orderId, payment.getCustomerId(), null, TransactionType.REFUND, TransactionStatus.FAILED,
+                    payment.getAmount(), code, null, payment.getGatewayRef());
+            throw new RefundFailedException();
+        }
+        payment.refund(now);
+        payments.save(payment);
+        transactions.save(new PaymentTransaction(orderId, payment.getCustomerId(), null, TransactionType.REFUND,
+                TransactionStatus.REFUNDED, payment.getAmount(), null, null, payment.getGatewayRef(), now));
+        return true;
+    }
+
+    /**
+     * El repartidor entregó el pedido (spec 014): el efectivo pendiente pasa a cobrado y queda la transacción. Un
+     * efectivo ya cobrado (anterior al 014) o una tarjeta no cambian.
+     */
+    @Transactional
+    public void collectCash(UUID orderId) {
+        Payment payment = payments.findByOrderIdForUpdate(orderId).orElse(null);
+        if (payment == null || !payment.isCash() || payment.getStatus() != PaymentStatus.AUTHORIZED) {
+            return;
+        }
+        Instant now = Instant.now(clock);
+        payment.capture(now);
+        payments.save(payment);
+        transactions.save(new PaymentTransaction(orderId, payment.getCustomerId(), null, TransactionType.CAPTURE,
+                TransactionStatus.CAPTURED, payment.getAmount(), CASH_CODE, null, payment.getGatewayRef(), now));
+    }
+
     private CaptureResult settle(UUID orderId, TransactionType type) {
         Payment payment = payments.findByOrderIdForUpdate(orderId).orElseThrow(PaymentStateException::new);
         if (payment.getStatus() != PaymentStatus.AUTHORIZED) {
@@ -168,6 +223,10 @@ public class PaymentService {
             throw new PaymentStateException();
         }
         boolean capture = type == TransactionType.CAPTURE;
+        if (capture && payment.isCash()) {
+            // Spec 014: el efectivo no se cobra al aceptar; queda pendiente hasta la entrega (collectCash).
+            return CaptureResult.CAPTURED;
+        }
         try {
             if (payment.isCash()) {
                 // Efectivo: no hay pasarela que llamar.

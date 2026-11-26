@@ -177,6 +177,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 .body(problem);
     }
 
+    /** 503: la pasarela no reembolsó; el pedido conserva su estado y se puede reintentar (spec 014). */
+    @ExceptionHandler(RefundFailedException.class)
+    ResponseEntity<ProblemDetail> handleRefundFailed(RefundFailedException ex) {
+        ProblemDetail problem = problem(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+        problem.setProperty("code", RefundFailedException.CODE);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(problem);
+    }
+
     /** 429 con Retry-After: demasiados intentos fallidos de inicio de sesión. */
     @ExceptionHandler(LoginRateLimitedException.class)
     ResponseEntity<ProblemDetail> handleLoginRateLimited(LoginRateLimitedException ex) {

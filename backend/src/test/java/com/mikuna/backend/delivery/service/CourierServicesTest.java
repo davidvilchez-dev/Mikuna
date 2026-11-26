@@ -45,6 +45,8 @@ class CourierServicesTest {
     private final CourierAvailabilityRepository availability = mock(CourierAvailabilityRepository.class);
     private final OrderStatusService orderStatus = mock(OrderStatusService.class);
     private final DeliveryDispatcher dispatcher = mock(DeliveryDispatcher.class);
+    private final com.mikuna.backend.payment.service.PaymentService payments =
+            mock(com.mikuna.backend.payment.service.PaymentService.class);
     private final com.mikuna.backend.restaurant.repository.RestaurantRepository restaurants = mock(com.mikuna.backend.restaurant.repository.RestaurantRepository.class);
     private final UUID courier = UUID.randomUUID();
     private CourierDeliveryService deliveryService;
@@ -55,7 +57,7 @@ class CourierServicesTest {
     @BeforeEach
     void setUp() {
         deliveryService = new CourierDeliveryService(orders, deliveries, rejections, availability, orderStatus, restaurants,
-                dispatcher, CLOCK);
+                dispatcher, payments, CLOCK);
         availabilityService = new CourierAvailabilityService(availability, dispatcher, CLOCK);
         order = OrderTransitionTest.orderIn(OrderStatus.ASSIGNED);
         delivery = new Delivery(order.getId(), NOW);

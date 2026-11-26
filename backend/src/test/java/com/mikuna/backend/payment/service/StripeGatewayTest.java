@@ -14,6 +14,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.mikuna.backend.common.exception.PaymentUnavailableException;
+import com.mikuna.backend.common.exception.RefundFailedException;
 import com.mikuna.backend.payment.service.StripeGateway.Authorization;
 import com.mikuna.backend.payment.service.StripeGateway.Outcome;
 import java.io.IOException;
@@ -214,5 +215,71 @@ class StripeGatewayTest {
 
         gateway.cancel("pi_9", "r1");
         assertThatThrownBy(() -> gateway.cancel("pi_8", "r2")).isInstanceOf(PaymentUnavailableException.class);
+    }
+
+    // Spec 014: reembolso total del intento cobrado.
+
+    @Test
+    void reembolsaElIntentoCompletoConSuClaveDeIdempotencia() {
+        MockRestServiceServer[] server = new MockRestServiceServer[1];
+        StripeGateway gateway = gateway(server);
+        server[0].expect(requestTo("https://api.stripe.com/v1/refunds"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("Authorization", "Bearer " + SECRET))
+                .andExpect(header("Idempotency-Key", "refund-1"))
+                .andExpect(content().string(containsString("payment_intent=pi_9")))
+                .andExpect(content().string(not(containsString("amount"))))
+                .andRespond(withSuccess("{\"id\":\"re_1\",\"status\":\"succeeded\"}", MediaType.APPLICATION_JSON));
+        server[0].expect(requestTo("https://api.stripe.com/v1/refunds"))
+                .andRespond(withSuccess("{\"id\":\"re_2\",\"status\":\"pending\"}", MediaType.APPLICATION_JSON));
+
+        gateway.refund("pi_9", "refund-1");
+        gateway.refund("pi_9", "refund-1");
+
+        server[0].verify();
+    }
+
+    @Test
+    void unReembolsoFallidoOCanceladoEsUnRechazo() {
+        MockRestServiceServer[] server = new MockRestServiceServer[1];
+        StripeGateway gateway = gateway(server);
+        server[0].expect(requestTo("https://api.stripe.com/v1/refunds"))
+                .andRespond(withSuccess("{\"id\":\"re_1\",\"status\":\"failed\"}", MediaType.APPLICATION_JSON));
+        server[0].expect(requestTo("https://api.stripe.com/v1/refunds"))
+                .andRespond(withSuccess("{\"id\":\"re_2\",\"status\":\"canceled\"}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> gateway.refund("pi_9", "k")).isInstanceOf(RefundFailedException.class);
+        assertThatThrownBy(() -> gateway.refund("pi_9", "k")).isInstanceOf(RefundFailedException.class);
+    }
+
+    @Test
+    void unCargoYaReembolsadoSeDaPorHecho() {
+        MockRestServiceServer[] server = new MockRestServiceServer[1];
+        StripeGateway gateway = gateway(server);
+        server[0].expect(requestTo("https://api.stripe.com/v1/refunds"))
+                .andRespond(withBadRequest().contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\":{\"code\":\"charge_already_refunded\"}}"));
+
+        gateway.refund("pi_9", "k");
+
+        server[0].verify();
+    }
+
+    @Test
+    void otrosErroresAlReembolsarSonPasarelaNoDisponible() {
+        MockRestServiceServer[] server = new MockRestServiceServer[1];
+        StripeGateway gateway = gateway(server);
+        server[0].expect(requestTo("https://api.stripe.com/v1/refunds")).andRespond(withServerError());
+        server[0].expect(requestTo("https://api.stripe.com/v1/refunds"))
+                .andRespond(withBadRequest().contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"error\":{\"code\":\"resource_missing\"}}"));
+        server[0].expect(requestTo("https://api.stripe.com/v1/refunds"))
+                .andRespond((request) -> {
+                    throw new IOException("Read timed out");
+                });
+
+        assertThatThrownBy(() -> gateway.refund("pi_9", "k")).isInstanceOf(PaymentUnavailableException.class);
+        assertThatThrownBy(() -> gateway.refund("pi_9", "k")).isInstanceOf(PaymentUnavailableException.class);
+        assertThatThrownBy(() -> gateway.refund("pi_9", "k")).isInstanceOf(PaymentUnavailableException.class);
     }
 }

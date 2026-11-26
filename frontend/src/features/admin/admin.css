@@ -301,3 +301,13 @@
   .adm-side { transition: none; }
   .adm-skeleton span { animation: none; }
 }
+
+/* Spec 014: cancelación administrativa */
+.adm-detail-actions { display: flex; justify-content: flex-end; }
+.adm-cancel-field textarea {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--adm-line-strong); border-radius: 10px;
+  font: inherit; resize: vertical;
+}
+.adm-cancel-field textarea:focus-visible { outline: 3px solid var(--color-mikuna-indigo); outline-offset: 0; }
+.adm-cancel-field textarea[aria-invalid='true'] { border-color: var(--adm-bad); }
+.adm-cancel-field small { justify-self: end; color: var(--adm-muted, #6B7080); font-size: 13px; }

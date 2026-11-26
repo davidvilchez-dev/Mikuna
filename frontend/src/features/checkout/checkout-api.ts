@@ -18,7 +18,7 @@ export interface Checkout {
   publishableKey: string
 }
 
-export type PaymentStatus = 'AUTHORIZED' | 'CAPTURED' | 'RELEASED'
+export type PaymentStatus = 'AUTHORIZED' | 'CAPTURED' | 'RELEASED' | 'REFUNDED'
 
 export interface Order {
   id: string
@@ -28,6 +28,8 @@ export interface Order {
   delivery: { label: string | null; street: string; district: string; reference: string | null; contactPhone: string | null }
   totals: { subtotal: number; deliveryFee: number; commission: number; total: number }
   payment: { method: string; status: PaymentStatus }
+  /** Solo en un pedido Cancelado: quién lo canceló (CUSTOMER, RESTAURANT, SYSTEM o ADMIN) y el motivo (spec 014). */
+  cancellation?: { by: string; reason: string | null }
   createdAt: string
   options: OrderOptions
   /** Vencimiento si el restaurante no responde (spec 012) y segundos restantes según el servidor. */
@@ -74,7 +76,8 @@ export function cancelOrder(token: string, id: string): Promise<Order> {
 }
 
 export function paymentStatusLabel(method: string, status: PaymentStatus): string {
-  if (method === 'CASH') return status === 'CAPTURED' ? 'Efectivo: se paga al recibir el pedido' : status === 'RELEASED' ? 'Efectivo: pedido sin cobro' : 'Efectivo: pagas al recibir el pedido'
+  // Spec 014: el efectivo queda pendiente hasta la entrega y se registra cobrado al entregarse.
+  if (method === 'CASH') return status === 'CAPTURED' ? 'Pagado en efectivo' : status === 'RELEASED' ? 'Efectivo: pedido sin cobro' : 'Efectivo: pagarás al recibir el pedido'
   return paymentStatusLabels[status]
 }
 
@@ -82,4 +85,5 @@ export const paymentStatusLabels: Record<PaymentStatus, string> = {
   AUTHORIZED: 'Reservado (se cobra cuando el restaurante acepte)',
   CAPTURED: 'Cobrado',
   RELEASED: 'Liberado (no se cobró)',
+  REFUNDED: 'Reembolsado (te devolvimos el total)',
 }

@@ -16,6 +16,8 @@ import com.mikuna.backend.order.model.Order;
 import com.mikuna.backend.order.model.OrderStatus;
 import com.mikuna.backend.order.repository.OrderRepository;
 import com.mikuna.backend.order.service.OrderStatusService;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -36,10 +38,13 @@ public class DeliveryAdminService {
     private final DeliveryAssignmentService assignment;
     private final OrderStatusService orderStatus;
     private final DeliveryDispatcher dispatcher;
+    private final Clock clock;
 
     public DeliveryAdminService(OrderRepository orders, DeliveryRepository deliveries,
             CourierAvailabilityRepository availability, AccountRepository accounts,
-            DeliveryAssignmentService assignment, OrderStatusService orderStatus, DeliveryDispatcher dispatcher) {
+            DeliveryAssignmentService assignment, OrderStatusService orderStatus, DeliveryDispatcher dispatcher,
+            Clock clock) {
+        this.clock = clock;
         this.orders = orders;
         this.deliveries = deliveries;
         this.availability = availability;
@@ -96,6 +101,26 @@ public class DeliveryAdminService {
         orderStatus.changeStatus(order, OrderStatus.READY, adminId, ActorRole.ADMIN, null);
         AfterCommit.run(() -> dispatcher.dispatch(orderId));
         return response(order, delivery, null, false, List.of());
+    }
+
+    /**
+     * Pedido Asignado o Recogido que el administrador cancela (spec 014), con el pedido ya bloqueado por quien llama:
+     * el repartidor vuelve a contar como libre y, tras el commit, se le ofrece otra entrega pendiente. La entrega
+     * conserva su {@code courier_id} como registro; deja de estar activa porque el pedido ya no está Asignado ni
+     * Recogido (research §6). Devuelve el repartidor liberado, o {@code null} si no había.
+     */
+    @Transactional
+    public UUID freeCourierOfCancelledOrder(UUID orderId) {
+        UUID courierId = deliveries.findByOrderId(orderId).map(Delivery::getCourierId).orElse(null);
+        if (courierId == null) {
+            return null;
+        }
+        availability.findByIdForUpdate(courierId).ifPresent(row -> {
+            row.markFree(Instant.now(clock));
+            availability.save(row);
+        });
+        AfterCommit.run(() -> dispatcher.courierBecameFree(courierId));
+        return courierId;
     }
 
     private List<PendingDeliveryResponse.Candidate> candidates(Delivery delivery) {

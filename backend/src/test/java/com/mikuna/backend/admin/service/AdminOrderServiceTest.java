@@ -27,7 +27,8 @@ class AdminOrderServiceTest {
         queries = mock(AdminOrderQueryRepository.class);
         deliveries = mock(DeliveryRepository.class);
         service = new AdminOrderService(queries, mock(AccountRepository.class), mock(PaymentRepository.class),
-                deliveries, mock(OrderStatusChangeRepository.class));
+                deliveries, mock(OrderStatusChangeRepository.class),
+                mock(com.mikuna.backend.payment.repository.PaymentTransactionRepository.class));
     }
 
     @Test

@@ -1,6 +1,8 @@
 package com.mikuna.backend.order.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.mikuna.backend.order.model.Order;
+import com.mikuna.backend.order.model.OrderStatus;
 import com.mikuna.backend.order.model.OrderLine;
 import com.mikuna.backend.order.service.OrderExpiryPolicy;
 import com.mikuna.backend.payment.model.PaymentStatus;
@@ -12,7 +14,12 @@ import java.util.UUID;
 /** Pedido con sus datos fijados al confirmar y el estado de su pago. No expone referencias de la pasarela. */
 public record OrderResponse(UUID id, String status, RestaurantInfo restaurant, List<Line> lines, Delivery delivery,
         Totals totals, PaymentInfo payment, Instant createdAt,
-        Options options, Instant expiresAt, Long secondsToExpire) {
+        Options options, Instant expiresAt, Long secondsToExpire,
+        @JsonInclude(JsonInclude.Include.NON_NULL) Cancellation cancellation) {
+
+    /** Quién canceló el pedido ({@code CUSTOMER}, {@code RESTAURANT}, {@code SYSTEM} o {@code ADMIN}) y su motivo. */
+    public record Cancellation(String by, String reason) {
+    }
 
     public record RestaurantInfo(UUID id, String name) {
     }
@@ -41,6 +48,11 @@ public record OrderResponse(UUID id, String status, RestaurantInfo restaurant, L
      * {@code now}, solo mientras está Pendiente (spec 012), para que la interfaz no dependa de su propio reloj.
      */
     public static OrderResponse of(Order order, PaymentStatus paymentStatus, Instant now) {
+        return of(order, paymentStatus, now, null);
+    }
+
+    /** Con la cancelación (spec 014): solo se informa si el pedido está Cancelado. */
+    public static OrderResponse of(Order order, PaymentStatus paymentStatus, Instant now, Cancellation cancellation) {
         List<Line> lines = order.getLines().stream().map(OrderResponse::line).toList();
         return new OrderResponse(order.getId(), order.getStatus().name(),
                 new RestaurantInfo(order.getRestaurantId(), order.getRestaurantName()), lines,
@@ -48,7 +60,8 @@ public record OrderResponse(UUID id, String status, RestaurantInfo restaurant, L
                         order.getDeliveryReference(), order.getDeliveryPhone()),
                 new Totals(order.getSubtotal(), order.getDeliveryFee(), order.getCommission(), order.getTotal()),
                 new PaymentInfo(order.getPaymentMethod().name(), paymentStatus.name()), order.getCreatedAt(),
-                options(order), order.getExpiresAt(), OrderExpiryPolicy.secondsToExpire(order, now));
+                options(order), order.getExpiresAt(), OrderExpiryPolicy.secondsToExpire(order, now),
+                order.getStatus() == OrderStatus.CANCELLED ? cancellation : null);
     }
 
     private static Options options(Order order) {

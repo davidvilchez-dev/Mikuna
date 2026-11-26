@@ -210,18 +210,21 @@ public class Order implements Persistable<UUID> {
     static {
         TRANSITIONS.put(OrderStatus.PENDING,
                 EnumSet.of(OrderStatus.ACCEPTED, OrderStatus.REJECTED, OrderStatus.CANCELLED));
-        TRANSITIONS.put(OrderStatus.ACCEPTED, EnumSet.of(OrderStatus.PREPARING));
-        TRANSITIONS.put(OrderStatus.PREPARING, EnumSet.of(OrderStatus.READY));
-        TRANSITIONS.put(OrderStatus.READY, EnumSet.of(OrderStatus.ASSIGNED));
+        // Desde ACCEPTED hasta PICKED_UP, CANCELLED solo lo origina la cancelación administrativa (spec 014).
+        TRANSITIONS.put(OrderStatus.ACCEPTED, EnumSet.of(OrderStatus.PREPARING, OrderStatus.CANCELLED));
+        TRANSITIONS.put(OrderStatus.PREPARING, EnumSet.of(OrderStatus.READY, OrderStatus.CANCELLED));
+        TRANSITIONS.put(OrderStatus.READY, EnumSet.of(OrderStatus.ASSIGNED, OrderStatus.CANCELLED));
         // ASSIGNED a READY solo lo origina el rechazo del repartidor o la liberación del administrador (spec 008).
-        TRANSITIONS.put(OrderStatus.ASSIGNED, EnumSet.of(OrderStatus.PICKED_UP, OrderStatus.READY));
-        TRANSITIONS.put(OrderStatus.PICKED_UP, EnumSet.of(OrderStatus.DELIVERED));
+        TRANSITIONS.put(OrderStatus.ASSIGNED,
+                EnumSet.of(OrderStatus.PICKED_UP, OrderStatus.READY, OrderStatus.CANCELLED));
+        TRANSITIONS.put(OrderStatus.PICKED_UP, EnumSet.of(OrderStatus.DELIVERED, OrderStatus.CANCELLED));
     }
 
     /**
-     * Único punto de cambio de estado (FR-007): solo Pendiente a Aceptado/Rechazado/Cancelado, Aceptado a En
-     * preparación, En preparación a Listo para recoger y, desde la spec 008, Listo a Asignado, Asignado a Recogido o
-     * de vuelta a Listo (rechazo), y Recogido a Entregado. Rechazado, Cancelado y Entregado son finales.
+     * Único punto de cambio de estado (FR-007): Pendiente a Aceptado/Rechazado/Cancelado, Aceptado a En preparación,
+     * En preparación a Listo para recoger y, desde la spec 008, Listo a Asignado, Asignado a Recogido o de vuelta a
+     * Listo (rechazo), y Recogido a Entregado. Desde la spec 014, de Aceptado a Recogido también a Cancelado, solo por
+     * el administrador (lo controla su servicio). Rechazado, Cancelado y Entregado son finales.
      */
     public void transitionTo(OrderStatus target) {
         if (!TRANSITIONS.getOrDefault(status, Set.of()).contains(target)) {

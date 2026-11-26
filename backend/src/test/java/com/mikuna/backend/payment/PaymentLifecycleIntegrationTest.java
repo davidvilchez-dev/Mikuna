@@ -158,13 +158,16 @@ class PaymentLifecycleIntegrationTest extends OrderTestSupport {
     }
 
     @Test
-    void noExisteNingunaOperacionDeReembolso() {
+    void elUnicoReembolsoEsElDeLaCancelacionAdministrativa() {
+        // Constitución 5.0.0 (spec 014): solo el reembolso total de la cancelación administrativa; ni parciales ni
+        // a pedido del cliente.
         List<String> names = new ArrayList<>();
         for (Class<?> type : new Class<?>[] {PaymentService.class, StripeGateway.class}) {
             for (Method method : type.getDeclaredMethods()) {
-                names.add(method.getName().toLowerCase());
+                names.add(type.getSimpleName() + "." + method.getName());
             }
         }
-        assertThat(names).noneMatch(name -> name.contains("refund") || name.contains("reembols"));
+        assertThat(names.stream().filter(name -> name.toLowerCase().contains("refund")).distinct())
+                .containsExactlyInAnyOrder("PaymentService.refundOrVoid", "StripeGateway.refund");
     }
 }

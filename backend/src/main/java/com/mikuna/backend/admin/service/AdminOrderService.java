@@ -20,6 +20,7 @@ import com.mikuna.backend.order.model.OrderStatusChange;
 import com.mikuna.backend.order.repository.OrderStatusChangeRepository;
 import com.mikuna.backend.payment.model.Payment;
 import com.mikuna.backend.payment.repository.PaymentRepository;
+import com.mikuna.backend.payment.repository.PaymentTransactionRepository;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -53,9 +54,12 @@ public class AdminOrderService {
     private final PaymentRepository payments;
     private final DeliveryRepository deliveries;
     private final OrderStatusChangeRepository changes;
+    private final PaymentTransactionRepository transactions;
 
     public AdminOrderService(AdminOrderQueryRepository queries, AccountRepository accounts,
-            PaymentRepository payments, DeliveryRepository deliveries, OrderStatusChangeRepository changes) {
+            PaymentRepository payments, DeliveryRepository deliveries, OrderStatusChangeRepository changes,
+            PaymentTransactionRepository transactions) {
+        this.transactions = transactions;
         this.queries = queries;
         this.accounts = accounts;
         this.payments = payments;
@@ -119,7 +123,11 @@ public class AdminOrderService {
                         payment == null ? null : payment.getAmount(), payment == null ? null : payment.getCurrency()),
                 new AdminOrderDetail.DeliveryAddress(order.getDeliveryStreet(), order.getDeliveryDistrict(),
                         order.getDeliveryReference(), order.getDeliveryPhone()),
-                entries(history, people));
+                entries(history, people),
+                transactions.findByOrderIdOrderByCreatedAtAsc(id).stream()
+                        .map(t -> new AdminOrderDetail.Transaction(t.getType().name(), t.getStatus().name(),
+                                t.getAmount(), t.getResultCode(), t.getCreatedAt()))
+                        .toList());
     }
 
     public AdminDeliveryDetail deliveryDetail(UUID id) {

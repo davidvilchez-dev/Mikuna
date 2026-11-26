@@ -163,6 +163,12 @@ export function OrderPage() {
           Tu pedido fue entregado. <Link to="/historial">Califícalo en tu historial</Link>.
         </p>
       )}
+      {status === 'CANCELLED' && order.cancellation?.by === 'ADMIN' && (
+        <p className="catalog-banner" role="status">
+          Cancelado por la plataforma{order.cancellation.reason ? `: ${order.cancellation.reason}` : ''}.
+          {order.payment.status === 'REFUNDED' && ' Te devolvimos el total que pagaste.'}
+        </p>
+      )}
       <div className="cart-layout">
       <div className="cart-main">
       {tracking && (

@@ -15,8 +15,9 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Pago de un pedido (RF-16): nace {@code AUTHORIZED} (monto reservado) y termina {@code CAPTURED} o
- * {@code RELEASED}, estados terminales y excluyentes. No existe estado de reembolso.
+ * Pago de un pedido (RF-16): nace {@code AUTHORIZED} (tarjeta reservada o efectivo pendiente de cobro) y pasa a
+ * {@code CAPTURED} o {@code RELEASED}. Desde la spec 014, una tarjeta {@code CAPTURED} puede terminar
+ * {@code REFUNDED} (reembolso total por cancelación administrativa) y el efectivo se cobra al entregar.
  */
 @Entity
 @Table(name = "pagos", uniqueConstraints = @UniqueConstraint(name = "uk_pagos_pedido", columnNames = "order_id"))
@@ -88,6 +89,27 @@ public class Payment {
     /** Pasa de AUTHORIZED a RELEASED; cualquier otro estado de origen se rechaza. */
     public void release(Instant now) {
         transition(PaymentStatus.RELEASED, now);
+    }
+
+    /** Tarjeta cobrada y devuelta por completo (spec 014): solo desde CAPTURED y nunca en efectivo. */
+    public void refund(Instant now) {
+        if (status != PaymentStatus.CAPTURED || isCash()) {
+            throw new PaymentStateException();
+        }
+        status = PaymentStatus.REFUNDED;
+        updatedAt = now;
+    }
+
+    /**
+     * Efectivo de un pedido cancelado antes de entregarse (spec 014): queda sin cobro. Admite CAPTURED porque antes
+     * del 014 el efectivo se marcaba cobrado al aceptar.
+     */
+    public void voidCash(Instant now) {
+        if (!isCash() || (status != PaymentStatus.AUTHORIZED && status != PaymentStatus.CAPTURED)) {
+            throw new PaymentStateException();
+        }
+        status = PaymentStatus.RELEASED;
+        updatedAt = now;
     }
 
     private void transition(PaymentStatus target, Instant now) {

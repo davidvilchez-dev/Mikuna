@@ -4,7 +4,10 @@ import { ApiError, errorMessage } from '../auth/auth-api'
 import { AuthLayout } from '../auth/AuthLayout'
 import { useSession } from '../auth/RequireSession'
 import { orderCode, type OrderStatus } from '../restaurant/orders-logic'
+import { Modal } from '../ui/Modal'
+import { notifySuccess } from '../ui/notify'
 import {
+  cancelAdminOrder,
   deliveryDetail,
   listDeliveries,
   listOrders,
@@ -14,11 +17,14 @@ import {
   type OrderDetail,
   type OrderSummary,
   type Page,
+  type PaymentTransaction,
   type StatusChange,
 } from './admin-api'
 import { AdminLayout } from './AdminLayout'
 import { Badge, EmptyState, ErrorState, LoadingBlock, Pager } from './admin-ui'
 import {
+  CANCEL_REASON_MAX,
+  canAdminCancel,
   formatDateTime,
   formatMoney,
   orderStatusLabel,
@@ -26,6 +32,9 @@ import {
   statusTone,
   paymentLabel,
   statusOptionsFor,
+  transactionStatusLabels,
+  transactionTypeLabels,
+  validateCancelReason,
   type OrdersTab,
 } from './admin-logic'
 
@@ -36,7 +45,10 @@ type ViewState =
   | { kind: 'forbidden' }
   | { kind: 'error'; message: string }
 
-/** Consulta administrativa (RF-33): todos los pedidos y entregas, por estado, con su pago y cambios de estado. Solo lectura. */
+/**
+ * Consulta administrativa (RF-33): todos los pedidos y entregas, por estado, con su pago, transacciones y cambios de
+ * estado. Desde la spec 014, el administrador cancela un pedido aceptado y no entregado con motivo y reembolso.
+ */
 export function AdminOrdersPage() {
   const session = useSession()
   const [tab, setTab] = useState<OrdersTab>('orders')
@@ -48,6 +60,7 @@ export function AdminOrdersPage() {
   const [orderInfo, setOrderInfo] = useState<OrderDetail | null>(null)
   const [deliveryInfo, setDeliveryInfo] = useState<DeliveryDetail | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [cancelling, setCancelling] = useState<OrderDetail | null>(null)
 
   const token = session.token
 
@@ -105,7 +118,7 @@ export function AdminOrdersPage() {
   const columns = tab === 'orders' ? 6 : 4
 
   return (
-    <AdminLayout title="Pedidos y entregas" description="Todos los pedidos y entregas de la plataforma, del más reciente al más antiguo. Solo lectura.">
+    <AdminLayout title="Pedidos y entregas" description="Todos los pedidos y entregas de la plataforma, del más reciente al más antiguo.">
       <div className="adm-seg" role="tablist" aria-label="Qué consultar">
         <button type="button" role="tab" aria-selected={tab === 'orders'} onClick={() => changeTab('orders')}>Pedidos</button>
         <button type="button" role="tab" aria-selected={tab === 'deliveries'} onClick={() => changeTab('deliveries')}>Entregas</button>
@@ -167,7 +180,7 @@ export function AdminOrdersPage() {
                     {open && (
                       <tr>
                         <td colSpan={columns + 1} className="adm-detail-cell">
-                          {tab === 'orders' && (orderInfo?.id === item.id ? <OrderPanel detail={orderInfo} /> : <div className="adm-detail"><LoadingBlock /></div>)}
+                          {tab === 'orders' && (orderInfo?.id === item.id ? <OrderPanel detail={orderInfo} onCancel={() => setCancelling(orderInfo)} /> : <div className="adm-detail"><LoadingBlock /></div>)}
                           {tab === 'deliveries' && (deliveryInfo?.id === item.id ? <DeliveryPanel detail={deliveryInfo} /> : <div className="adm-detail"><LoadingBlock /></div>)}
                         </td>
                       </tr>
@@ -178,6 +191,15 @@ export function AdminOrdersPage() {
             </tbody>
           </table>
         </div>
+      )}
+      {cancelling && (
+        <CancelOrderDialog token={token} order={cancelling} onClose={() => setCancelling(null)}
+          onCancelled={(updated) => {
+            setCancelling(null)
+            setOrderInfo(updated)
+            notifySuccess(updated.payment.status === 'REFUNDED' ? 'Pedido cancelado y reembolsado' : 'Pedido cancelado')
+            setAttempt((n) => n + 1)
+          }} />
       )}
       {view.kind === 'ready' && (
         <Pager summary={pageSummary(view.data.page, view.data.totalPages, view.data.totalItems)} page={page} totalPages={view.data.totalPages} onChange={setPage} />
@@ -205,9 +227,14 @@ function Changes({ changes }: { changes: StatusChange[] }) {
   )
 }
 
-function OrderPanel({ detail }: { detail: OrderDetail }) {
+function OrderPanel({ detail, onCancel }: { detail: OrderDetail; onCancel: () => void }) {
   return (
     <div className="adm-detail">
+      {canAdminCancel(detail.status) && (
+        <div className="adm-detail-actions">
+          <button type="button" className="adm-btn adm-btn-danger adm-btn-sm" onClick={onCancel}>Cancelar pedido</button>
+        </div>
+      )}
       <dl className="adm-facts">
         <div><dt>Cliente</dt><dd>{detail.customer.name ?? '—'}{detail.customer.email ? ` (${detail.customer.email})` : ''}</dd></div>
         <div><dt>Repartidor</dt><dd>{detail.courier?.name ?? 'Sin asignar'}</dd></div>
@@ -232,7 +259,83 @@ function OrderPanel({ detail }: { detail: OrderDetail }) {
         <strong>Total {formatMoney(detail.amounts.total)}</strong>
       </p>
       <Changes changes={detail.statusChanges} />
+      <Transactions items={detail.transactions ?? []} />
     </div>
+  )
+}
+
+function Transactions({ items }: { items: PaymentTransaction[] }) {
+  if (items.length === 0) return null
+  return (
+    <>
+      <h3>Transacciones de pago</h3>
+      <table className="adm-table-inner">
+        <thead><tr><th>Operación</th><th>Resultado</th><th className="adm-num">Importe</th><th>Fecha</th></tr></thead>
+        <tbody>
+          {items.map((item, index) => (
+            <tr key={index}>
+              <td>{transactionTypeLabels[item.type] ?? item.type}</td>
+              <td>{transactionStatusLabels[item.status] ?? item.status}{item.code ? ` (${item.code})` : ''}</td>
+              <td className="adm-num">{formatMoney(item.amount)}</td>
+              <td>{formatDateTime(item.at)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  )
+}
+
+interface CancelDialogProps {
+  token: string
+  order: OrderDetail
+  onClose: () => void
+  onCancelled: (updated: OrderDetail) => void
+}
+
+/** Motivo obligatorio y confirmación; si la pasarela falla, el pedido no cambia y se puede reintentar (spec 014). */
+function CancelOrderDialog({ token, order, onClose, onCancelled }: CancelDialogProps) {
+  const [reason, setReason] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const card = order.payment.method === 'CARD' && order.payment.status === 'CAPTURED'
+
+  async function submit() {
+    const invalid = validateCancelReason(reason)
+    if (invalid) { setError(invalid); return }
+    setBusy(true)
+    setError(null)
+    try {
+      onCancelled(await cancelAdminOrder(token, order.id, reason))
+    } catch (failure) {
+      setError(errorMessage(failure))
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal title={'Cancelar pedido ' + orderCode(order.id)} onClose={onClose}>
+      <p className="mk-confirm-text">
+        {card
+          ? `Se devolverá al cliente el total cobrado (${formatMoney(order.amounts.total)}).`
+          : 'El pedido se pagaba en efectivo: no hay cobro que devolver.'}
+        {' '}El cliente, el restaurante y el repartidor (si lo hay) recibirán un aviso con el motivo.
+      </p>
+      <div className="auth-field adm-cancel-field">
+        <label htmlFor="adm-cancel-reason">Motivo de la cancelación</label>
+        <textarea id="adm-cancel-reason" rows={3} value={reason} maxLength={CANCEL_REASON_MAX + 50}
+          aria-invalid={error ? true : undefined} aria-describedby="adm-cancel-count"
+          onChange={(e) => setReason(e.target.value)} disabled={busy} />
+        <small id="adm-cancel-count">{reason.trim().length}/{CANCEL_REASON_MAX}</small>
+        {error && <p className="auth-error" role="alert">{error}</p>}
+      </div>
+      <div className="mk-confirm-actions">
+        <button type="button" className="mk-confirm-btn mk-confirm-cancel" onClick={onClose} disabled={busy}>Volver</button>
+        <button type="button" className="mk-confirm-btn mk-confirm-danger" onClick={() => void submit()} disabled={busy}>
+          {busy ? 'Cancelando…' : card ? 'Cancelar y reembolsar' : 'Cancelar pedido'}
+        </button>
+      </div>
+    </Modal>
   )
 }
 
