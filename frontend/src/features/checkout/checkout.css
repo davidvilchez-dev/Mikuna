@@ -62,10 +62,10 @@
 /* Avisos de la página del pedido (vencimiento, entregado y cancelado por la plataforma) */
 .order-banner {
   margin: 0 0 16px; padding: 14px 16px;
-  border: 1px solid #F6C9AE; border-left: 4px solid var(--color-mikuna-orange); border-radius: 12px;
+  border: 1px solid #F6C9AE; border-radius: 12px;
   background: var(--color-mikuna-peach); color: var(--color-mikuna-indigo); font-weight: 600; line-height: 1.45;
 }
 .order-banner span { font-weight: 500; }
 .order-banner a { color: inherit; text-decoration: underline; }
-.order-banner-done { border-color: #BFE3CC; border-left-color: #1E7B45; background: #EAF6EE; }
-.order-banner-cancelled { display: grid; gap: 4px; background: var(--color-mikuna-white); }
+.order-banner-done { border-color: #BFE3CC; background: #EAF6EE; }
+.order-banner-cancelled { display: grid; gap: 4px; }
