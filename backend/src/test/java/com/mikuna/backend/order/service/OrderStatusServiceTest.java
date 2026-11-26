@@ -98,6 +98,30 @@ class OrderStatusServiceTest {
     }
 
     @Test
+    void siElRelojRetrocedeElCambioQuedaDespuesDelAnterior() {
+        // El último cambio quedó registrado 1,1 s "en el futuro" respecto del reloj actual (el reloj retrocedió).
+        Instant later = Instant.now(CLOCK).plusMillis(1100);
+        OrderStatusChange previous = new OrderStatusChange(order.getId(), OrderStatus.PENDING, OrderStatus.PENDING,
+                later, null, ActorRole.SYSTEM, null);
+        when(changes.findFirstByOrderIdOrderByChangedAtDesc(order.getId())).thenReturn(Optional.of(previous));
+
+        service.accept(ownerId, order.getId());
+
+        assertThat(savedChange().getChangedAt()).isEqualTo(later.plus(1, java.time.temporal.ChronoUnit.MICROS));
+    }
+
+    @Test
+    void dosCambiosEnElMismoInstanteQuedanOrdenados() {
+        OrderStatusChange previous = new OrderStatusChange(order.getId(), OrderStatus.PENDING, OrderStatus.PENDING,
+                Instant.now(CLOCK), null, ActorRole.SYSTEM, null);
+        when(changes.findFirstByOrderIdOrderByChangedAtDesc(order.getId())).thenReturn(Optional.of(previous));
+
+        service.accept(ownerId, order.getId());
+
+        assertThat(savedChange().getChangedAt()).isAfter(previous.getChangedAt());
+    }
+
+    @Test
     void aceptarConReservaVencidaCancelaComoSistemaSinLanzar() {
         when(paymentService.capture(order.getId())).thenReturn(CaptureResult.RESERVATION_EXPIRED);
 

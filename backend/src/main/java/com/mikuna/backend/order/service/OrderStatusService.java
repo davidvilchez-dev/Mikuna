@@ -22,6 +22,7 @@ import com.mikuna.backend.restaurant.model.RestaurantStatus;
 import com.mikuna.backend.restaurant.repository.RestaurantRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
@@ -185,11 +186,23 @@ public class OrderStatusService {
         OrderStatus from = order.getStatus();
         order.transitionTo(target);
         orders.save(order);
-        OrderStatusChange change = new OrderStatusChange(order.getId(), from, target, Instant.now(clock), actorId,
+        OrderStatusChange change = new OrderStatusChange(order.getId(), from, target, changedAt(order.getId()), actorId,
                 role, normalize(reason));
         changes.save(change);
         events.publishEvent(new OrderStatusChangedEvent(change.getId(), order.getId(), from, target, actorId, role,
                 change.getReason()));
+    }
+
+    /**
+     * Momento del cambio, estrictamente posterior al último cambio del mismo pedido. Si el reloj del sistema retrocede
+     * (por ejemplo, la sincronización de hora al reanudar un equipo), el historial conserva el orden real en que
+     * ocurrieron los cambios. Quien llama ya bloqueó el pedido, así que el último cambio leído es el vigente. Se trunca
+     * a microsegundos, la precisión con la que PostgreSQL guarda la hora.
+     */
+    private Instant changedAt(UUID orderId) {
+        Instant now = Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
+        return changes.findFirstByOrderIdOrderByChangedAtDesc(orderId).map(OrderStatusChange::getChangedAt)
+                .filter(last -> !now.isAfter(last)).map(last -> last.plus(1, ChronoUnit.MICROS)).orElse(now);
     }
 
     private static String normalize(String reason) {
