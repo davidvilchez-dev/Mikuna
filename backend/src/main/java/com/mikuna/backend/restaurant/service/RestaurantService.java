@@ -1,5 +1,6 @@
 package com.mikuna.backend.restaurant.service;
 
+import com.mikuna.backend.common.cache.PublicCatalogChanged;
 import com.mikuna.backend.account.model.Account;
 import com.mikuna.backend.account.repository.AccountRepository;
 import com.mikuna.backend.common.exception.RegistrationValidationException;
@@ -27,6 +28,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,9 +47,11 @@ public class RestaurantService {
     private final AccountRepository accounts;
     private final OrderEligibility eligibility;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
 
     public RestaurantService(RestaurantRepository restaurants, AccountRepository accounts,
-            OrderEligibility eligibility, Clock clock) {
+            OrderEligibility eligibility, Clock clock, ApplicationEventPublisher events) {
+        this.events = events;
         this.restaurants = restaurants;
         this.accounts = accounts;
         this.eligibility = eligibility;
@@ -64,7 +68,7 @@ public class RestaurantService {
             throw alreadyRequested();
         }
         try {
-            return respond(restaurants.saveAndFlush(newRestaurant(ownerId, data)));
+            return changed(restaurants.saveAndFlush(newRestaurant(ownerId, data)));
         } catch (DataIntegrityViolationException concurrentDuplicate) {
             throw alreadyRequested();
         }
@@ -77,7 +81,7 @@ public class RestaurantService {
         if (restaurants.findByOwnerIdOrderBySubmittedAtAsc(ownerId).isEmpty()) {
             throw new RestaurantNotFoundException("Primero envía la solicitud de tu restaurante");
         }
-        return respond(restaurants.saveAndFlush(newRestaurant(ownerId, data)));
+        return changed(restaurants.saveAndFlush(newRestaurant(ownerId, data)));
     }
 
     /** Todas las sucursales de la cuenta, para el selector del panel. */
@@ -106,7 +110,7 @@ public class RestaurantService {
         restaurant.updateGeneralData(data.name(), data.category(), data.description(), data.address(),
                 data.zone(), data.phone());
         restaurant.changeLocation(data.latitude(), data.longitude());
-        return respond(save(restaurant));
+        return changed(save(restaurant));
     }
 
     /** Reenvío tras un rechazo: REJECTED → PENDING mediante actualización condicional. */
@@ -119,7 +123,7 @@ public class RestaurantService {
         if (restaurants.resubmit(restaurant.getId(), ownerId, Instant.now(clock)) == 0) {
             throw new RestaurantConflictException("La solicitud cambió; vuelve a consultarla");
         }
-        return respond(find(ownerId));
+        return changed(find(ownerId));
     }
 
     /** RF-07: horario semanal completo; solo un restaurante aprobado. */
@@ -127,7 +131,7 @@ public class RestaurantService {
     public RestaurantResponse updateSchedule(UUID ownerId, ScheduleRequest request) {
         Restaurant restaurant = approved(find(ownerId));
         restaurant.replaceSchedule(parseSchedule(request));
-        return respond(save(restaurant));
+        return changed(save(restaurant));
     }
 
     /** RF-07: activar o pausar la disponibilidad; solo un restaurante aprobado. */
@@ -138,7 +142,13 @@ public class RestaurantService {
         }
         Restaurant restaurant = approved(find(ownerId));
         restaurant.setAvailable(request.available());
-        return respond(save(restaurant));
+        return changed(save(restaurant));
+    }
+
+    /** Cambio visible para el público: la caché de la consulta pública se descarta tras el commit (spec 015). */
+    private RestaurantResponse changed(Restaurant restaurant) {
+        events.publishEvent(PublicCatalogChanged.restaurants());
+        return respond(restaurant);
     }
 
     private Restaurant find(UUID ownerId) {

@@ -76,12 +76,15 @@ class PublicCatalogIntegrationTest extends IntegrationTestSupport {
         catalog(restaurantId, "").andExpect(jsonPath("$.products.totalItems").value(1));
 
         jdbc.update("update productos set available = false where id = ?", product);
+        clearCaches(); // cambio directo en BD, sin el servicio que descarta la caché
         catalog(restaurantId, "").andExpect(jsonPath("$.products.totalItems").value(0));
 
         jdbc.update("update productos set available = true where id = ?", product);
+        clearCaches(); // cambio directo en BD, sin el servicio que descarta la caché
         catalog(restaurantId, "").andExpect(jsonPath("$.products.totalItems").value(1));
 
         jdbc.update("update productos set active = null, withdrawn_at = now() where id = ?", product);
+        clearCaches(); // cambio directo en BD, sin el servicio que descarta la caché
         catalog(restaurantId, "").andExpect(jsonPath("$.products.totalItems").value(0));
     }
 
@@ -101,12 +104,15 @@ class PublicCatalogIntegrationTest extends IntegrationTestSupport {
         String expectedDetail = JsonPath.read(missing, "$.detail");
 
         jdbc.update("update restaurantes set status = 'PENDING' where id = ?", restaurantId);
+        clearCaches(); // cambio directo en BD, sin el servicio que descarta la caché
         assertThat(JsonPath.<String>read(catalog(restaurantId, "").andExpect(status().isNotFound()).andReturn()
                 .getResponse().getContentAsString(), "$.detail")).isEqualTo(expectedDetail);
         jdbc.update("update restaurantes set status = 'REJECTED' where id = ?", restaurantId);
+        clearCaches(); // cambio directo en BD, sin el servicio que descarta la caché
         catalog(restaurantId, "").andExpect(status().isNotFound());
 
         jdbc.update("update restaurantes set status = 'APPROVED' where id = ?", restaurantId);
+        clearCaches(); // cambio directo en BD, sin el servicio que descarta la caché
         catalog(restaurantId, "").andExpect(status().isOk());
         disable(owner.getId());
         catalog(restaurantId, "").andExpect(status().isNotFound());
@@ -117,12 +123,15 @@ class PublicCatalogIntegrationTest extends IntegrationTestSupport {
         TestProducts.product(jdbc, restaurantId, "Lomo", "Fondos", "22.50", true, true);
 
         jdbc.update("update restaurantes set available = false where id = ?", restaurantId);
+        clearCaches(); // cambio directo en BD, sin el servicio que descarta la caché
         catalog(restaurantId, "").andExpect(status().isOk())
                 .andExpect(jsonPath("$.restaurant.attention").value("PAUSED"))
                 .andExpect(jsonPath("$.products.items[0].name").value("Lomo"));
 
         jdbc.update("update restaurantes set available = true where id = ?", restaurantId);
+        clearCaches(); // cambio directo en BD, sin el servicio que descarta la caché
         TestProducts.closeAllDays(jdbc, restaurantId);
+        clearCaches(); // cambio directo en BD, sin el servicio que descarta la caché
         catalog(restaurantId, "").andExpect(status().isOk())
                 .andExpect(jsonPath("$.restaurant.attention").value("OUTSIDE_HOURS"))
                 .andExpect(jsonPath("$.products.totalItems").value(1));

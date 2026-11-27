@@ -41,9 +41,20 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      # Redis (spec 015): solo para las pruebas marcadas con MIKUNA_TEST_REDIS; el resto usa caché en memoria.
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       DB_USERNAME: postgres
       DB_PASSWORD: postgres
+      MIKUNA_TEST_REDIS: 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

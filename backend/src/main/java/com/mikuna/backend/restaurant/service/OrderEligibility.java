@@ -1,11 +1,13 @@
 package com.mikuna.backend.restaurant.service;
 
+import com.mikuna.backend.restaurant.model.ScheduleSlot;
 import com.mikuna.backend.restaurant.model.AttentionStatus;
 import com.mikuna.backend.restaurant.model.Restaurant;
 import com.mikuna.backend.restaurant.model.RestaurantStatus;
 import java.time.Clock;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -32,13 +34,23 @@ public class OrderEligibility {
 
     /** Pausa del titular primero; si no, dentro o fuera del horario del día (hora local de la plataforma). */
     public AttentionStatus attentionStatus(Restaurant restaurant) {
-        if (!restaurant.isAvailable()) {
+        return attentionStatus(restaurant.isAvailable(), restaurant.getSchedule().stream()
+                .map(ScheduleSlot::of)
+                .toList());
+    }
+
+    /**
+     * La misma regla sobre los datos guardados en la caché pública (spec 015): se evalúa en cada consulta con la
+     * hora actual, nunca se guarda el resultado (FR-002).
+     */
+    public AttentionStatus attentionStatus(boolean available, List<ScheduleSlot> schedule) {
+        if (!available) {
             return AttentionStatus.PAUSED;
         }
         ZonedDateTime now = ZonedDateTime.now(clock).withZoneSameInstant(zone);
-        boolean inSchedule = restaurant.getSchedule().stream()
-                .filter(hour -> hour.getDay() == now.getDayOfWeek())
-                .anyMatch(hour -> hour.contains(now.toLocalTime()));
+        boolean inSchedule = schedule.stream()
+                .filter(slot -> slot.day() == now.getDayOfWeek())
+                .anyMatch(slot -> slot.contains(now.toLocalTime()));
         return inSchedule ? AttentionStatus.OPEN : AttentionStatus.OUTSIDE_HOURS;
     }
 }

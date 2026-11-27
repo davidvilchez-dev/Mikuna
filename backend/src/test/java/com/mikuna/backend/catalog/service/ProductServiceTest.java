@@ -67,7 +67,7 @@ class ProductServiceTest {
     @BeforeEach
     void setUp() {
         service = new ProductService(products, restaurants, imageValidator, storage,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                Clock.fixed(NOW, ZoneOffset.UTC), event -> { });
         restaurant = TestRestaurants.restaurant(OWNER, RestaurantStatus.APPROVED);
         when(restaurants.findByOwnerId(OWNER)).thenReturn(Optional.of(restaurant));
         when(imageValidator.validate(any())).thenReturn(TestProducts.JPEG);

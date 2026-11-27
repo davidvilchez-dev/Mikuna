@@ -36,8 +36,12 @@ public class AuthService {
     /**
      * {@code clientIp} identifica el origen para el límite de intentos; con la cuenta o la IP bloqueadas se responde
      * 429 sin comprobar la contraseña. Un correo inexistente cuenta como fallo igual que uno existente.
+     *
+     * <p>Sin transacción a propósito (spec 015): la cuenta se lee en la transacción del repositorio, que devuelve la
+     * conexión antes de comprobar la contraseña. PBKDF2 tarda cientos de milisegundos; dentro de una transacción
+     * retenía una conexión del pool todo ese tiempo y, con 200 usuarios, agotaba el pool para toda la aplicación
+     * (load-tests/reports, corrida de carga con caché del 2026-11-26). La cuenta no tiene relaciones perezosas.
      */
-    @Transactional(readOnly = true)
     public LoginResponse login(String email, String password, String clientIp) {
         String normalized = EmailNormalizer.normalize(email);
         attempts.check(normalized, clientIp);

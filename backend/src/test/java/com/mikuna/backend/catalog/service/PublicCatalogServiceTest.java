@@ -2,8 +2,6 @@ package com.mikuna.backend.catalog.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.mikuna.backend.catalog.dto.CatalogResponse;
@@ -24,16 +22,13 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
+import org.springframework.cache.support.NoOpCacheManager;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /** RF-09 y RF-10: búsqueda, filtros y catálogo público con reloj fijo (lunes 15:00 en Lima). */
@@ -51,7 +46,9 @@ class PublicCatalogServiceTest {
     void setUp() {
         OrderEligibility eligibility = new OrderEligibility(
                 Clock.fixed(Instant.parse("2026-11-16T20:00:00Z"), ZoneOffset.UTC), "America/Lima");
-        service = new PublicCatalogService(restaurants, products, eligibility);
+        // Sin proxy de Spring no hay caché: cada llamada lee los repositorios simulados.
+        service = new PublicCatalogService(new PublicCatalogCache(restaurants, products, new NoOpCacheManager()),
+                eligibility);
     }
 
     /** Abierto el lunes de 09:00 a 21:00, por tanto OPEN en el reloj de la prueba si está disponible. */
@@ -215,11 +212,11 @@ class PublicCatalogServiceTest {
     @Test
     void elCatalogoDeUnRestauranteVisibleIncluyeSuAtencionYSoloProductosDisponibles() {
         Restaurant restaurant = restaurant("La Picantería", "Criolla", "Ayacucho", false); // pausado
-        when(restaurants.findVisibleById(restaurant.getId())).thenReturn(Optional.of(restaurant));
+        visible(restaurant);
         Product product = Product.create(restaurant.getId(), "Lomo", "Casero", "Fondos", new BigDecimal("20"),
                 "https://img.test/p.jpg", "mikuna/products/p", Instant.parse("2026-11-17T00:00:00Z"));
-        when(products.findByRestaurantIdAndActiveTrueAndAvailableTrue(any(), any()))
-                .thenReturn(new PageImpl<>(List.of(product)));
+        when(products.findByRestaurantIdAndActiveTrueAndAvailableTrueOrderByCategoryAscNameAsc(restaurant.getId()))
+                .thenReturn(List.of(product));
 
         CatalogResponse catalog = service.catalog(restaurant.getId(), 0, 24);
 
@@ -227,17 +224,46 @@ class PublicCatalogServiceTest {
         assertThat(catalog.restaurant().name()).isEqualTo("La Picantería");
         assertThat(catalog.products().items()).hasSize(1);
         assertThat(catalog.products().items().get(0).imageUrl()).isEqualTo("https://img.test/p.jpg");
-        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-        verify(products).findByRestaurantIdAndActiveTrueAndAvailableTrue(any(), pageable.capture());
-        assertThat(pageable.getValue().getPageSize()).isEqualTo(24);
-        assertThat(pageable.getValue().getSort().stream().map(order -> order.getProperty()).toList())
-                .containsExactly("category", "name");
+        assertThat(catalog.products().size()).isEqualTo(24);
+        assertThat(catalog.products().totalItems()).isEqualTo(1);
+    }
+
+    @Test
+    void elCatalogoSePaginaEnMemoriaSobreLaCartaOrdenada() {
+        Restaurant restaurant = restaurant("La Picantería", "Criolla", "Ayacucho", true);
+        visible(restaurant);
+        List<Product> carta = java.util.stream.IntStream.range(0, 5)
+                .mapToObj(i -> Product.create(restaurant.getId(), "Plato " + i, "d", "Fondos", BigDecimal.TEN,
+                        "https://img.test/" + i + ".jpg", "p" + i, Instant.parse("2026-11-17T00:00:00Z")))
+                .toList();
+        when(products.findByRestaurantIdAndActiveTrueAndAvailableTrueOrderByCategoryAscNameAsc(restaurant.getId()))
+                .thenReturn(carta);
+
+        PageResponse<?> segunda = service.catalog(restaurant.getId(), 1, 2).products();
+
+        assertThat(segunda.items()).hasSize(2);
+        assertThat(segunda.totalItems()).isEqualTo(5);
+        assertThat(segunda.totalPages()).isEqualTo(3);
+    }
+
+    @Test
+    void sinPortadaPropiaUsaLaImagenDelPrimerPlatoDisponible() {
+        Restaurant restaurant = restaurant("Sin portada", "Criolla", "Ayacucho", true);
+        visible(restaurant);
+        ProductRepository.FirstImage first = new ProductRepository.FirstImage() {
+            public UUID getRestaurantId() { return restaurant.getId(); }
+            public String getImageUrl() { return "https://img.test/primero.jpg"; }
+        };
+        when(products.firstAvailableImageByRestaurant(List.of(restaurant.getId()))).thenReturn(List.of(first));
+
+        assertThat(service.search(null, null, null, 0, 20).items().get(0).coverUrl())
+                .isEqualTo("https://img.test/primero.jpg");
     }
 
     @Test
     void unRestauranteNoVisibleOInexistenteDaNoEncontradoYNoConsultaProductos() {
         UUID id = UUID.randomUUID();
-        when(restaurants.findVisibleById(id)).thenReturn(Optional.empty());
+        visible();
 
         assertThatThrownBy(() -> service.catalog(id, 0, 24)).isInstanceOf(RestaurantNotFoundException.class);
         assertThatThrownBy(() -> service.catalog(id, -1, 24)).isInstanceOf(RegistrationValidationException.class);

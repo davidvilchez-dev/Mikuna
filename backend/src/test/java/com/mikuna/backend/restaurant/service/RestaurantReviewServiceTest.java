@@ -56,7 +56,8 @@ class RestaurantReviewServiceTest {
     @BeforeEach
     void setUp() {
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
-        service = new RestaurantReviewService(restaurants, accounts, new OrderEligibility(clock, "America/Lima"), clock);
+        service = new RestaurantReviewService(restaurants, accounts, new OrderEligibility(clock, "America/Lima"), clock,
+                event -> { });
         ownerAccount = TestAccounts.account(Role.RESTAURANT, "local@mail.com", "{hash}");
         when(accounts.findById(owner)).thenReturn(Optional.of(ownerAccount));
     }

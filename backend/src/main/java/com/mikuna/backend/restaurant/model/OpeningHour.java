@@ -36,8 +36,8 @@ public class OpeningHour {
         return opensAt != null && closesAt != null;
     }
 
-    /** Apertura inclusiva y cierre exclusivo. */
+    /** Apertura inclusiva y cierre exclusivo; la regla vive en {@link ScheduleSlot#contains}. */
     public boolean contains(LocalTime time) {
-        return isOpen() && !time.isBefore(opensAt) && time.isBefore(closesAt);
+        return ScheduleSlot.of(this).contains(time);
     }
 }

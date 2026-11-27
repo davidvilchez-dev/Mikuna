@@ -1,5 +1,6 @@
 package com.mikuna.backend.catalog.service;
 
+import com.mikuna.backend.common.cache.PublicCatalogChanged;
 import com.mikuna.backend.catalog.dto.AvailabilityRequest;
 import com.mikuna.backend.catalog.dto.PageResponse;
 import com.mikuna.backend.catalog.dto.ProductRequest;
@@ -23,6 +24,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -45,9 +47,12 @@ public class ProductService {
     private final ImageValidator imageValidator;
     private final CloudinaryImageStorage storage;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
 
     public ProductService(ProductRepository products, RestaurantRepository restaurants,
-            ImageValidator imageValidator, CloudinaryImageStorage storage, Clock clock) {
+            ImageValidator imageValidator, CloudinaryImageStorage storage, Clock clock,
+            ApplicationEventPublisher events) {
+        this.events = events;
         this.products = products;
         this.restaurants = restaurants;
         this.imageValidator = imageValidator;
@@ -68,6 +73,7 @@ public class ProductService {
         try {
             Product saved = products.saveAndFlush(Product.create(restaurant.getId(), data.name(), data.description(),
                     data.category(), data.price(), stored.secureUrl(), stored.publicId(), Instant.now(clock)));
+            events.publishEvent(PublicCatalogChanged.catalog(restaurant.getId()));
             return ProductResponse.from(saved);
         } catch (DataIntegrityViolationException duplicate) {
             storage.delete(stored.publicId());
@@ -120,6 +126,7 @@ public class ProductService {
             uploaded.forEach(storage::delete);
             throw failure;
         }
+        events.publishEvent(PublicCatalogChanged.catalog(target.getId()));
         return new CopyMenuResult(copied, skipped);
     }
 
@@ -158,6 +165,7 @@ public class ProductService {
         product.update(data.name(), data.description(), data.category(), data.price());
         try {
             Product saved = products.saveAndFlush(product);
+            events.publishEvent(PublicCatalogChanged.catalog(restaurant.getId()));
             if (previousImage != null) {
                 String toDelete = previousImage;
                 afterCommit(() -> storage.delete(toDelete));
@@ -183,7 +191,9 @@ public class ProductService {
         Product product = own(approvedRestaurant(ownerId), productId);
         requireVersion(request.version(), product);
         product.setAvailable(request.available());
-        return ProductResponse.from(saveStrict(product));
+        ProductResponse saved = ProductResponse.from(saveStrict(product));
+        events.publishEvent(PublicCatalogChanged.catalog(product.getRestaurantId()));
+        return saved;
     }
 
     /** Retiro lógico y definitivo; no borra la imagen (la referencia histórica de pedidos la necesitará). */
@@ -193,6 +203,7 @@ public class ProductService {
         requireVersion(version, product);
         product.withdraw(Instant.now(clock));
         saveStrict(product);
+        events.publishEvent(PublicCatalogChanged.catalog(product.getRestaurantId()));
     }
 
     private Restaurant approvedRestaurant(UUID ownerId) {

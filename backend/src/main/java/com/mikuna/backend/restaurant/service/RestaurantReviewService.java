@@ -1,5 +1,6 @@
 package com.mikuna.backend.restaurant.service;
 
+import com.mikuna.backend.common.cache.PublicCatalogChanged;
 import com.mikuna.backend.account.model.Account;
 import com.mikuna.backend.account.repository.AccountRepository;
 import com.mikuna.backend.common.exception.RegistrationValidationException;
@@ -14,6 +15,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,9 +32,11 @@ public class RestaurantReviewService {
     private final AccountRepository accounts;
     private final OrderEligibility eligibility;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
 
     public RestaurantReviewService(RestaurantRepository restaurants, AccountRepository accounts,
-            OrderEligibility eligibility, Clock clock) {
+            OrderEligibility eligibility, Clock clock, ApplicationEventPublisher events) {
+        this.events = events;
         this.restaurants = restaurants;
         this.accounts = accounts;
         this.eligibility = eligibility;
@@ -71,6 +75,7 @@ public class RestaurantReviewService {
         }
         Restaurant restaurant = restaurants.findById(restaurantId)
                 .orElseThrow(() -> new RestaurantNotFoundException("Solicitud no encontrada"));
+        events.publishEvent(PublicCatalogChanged.restaurants());
         return respond(restaurant);
     }
 

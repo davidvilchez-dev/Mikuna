@@ -1,5 +1,6 @@
 package com.mikuna.backend.restaurant.service;
 
+import com.mikuna.backend.common.cache.PublicCatalogChanged;
 import com.mikuna.backend.catalog.service.CloudinaryImageStorage;
 import com.mikuna.backend.catalog.service.CloudinaryImageStorage.StoredImage;
 import com.mikuna.backend.catalog.service.ImageValidator;
@@ -9,6 +10,7 @@ import com.mikuna.backend.restaurant.dto.RestaurantResponse;
 import com.mikuna.backend.restaurant.model.Restaurant;
 import com.mikuna.backend.restaurant.repository.RestaurantRepository;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,9 +23,11 @@ public class RestaurantImageService {
     private final RestaurantService restaurantService;
     private final ImageValidator validator;
     private final CloudinaryImageStorage storage;
+    private final ApplicationEventPublisher events;
 
     public RestaurantImageService(RestaurantRepository restaurants, RestaurantService restaurantService,
-            ImageValidator validator, CloudinaryImageStorage storage) {
+            ImageValidator validator, CloudinaryImageStorage storage, ApplicationEventPublisher events) {
+        this.events = events;
         this.restaurants = restaurants;
         this.restaurantService = restaurantService;
         this.validator = validator;
@@ -52,6 +56,7 @@ public class RestaurantImageService {
             restaurant.changeCover(stored.secureUrl(), stored.publicId());
         }
         restaurants.saveAndFlush(restaurant);
+        events.publishEvent(PublicCatalogChanged.restaurants());
         if (hasLogo && oldLogo != null) {
             storage.delete(oldLogo);
         }

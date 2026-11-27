@@ -1,0 +1,45 @@
+{
+  "escenario": "load",
+  "commit": "3aa13ba-wip",
+  "fecha": "2026-11-27T00:59:49.193Z",
+  "cache": "cache-pool25",
+  "instancias": 1,
+  "baseUrls": [
+    "http://localhost:8080"
+  ],
+  "datos": "load-tests/seed/seed.sql (200 restaurantes, 6000 productos, 300 clientes)",
+  "usuariosMaximos": 221,
+  "duracionMs": 482722.8833,
+  "flujos": [
+    {
+      "flow": "catalogo",
+      "p50": 2.4328,
+      "p95": 11.9999,
+      "p99": 44.59292199999981,
+      "errors": 0,
+      "ok": true
+    },
+    {
+      "flow": "login",
+      "p50": 1096.7037,
+      "p95": 2015.3300599999989,
+      "p99": 3420.7603,
+      "errors": 0,
+      "ok": false
+    },
+    {
+      "flow": "pedido",
+      "p50": 7.88335,
+      "p95": 21.732574999999994,
+      "p99": 59.26964900000007,
+      "errors": 0,
+      "ok": true
+    }
+  ],
+  "aciertosCache": {
+    "hits": 272771,
+    "misses": 127,
+    "proporcion": 0.9995346246582972
+  },
+  "umbralesCumplidos": false
+}

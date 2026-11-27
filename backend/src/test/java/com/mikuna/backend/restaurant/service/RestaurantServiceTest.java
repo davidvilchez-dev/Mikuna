@@ -67,7 +67,8 @@ class RestaurantServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new RestaurantService(restaurants, accounts, new OrderEligibility(CLOCK, "America/Lima"), CLOCK);
+        service = new RestaurantService(restaurants, accounts, new OrderEligibility(CLOCK, "America/Lima"), CLOCK,
+                event -> { });
         Account account = TestAccounts.account(Role.RESTAURANT, "local@mail.com", "{hash}");
         when(accounts.findById(owner)).thenReturn(Optional.of(account));
         when(restaurants.saveAndFlush(any(Restaurant.class))).thenAnswer(call -> call.getArgument(0));

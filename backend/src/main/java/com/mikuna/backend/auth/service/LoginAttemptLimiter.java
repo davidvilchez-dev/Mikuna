@@ -1,103 +1,93 @@
 package com.mikuna.backend.auth.service;
 
 import com.mikuna.backend.common.exception.LoginRateLimitedException;
+import com.mikuna.backend.common.ratelimit.InMemorySlidingWindowCounter;
+import com.mikuna.backend.common.ratelimit.SlidingWindowCounter;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.HexFormat;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 /**
  * Freno a la fuerza bruta en el inicio de sesión. Cuenta solo los intentos fallidos, por correo normalizado y por
  * IP, en una ventana deslizante; al llegar al máximo se rechaza con 429 antes de comprobar la contraseña. Un
- * acceso correcto borra los fallos de esa cuenta. Vive en memoria (una sola instancia del backend) y se reinicia
- * con la aplicación.
+ * acceso correcto borra los fallos de esa cuenta. Con el perfil "redis" el conteo se comparte entre instancias
+ * (spec 015); si no, vive en la memoria de la instancia. Las claves llevan un hash del correo y de la IP, nunca el
+ * dato en claro.
  */
 @Component
 @EnableConfigurationProperties(LoginProperties.class)
 public class LoginAttemptLimiter {
 
-    private final Clock clock;
     private final LoginProperties properties;
-    private final Map<String, Deque<Instant>> byAccount = new ConcurrentHashMap<>();
-    private final Map<String, Deque<Instant>> byIp = new ConcurrentHashMap<>();
+    private final SlidingWindowCounter counter;
 
-    public LoginAttemptLimiter(Clock clock, LoginProperties properties) {
-        this.clock = clock;
+    @Autowired
+    public LoginAttemptLimiter(LoginProperties properties, SlidingWindowCounter counter) {
         this.properties = properties;
+        this.counter = counter;
+    }
+
+    /** Una sola instancia, en memoria (pruebas unitarias). */
+    public LoginAttemptLimiter(Clock clock, LoginProperties properties) {
+        this(properties, new InMemorySlidingWindowCounter(clock));
     }
 
     /** Lanza {@link LoginRateLimitedException} si la cuenta o la IP agotaron sus intentos. */
     public void check(String email, String ip) {
-        Instant now = clock.instant();
-        long wait = Math.max(waitSeconds(byAccount, email, properties.maxFailuresPerAccount(), now),
-                waitSeconds(byIp, ip, properties.maxFailuresPerIp(), now));
+        long wait = Math.max(waitSeconds(accountKey(email), properties.maxFailuresPerAccount()),
+                waitSeconds(ipKey(ip), properties.maxFailuresPerIp()));
         if (wait > 0) {
             throw new LoginRateLimitedException(wait);
         }
     }
 
     public void recordFailure(String email, String ip) {
-        Instant now = clock.instant();
-        add(byAccount, email, now);
-        add(byIp, ip, now);
-        purge(now.minus(properties.window()));
+        record(accountKey(email));
+        record(ipKey(ip));
     }
 
     /** Acceso correcto: la cuenta empieza de cero; los fallos de la IP se conservan. */
     public void recordSuccess(String email) {
-        byAccount.remove(email);
+        String key = accountKey(email);
+        if (key != null) {
+            counter.clear(key);
+        }
     }
 
     /** Solo para pruebas: olvida todos los intentos. */
     public void reset() {
-        byAccount.clear();
-        byIp.clear();
+        counter.clearAll();
     }
 
-    private long waitSeconds(Map<String, Deque<Instant>> map, String key, int max, Instant now) {
-        if (key == null) {
-            return 0;
-        }
-        Instant limit = now.minus(properties.window());
-        long[] wait = {0};
-        map.computeIfPresent(key, (k, stamps) -> {
-            prune(stamps, limit);
-            if (stamps.size() >= max) {
-                // Se libera cuando el fallo que completa el máximo sale de la ventana.
-                Instant oldestCounted = stamps.stream().skip(stamps.size() - max).findFirst().orElseThrow();
-                wait[0] = Math.max(1, Duration.between(now, oldestCounted.plus(properties.window())).toSeconds() + 1);
-            }
-            return stamps.isEmpty() ? null : stamps;
-        });
-        return wait[0];
+    private long waitSeconds(String key, int max) {
+        return key == null ? 0 : counter.waitSeconds(key, max, properties.window());
     }
 
-    private void add(Map<String, Deque<Instant>> map, String key, Instant now) {
-        if (key == null) {
-            return;
-        }
-        map.compute(key, (k, stamps) -> {
-            Deque<Instant> window = stamps == null ? new ArrayDeque<>() : stamps;
-            window.addLast(now);
-            return window;
-        });
-    }
-
-    private static void prune(Deque<Instant> stamps, Instant limit) {
-        while (!stamps.isEmpty() && !stamps.peekFirst().isAfter(limit)) {
-            stamps.pollFirst();
+    private void record(String key) {
+        if (key != null) {
+            counter.record(key, properties.window());
         }
     }
 
-    /** Se ejecuta en cada fallo para que las claves sin fallos recientes no se acumulen en memoria. */
-    private void purge(Instant limit) {
-        // Una purga que coincida con un alta concurrente solo puede perder un conteo: aceptable.
-        byAccount.values().removeIf(stamps -> stamps.isEmpty() || !stamps.peekLast().isAfter(limit));
-        byIp.values().removeIf(stamps -> stamps.isEmpty() || !stamps.peekLast().isAfter(limit));
+    private static String accountKey(String email) {
+        return email == null ? null : "login:acct:" + sha256(email);
+    }
+
+    private static String ipKey(String ip) {
+        return ip == null ? null : "login:ip:" + sha256(ip);
+    }
+
+    private static String sha256(String value) {
+        try {
+            return HexFormat.of().formatHex(
+                    MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("SHA-256 no disponible", impossible);
+        }
     }
 }

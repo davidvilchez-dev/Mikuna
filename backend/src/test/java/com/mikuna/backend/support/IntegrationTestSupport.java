@@ -17,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.cache.CacheManager;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -46,6 +47,9 @@ public abstract class IntegrationTestSupport {
 
     @Autowired
     private LoginAttemptLimiter loginAttempts;
+
+    @Autowired
+    protected CacheManager cacheManager;
 
     /** Cloudinary nunca se llama en las pruebas; por defecto devuelve una imagen fija. */
     @MockitoBean
@@ -83,6 +87,12 @@ public abstract class IntegrationTestSupport {
         jdbc.update("delete from horarios_restaurante");
         jdbc.update("delete from restaurantes");
         accounts.deleteAll();
+        clearCaches();
+    }
+
+    /** Las cachés públicas (spec 015) sobreviven entre pruebas del mismo contexto: se vacían en cada una. */
+    protected void clearCaches() {
+        cacheManager.getCacheNames().forEach(name -> cacheManager.getCache(name).clear());
     }
 
     protected String loginAndGetToken(String email) throws Exception {
@@ -113,5 +123,7 @@ public abstract class IntegrationTestSupport {
 
     protected void disable(UUID accountId) {
         jdbc.update("update cuentas set status = 'DISABLED' where id = ?", accountId);
+        // Cambia la visibilidad sin pasar por los servicios, que son los que descartan la caché.
+        clearCaches();
     }
 }

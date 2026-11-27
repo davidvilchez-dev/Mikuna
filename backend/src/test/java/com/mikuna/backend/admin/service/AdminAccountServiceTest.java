@@ -51,7 +51,8 @@ class AdminAccountServiceTest {
         actions = mock(AdminAccountActionRepository.class);
         restaurants = mock(RestaurantRepository.class);
         queries = mock(AdminAccountQueryService.class);
-        service = new AdminAccountService(accounts, actions, restaurants, queries, Clock.fixed(NOW, ZoneOffset.UTC));
+        service = new AdminAccountService(accounts, actions, restaurants, queries, Clock.fixed(NOW, ZoneOffset.UTC),
+                event -> { });
     }
 
     @Test

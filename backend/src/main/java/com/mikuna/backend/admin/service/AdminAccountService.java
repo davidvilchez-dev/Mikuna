@@ -1,5 +1,6 @@
 package com.mikuna.backend.admin.service;
 
+import com.mikuna.backend.common.cache.PublicCatalogChanged;
 import com.mikuna.backend.account.model.Account;
 import com.mikuna.backend.account.model.AccountStatus;
 import com.mikuna.backend.account.model.Role;
@@ -16,6 +17,7 @@ import com.mikuna.backend.restaurant.repository.RestaurantRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,9 +35,12 @@ public class AdminAccountService {
     private final RestaurantRepository restaurants;
     private final AdminAccountQueryService queries;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
 
     public AdminAccountService(AdminAccountQueryRepository accounts, AdminAccountActionRepository actions,
-            RestaurantRepository restaurants, AdminAccountQueryService queries, Clock clock) {
+            RestaurantRepository restaurants, AdminAccountQueryService queries, Clock clock,
+            ApplicationEventPublisher events) {
+        this.events = events;
         this.accounts = accounts;
         this.actions = actions;
         this.restaurants = restaurants;
@@ -53,6 +58,7 @@ public class AdminAccountService {
         AccountStatus to = enabled ? AccountStatus.ENABLED : AccountStatus.DISABLED;
         if (accounts.updateStatus(accountId, from.name(), to.name()) == 1) {
             record(accountId, ActionScope.ACCESS, enabled, adminId);
+            restaurantVisibilityChanged(account.getRole());
         }
         return queries.userDetail(accountId);
     }
@@ -75,6 +81,14 @@ public class AdminAccountService {
                 .orElseThrow(AccountNotFoundException::new);
         if (accounts.updateOperation(account.getId(), active, role.name()) == 1) {
             record(account.getId(), ActionScope.OPERATION, active, adminId);
+            restaurantVisibilityChanged(role);
+        }
+    }
+
+    /** Habilitar o no la cuenta de un titular cambia qué restaurantes ve el público (spec 015). */
+    private void restaurantVisibilityChanged(Role role) {
+        if (role == Role.RESTAURANT) {
+            events.publishEvent(PublicCatalogChanged.restaurants());
         }
     }
 

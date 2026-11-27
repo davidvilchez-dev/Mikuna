@@ -1,0 +1,132 @@
+El paginador no se usar�.
+ANALYZE
+== 1. Restaurantes visibles (findVisible, se ejecuta al llenar la instantánea)
+                                                                                                                                                               QUERY PLAN                                                                                                                                                                
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ HashAggregate (actual time=2.513..2.992 rows=1400 loops=1)
+   Group Key: r.available, r.latitude, r.longitude, r.resolved_at, r.submitted_at, r.version, r.id, r.owner_id, r.resolved_by, r.phone, r.category, r.name, r.zone, r.address, r.cover_public_id, r.logo_public_id, r.description, r.rejection_reason, r.cover_url, r.logo_url, h.closes_at, h.opens_at, h.day_of_week, h.restaurante_id
+   Batches: 1  Memory Usage: 857kB
+   Buffers: shared hit=34
+   ->  Hash Join (actual time=0.287..1.261 rows=1400 loops=1)
+         Hash Cond: (r.owner_id = a.id)
+         Buffers: shared hit=34
+         ->  Hash Right Join (actual time=0.107..0.712 rows=1400 loops=1)
+               Hash Cond: (h.restaurante_id = r.id)
+               Buffers: shared hit=19
+               ->  Seq Scan on horarios_restaurante h (actual time=0.006..0.096 rows=1400 loops=1)
+                     Buffers: shared hit=13
+               ->  Hash (actual time=0.093..0.093 rows=200 loops=1)
+                     Buckets: 1024  Batches: 1  Memory Usage: 54kB
+                     Buffers: shared hit=6
+                     ->  Seq Scan on restaurantes r (actual time=0.015..0.058 rows=200 loops=1)
+                           Filter: ((status)::text = 'APPROVED'::text)
+                           Buffers: shared hit=6
+         ->  Hash (actual time=0.170..0.171 rows=501 loops=1)
+               Buckets: 1024  Batches: 1  Memory Usage: 32kB
+               Buffers: shared hit=15
+               ->  Seq Scan on cuentas a (actual time=0.006..0.106 rows=501 loops=1)
+                     Filter: (operation_enabled AND ((status)::text = 'ENABLED'::text))
+                     Buffers: shared hit=15
+ Planning:
+   Buffers: shared hit=210
+ Planning Time: 6.294 ms
+ Execution Time: 3.254 ms
+(28 filas)
+
+== 2. Portada de respaldo de todos los restaurantes (una sola consulta, DISTINCT ON)
+                                          QUERY PLAN                                          
+----------------------------------------------------------------------------------------------
+ Unique (actual time=16.425..17.190 rows=200 loops=1)
+   Buffers: shared hit=188
+   ->  Sort (actual time=16.423..16.799 rows=6000 loops=1)
+         Sort Key: productos.restaurant_id, productos.category, productos.name
+         Sort Method: quicksort  Memory: 896kB
+         Buffers: shared hit=188
+         ->  Hash Join (actual time=0.151..2.923 rows=6000 loops=1)
+               Hash Cond: (productos.restaurant_id = restaurantes.id)
+               Buffers: shared hit=188
+               ->  Seq Scan on productos (actual time=0.024..0.871 rows=6000 loops=1)
+                     Filter: (active AND available)
+                     Buffers: shared hit=182
+               ->  Hash (actual time=0.114..0.115 rows=200 loops=1)
+                     Buckets: 1024  Batches: 1  Memory Usage: 18kB
+                     Buffers: shared hit=6
+                     ->  Seq Scan on restaurantes (actual time=0.010..0.061 rows=200 loops=1)
+                           Buffers: shared hit=6
+ Planning:
+   Buffers: shared hit=55
+ Planning Time: 3.914 ms
+ Execution Time: 17.391 ms
+(21 filas)
+
+== 3. Carta pública de un restaurante (activos y disponibles, en orden de carta)
+                                                   QUERY PLAN                                                   
+----------------------------------------------------------------------------------------------------------------
+ Sort (actual time=0.177..0.178 rows=30 loops=1)
+   Sort Key: category, name
+   Sort Method: quicksort  Memory: 32kB
+   Buffers: shared hit=32
+   ->  Bitmap Heap Scan on productos (actual time=0.058..0.097 rows=30 loops=1)
+         Recheck Cond: ((restaurant_id = 'ad59fe70-c197-d374-c258-cfad09309a45'::uuid) AND active)
+         Filter: available
+         Heap Blocks: exact=30
+         Buffers: shared hit=32
+         ->  Bitmap Index Scan on uk_productos_activo (actual time=0.045..0.045 rows=30 loops=1)
+               Index Cond: ((restaurant_id = 'ad59fe70-c197-d374-c258-cfad09309a45'::uuid) AND (active = true))
+               Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=39
+ Planning Time: 0.444 ms
+ Execution Time: 0.220 ms
+(16 filas)
+
+== 4. Inicio de sesión: cuenta por correo
+                                       QUERY PLAN                                       
+----------------------------------------------------------------------------------------
+ Index Scan using uk_cuentas_email on cuentas (actual time=0.036..0.037 rows=1 loops=1)
+   Index Cond: ((email)::text = 'carga150@mikuna.test'::text)
+   Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=15
+ Planning Time: 0.145 ms
+ Execution Time: 0.050 ms
+(7 filas)
+
+== 5. Pedidos del cliente (historial, más recientes primero)
+                                     QUERY PLAN                                     
+------------------------------------------------------------------------------------
+ Limit (actual time=0.012..0.013 rows=0 loops=1)
+   ->  Sort (actual time=0.011..0.012 rows=0 loops=1)
+         Sort Key: created_at DESC
+         Sort Method: quicksort  Memory: 25kB
+         ->  Seq Scan on pedidos (actual time=0.008..0.008 rows=0 loops=1)
+               Filter: (customer_id = '0a86fcf6-1bf9-ee22-9aa8-a9d1dabfe33c'::uuid)
+ Planning:
+   Buffers: shared hit=95 read=6
+ Planning Time: 4.992 ms
+ Execution Time: 0.033 ms
+(10 filas)
+
+== 6. Pedidos del restaurante por estado (panel)
+                                                          QUERY PLAN                                                           
+-------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=0.017..0.018 rows=0 loops=1)
+   ->  Sort (actual time=0.017..0.017 rows=0 loops=1)
+         Sort Key: created_at DESC
+         Sort Method: quicksort  Memory: 25kB
+         ->  Seq Scan on pedidos (actual time=0.011..0.011 rows=0 loops=1)
+               Filter: ((restaurant_id = 'ad59fe70-c197-d374-c258-cfad09309a45'::uuid) AND ((status)::text = 'PENDING'::text))
+ Planning:
+   Buffers: shared hit=6
+ Planning Time: 0.392 ms
+ Execution Time: 0.049 ms
+(10 filas)
+
+== Índices de productos
+         indexname         |                                                        indexdef                                                         
+---------------------------+-------------------------------------------------------------------------------------------------------------------------
+ idx_productos_restaurante | CREATE INDEX idx_productos_restaurante ON public.productos USING btree (restaurant_id, active, available)
+ productos_pkey            | CREATE UNIQUE INDEX productos_pkey ON public.productos USING btree (id)
+ uk_productos_activo       | CREATE UNIQUE INDEX uk_productos_activo ON public.productos USING btree (restaurant_id, name_key, category_key, active)
+(3 filas)
+

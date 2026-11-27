@@ -48,7 +48,8 @@ public class SecurityConfig {
                         // ya se resolvió en la petición original, así que ASYNC y ERROR no se vuelven a evaluar.
                         .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/liveness",
+                                "/actuator/health/readiness").permitAll()
                         // RF-09/RF-10 son públicos (constitución III): solo lectura de datos comerciales.
                         .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
                         .requestMatchers("/error").permitAll()
@@ -58,6 +59,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/courier/**").hasRole("COURIER")
                         .requestMatchers("/api/notifications/**").hasAnyRole("CUSTOMER", "RESTAURANT", "COURIER")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        // Métricas de Actuator (aciertos de caché, spec 015): solo el administrador; la salud es pública.
+                        .requestMatchers("/actuator/metrics/**", "/actuator/metrics").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth
                         .jwt(Customizer.withDefaults())

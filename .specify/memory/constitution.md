@@ -1,14 +1,3 @@
-<!--
-Sync Impact Report (temporal; retirar antes del commit)
-Version change: 4.0.0 -> 5.0.0 (MAJOR: se redefine "NO hay reembolsos" y el flujo de estados)
-Principios modificados: IV (cancelación administrativa desde Aceptado hasta Recogido; reembolso total
-  solo en ese caso; efectivo cobrado al entregar).
-Secciones modificadas: alcance (fuera solo reembolsos parciales o a pedido del cliente), Governance
-  (aprobación 5.0.0 y versión).
-Secciones añadidas/eliminadas: ninguna. RF/RNF sin cambios de texto; RF-16 se amplía por el 014.
-TODO: ninguno. Specs 006/007 citan "sin reembolsos" como contexto histórico; no se reescriben.
--->
-
 # Mikuna Constitution
 
 ## Core Principles
@@ -49,9 +38,10 @@ sin depender de servicios externos reales en las pruebas unitarias.
 
 ### III. Seguridad verificable
 
-- El desarrollo en localhost DEBE utilizar HTTP. NO DEBEN prepararse certificados, autoridades
-  certificadoras ni TLS local. La comprobación de HTTPS del despliegue queda aplazada;
-  RNF-06 NO DEBE declararse cumplido por una ejecución local.
+- El desarrollo en localhost DEBE utilizar HTTP. NO DEBEN prepararse en el equipo local
+  certificados, autoridades certificadoras, llaves privadas ni configuración HTTPS, SSL o TLS
+  (decisión reiterada del usuario del 2026-11-26: rompía la ejecución local). La comprobación de
+  HTTPS del despliegue queda aplazada; RNF-06 NO DEBE declararse cumplido por una ejecución local.
 - Las únicas integraciones externas permitidas son Cloudinary para imágenes, el servicio de
   correo electrónico, desde el incremento 006 (decisión del usuario del 2026-11-17) Stripe
   exclusivamente en modo de pruebas (sandbox) y, desde el incremento 013 (decisión del usuario
@@ -133,15 +123,17 @@ comprobando el estado persistido. No se requieren servicios distribuidos para es
   exclusiones justificadas. NO DEBEN excluirse reglas, validaciones o transiciones de negocio
   para alcanzar el umbral ni diluirlo con código generado. Sin lógica de negocio, la medición
   DEBE registrarse como no aplicable, sin atribuir 100 % ni cumplimiento completo de RNF-11.
-- Playwright PUEDE permanecer instalado en el frontend para uso manual del responsable del
-  proyecto (decisión del usuario del 2026-11-17). Los agentes NO DEBEN configurarlo, ampliarlo
-  ni ejecutarlo, y sus pruebas NO son condición de aceptación. Las pruebas E2E automatizadas
-  de navegador siguen aplazadas y NO DEBEN sustituirse por otra herramienta para el mismo trabajo.
+- Desde la enmienda 6.0.0 (decisión del usuario del 2026-11-26) los agentes PUEDEN configurar,
+  ampliar y ejecutar pruebas E2E con Playwright, sin sustituirlo por otra herramienta para el mismo
+  trabajo. Las E2E NO DEBEN llamar a Stripe ni a Gemini reales ni exigir TLS local.
 - Las pruebas unitarias NO DEBEN llamar a Stripe ni a Gemini reales; DEBEN usar dobles (Mockito).
   Las pruebas contra el sandbox de Stripe o contra Gemini son opcionales y manuales.
 - Se DEBEN verificar compilación, funcionamiento local y reglas relevantes del incremento.
   Las comprobaciones aprobadas NO DEBEN repetirse sin cambios, fallos o dudas concretas que
-  lo justifiquen. CI/CD y publicación de cobertura en CI quedan aplazados.
+  lo justifiquen. La integración continua DEBE ejecutar las pruebas y publicar la cobertura como
+  evidencia; el despliegue continuo queda aplazado.
+- Las pruebas de carga con k6 se PERMITEN en local desde la enmienda 6.0.0; sus resultados
+  locales NO acreditan los RNF de producción.
 
 **Verificación:** resultados reproducibles de las comprobaciones locales pertinentes y cobertura
 de negocio. El porcentaje no sustituye comprobar reglas y criterios de aceptación.
@@ -205,6 +197,7 @@ comercio, reembolsos parciales o a pedido del cliente y conciliación contable.
 | Backend | Una aplicación Java + Spring Boot organizada por funcionalidades. |
 | Persistencia | PostgreSQL local mediante Spring Data JPA; base creada manualmente por el usuario. |
 | Configuración | `src/main/resources/application.properties` del backend. |
+| Caché | Redis opcional en local mediante contenedor (desde el 015); sin él, caché en memoria. La aplicación DEBE arrancar sin Redis ni contenedores. |
 | Integraciones permitidas | Cloudinary, correo (Resend según la propuesta), Stripe solo en modo de pruebas y Gemini en plan gratuito (asistente, desde el 013), solo cuando sean necesarios y con cifrado. |
 
 La conexión PostgreSQL, el puerto y, cuando correspondan, los parámetros de correo y Cloudinary
@@ -219,21 +212,24 @@ esquema que dejaba `ddl-auto=update`; las bases previas se marcan en ella sin ej
 
 ### Registro explícito de aplazamientos
 
-- **Cloud y entrega:** NO DEBEN realizarse configuraciones, despliegues, investigaciones ni
-  comparaciones sobre AWS u otros proveedores. Quedan aplazados infraestructura como código,
+- **Cloud y entrega:** NO DEBEN realizarse configuraciones ni despliegues sobre AWS u otros
+  proveedores, ni añadirse archivos o carpetas de infraestructura (decisión reiterada del usuario
+  del 2026-11-26). Las specs PUEDEN describir el destino previsto (AWS en capa gratuita) solo como
+  contexto de dimensionamiento. Quedan aplazados infraestructura como código,
   balanceadores, escalamiento, réplicas, CDN, monitoreo cloud y despliegue continuo (el job de
   despliegue del frontend permanece inactivo mientras no se configure su destino). La
   integración continua (GitHub Actions que verifica frontend y backend en cada cambio) sí está
   permitida.
-- **Infraestructura adicional:** Redis, RabbitMQ, workers separados, contenedores y demás
-  infraestructura adicional quedan aplazados. El correo que se necesite NO DEBE exigirlos.
+- **Infraestructura adicional:** desde la enmienda 6.0.0 se permiten Redis y su contenedor local,
+  siempre opcionales para ejecutar la aplicación. RabbitMQ, workers separados y demás
+  infraestructura adicional siguen aplazados. El correo que se necesite NO DEBE exigirlos.
 - **Otras integraciones:** MapTiler y FCM quedan como referencias aplazadas de mapas y
   notificaciones push; no se permite integrarlos durante esta etapa. Cloudinary, correo, Stripe
   (solo pruebas, desde el incremento 006) y Gemini (plan gratuito, desde el incremento 013) se
   preparan exclusivamente cuando sean necesarios para la funcionalidad actual.
-- **Verificaciones posteriores:** HTTPS del despliegue, E2E automatizadas de navegador,
-  validación de infraestructura y evaluaciones de carga y disponibilidad correspondientes
-  quedan pendientes. NO DEBEN prepararse certificados ni TLS local para anticiparlas.
+- **Verificaciones posteriores:** HTTPS del despliegue, validación de infraestructura y
+  evaluaciones de carga y disponibilidad en la nube quedan pendientes. NO DEBEN prepararse
+  certificados ni TLS local para anticiparlas.
 
 La arquitectura cloud de la propuesta queda como antecedente aplazado, sin obligación de
 prepararla durante esta etapa. Su abordaje posterior requiere una planificación explícita.
@@ -287,24 +283,24 @@ distinguirse de la validación futura. Esta tabla define aplicabilidad, no certi
 
 | Código | Objetivo conservado | Aplicación y evidencia durante esta etapa |
 | --- | --- | --- |
-| RNF-01 | Al menos el 95 % de consultas de restaurantes, catálogo y estado en menos de 2 s con 1 000 usuarios concurrentes. | Validación de carga aplazada; las comprobaciones funcionales locales no acreditan este objetivo. |
-| RNF-02 | Con 3 instancias atender al menos el doble de usuarios que con 1, sin cambiar la lógica. | Escalamiento y corridas comparables aplazados. |
-| RNF-03 | Atender desde caché al menos el 80 % de consultas repetidas de restaurantes y catálogo. | Caché y medición de aciertos aplazadas. |
+| RNF-01 | Al menos el 95 % de consultas de restaurantes, catálogo y estado en menos de 2 s con 1 000 usuarios concurrentes. | Carga con k6 en local desde el 015 (objetivo medido de 200 usuarios); la evaluación en producción sigue pendiente. |
+| RNF-02 | Con 3 instancias atender al menos el doble de usuarios que con 1, sin cambiar la lógica. | Coherencia con dos instancias comprobada en local desde el 015; escalamiento en la nube aplazado. |
+| RNF-03 | Atender desde caché al menos el 80 % de consultas repetidas de restaurantes y catálogo. | Caché y medición de aciertos en el 015. |
 | RNF-04 | Continuar atendiendo si cae una instancia y otras siguen disponibles. | Infraestructura redundante y prueba de caída aplazadas. |
 | RNF-05 | No asignar simultáneamente una entrega a más de un repartidor. | Aplicable al implementar asignación; integración concurrente y estado persistido único. |
 | RNF-06 | HTTPS cliente/plataforma y redirección o rechazo de HTTP en despliegue. | Aplazado para despliegue; desarrollo local por HTTP sin certificados ni TLS local. La integración local con Stripe de pruebas no lo acredita. |
 | RNF-07 | Denegar el 100 % de accesos sin autenticación o permisos a operaciones protegidas. | Aplicable; pruebas por rol, recurso, 401/403 y rutas públicas declaradas. |
 | RNF-08 | No almacenar datos sensibles de tarjetas y delegar su procesamiento a una pasarela cifrada. | Prohibición de almacenamiento vigente; integración con Stripe de pruebas desde el 006; evidencia completa del despliegue aplazada. |
-| RNF-09 | Un usuario nuevo completa el pedido desde búsqueda hasta confirmación en menos de 5 min y sin ayuda. | Evaluación cronometrada con cinco personas cuando exista el flujo; E2E automatizadas aplazadas. |
+| RNF-09 | Un usuario nuevo completa el pedido desde búsqueda hasta confirmación en menos de 5 min y sin ayuda. | Evaluación cronometrada con cinco personas cuando exista el flujo; E2E con Playwright permitidas desde la 6.0.0. |
 | RNF-10 | Visualizar CPU, tiempo de respuesta y tasa de errores durante operación y carga. | Monitoreo cloud y evidencia del panel durante carga aplazados. |
-| RNF-11 | Al menos 90 % de líneas de lógica de negocio y reporte de ramas sin umbral obligatorio. | Pruebas y reporte locales; publicación en CI aplazada y sin extender el umbral a toda la presentación. |
-| RNF-12 | Cada cambio en la rama principal ejecuta pruebas y, si pasan, se despliega sin intervención manual. | CI/CD y su historial de evidencia aplazados; no bloquean la aceptación local. |
+| RNF-11 | Al menos 90 % de líneas de lógica de negocio y reporte de ramas sin umbral obligatorio. | Pruebas y reporte locales y publicados en CI, sin extender el umbral a toda la presentación. |
+| RNF-12 | Cada cambio en la rama principal ejecuta pruebas y, si pasan, se despliega sin intervención manual. | CI activo en frontend y backend; el despliegue automático queda aplazado y no bloquea la aceptación local. |
 
 Los aproximadamente **10 000 usuarios** siguen siendo una referencia de diseño; **1 000 usuarios
-concurrentes** son el objetivo futuro de RNF-01. Para la futura evaluación de carga se conservan
-k6, p(95) < 2 000 ms y tasa de errores inferior al 1 % de la propuesta, sin preparar ni ejecutar
-esa evaluación en esta etapa. Sus informes deberán registrar versión, datos, duración y
-configuración para ser reproducibles; el perfil se definirá cuando corresponda abordarlo.
+concurrentes** son el objetivo futuro de RNF-01. La evaluación de carga usa k6, p(95) < 2 000 ms y
+tasa de errores inferior al 1 % de la propuesta; desde el 015 se ejecuta en local con 200 usuarios
+como objetivo medido. Sus informes DEBEN registrar versión, datos, duración y configuración para
+ser reproducibles.
 
 ## Desarrollo incremental y criterios de aceptación
 
@@ -330,7 +326,7 @@ una explicación breve, sin diseñar por anticipado toda la plataforma.
 - Evidencia de los requisitos aplicables al flujo que se declara terminado. La verificación
   futura DEBE registrarse como pendiente, sin confundirse con cumplimiento.
 - Los aplazamientos de esta etapa NO DEBEN generar tareas obligatorias de cloud, TLS local,
-  infraestructura adicional, E2E de navegador ni CI/CD para aceptar el incremento.
+  infraestructura adicional ni despliegue continuo para aceptar el incremento.
 
 ### Reglas de negocio pendientes y decisiones rutinarias
 
@@ -364,6 +360,9 @@ La enmienda 4.0.0 (Flyway con `ddl-auto=validate` en lugar de `ddl-auto=update`,
 continua del backend) cuenta con la aprobación explícita del usuario del 2026-11-25.
 La enmienda 5.0.0 (cancelación administrativa tras aceptar con reembolso total, y cobro del
 efectivo al entregar; incremento 014) cuenta con la aprobación explícita del usuario del 2026-11-25.
+La enmienda 6.0.0 (Redis local opcional, k6, Playwright E2E por agentes y cobertura en CI;
+prohibición reiterada de TLS local y de configuración de AWS; incremento 015) cuenta con la
+aprobación explícita del usuario del 2026-11-26.
 Un conflicto nuevo sobre alcance o reglas de negocio DEBE consultarse cuando afecte al incremento.
 Las decisiones rutinarias se resuelven conforme al principio VII.
 
@@ -376,7 +375,7 @@ revisión, que se retirará antes del commit.
 La revisión de cada incremento DEBE comprobar los siete principios y la evidencia aplicable.
 Los incumplimientos del alcance implementado DEBEN resolverse antes de aceptarlo. Los servicios
 y RNF aplazados NO DEBEN declararse cumplidos ni bloquear la entrega local por su preparación.
-La infraestructura futura y las pruebas E2E se abordarán después mediante una decisión explícita
+La infraestructura cloud futura se abordará después mediante una decisión explícita
 y la planificación correspondiente.
 
-**Version**: 5.0.0 | **Ratified**: 2026-11-12 | **Last Amended**: 2026-11-25
+**Version**: 6.0.0 | **Ratified**: 2026-11-12 | **Last Amended**: 2026-11-26
