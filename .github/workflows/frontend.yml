@@ -37,6 +37,9 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Lint
         run: pnpm lint
+      - name: Unit tests and coverage
+        # Falla si la cobertura de líneas baja del umbral definido en vite.config.ts.
+        run: pnpm test:coverage
       - name: Check browser-test types
         run: pnpm typecheck:e2e
       - name: Build
@@ -51,6 +54,7 @@ jobs:
         with:
           name: frontend-evidence-${{ github.sha }}
           path: |
+            frontend/coverage/
             frontend/playwright-report/
             frontend/test-results/
           if-no-files-found: warn
