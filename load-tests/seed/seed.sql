@@ -7,6 +7,8 @@
 -- Clientes: carga1@mikuna.test .. carga300@mikuna.test   Administrador: admin-carga@mikuna.test
 
 \set ON_ERROR_STOP on
+-- El archivo está en UTF-8; sin esto, psql en Windows lo lee con la página de códigos local (WIN1252).
+SET client_encoding = 'UTF8';
 
 DO $$
 BEGIN

@@ -13,6 +13,7 @@
     "test:coverage": "vitest run --coverage",
     "typecheck:e2e": "tsc --noEmit --project tsconfig.e2e.json",
     "test:e2e": "playwright test",
+    "test:e2e:flujos": "playwright test --config playwright.flujos.config.ts",
     "test:e2e:report": "playwright show-report"
   },
   "dependencies": {

@@ -5,8 +5,10 @@ build/
 target/
 coverage/
 playwright-report/
+playwright-report-flujos/
 blob-report/
 test-results/
+test-results-flujos/
 logs/
 *.log
 *.tmp

@@ -11,6 +11,8 @@ const windows = [
 
 export default defineConfig({
   testDir: './tests/e2e',
+  // Los flujos con backend real tienen su propia configuración (playwright.flujos.config.ts).
+  testIgnore: '**/flujos/**',
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,

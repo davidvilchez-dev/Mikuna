@@ -1,0 +1,90 @@
+name: Mikuna E2E de flujos
+
+# Pruebas de navegador de flujos completos (registro, pedido, restaurante y administración) contra el backend real
+# y PostgreSQL. Las claves son ficticias de prueba: los flujos pagan en efectivo y no suben imágenes, así que nunca
+# llaman a Stripe, Cloudinary ni Gemini.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mikuna-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flujos:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mikuna_e2e_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mikuna_e2e_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      MIKUNA_JWT_SECRET: e2e-secreto-solo-para-ci-no-es-real-32-bytes-o-mas
+      STRIPE_SECRET_KEY: sk_test_e2e_ficticia
+      STRIPE_PUBLISHABLE_KEY: pk_test_e2e_ficticia
+      CLOUDINARY_CLOUDNAME: e2e
+      CLOUDINARY_APIKEY: e2e
+      CLOUDINARY_APISECRET: e2e
+      MIKUNA_DELIVERY_DISTRICTS: Ayacucho,San Juan Bautista,Carmen Alto
+      MIKUNA_DELIVERY_FEE: '5.00'
+      MIKUNA_COMMISSION_RATE: '5'
+      GEMINI_API_KEY: ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Java 25
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Compile backend
+        working-directory: backend
+        run: sh ./mvnw -B -ntp -q -DskipTests compile
+      - name: Node 24.14.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.14.0'
+          package-manager-cache: false
+      - name: pnpm 12.4.2
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: '12.4.2'
+          package_json_file: frontend/package.json
+          run_install: false
+          cache: false
+      - name: Install from lock
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+      - name: E2E flows
+        working-directory: frontend
+        run: pnpm test:e2e:flujos
+      - name: E2E evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-flujos-${{ github.sha }}
+          path: |
+            frontend/playwright-report-flujos/
+            frontend/test-results-flujos/
+          if-no-files-found: warn
+          retention-days: 14
